@@ -316,6 +316,41 @@ export function TaskBrief({ item, task, onGone }: Props) {
 
       <section className="dossier-card">
         <header>
+          <h3>Deadlines</h3>
+          <p>Task, dev, review and test dates.</p>
+        </header>
+        <TaskDueRail
+          item={item}
+          values={{ dueAt, devDueAt, reviewDueAt, testDueAt }}
+          onChange={(key, next) => {
+            if (key === 'dueAt') setDueAt(next)
+            if (key === 'devDueAt') setDevDueAt(next)
+            if (key === 'reviewDueAt') setReviewDueAt(next)
+            if (key === 'testDueAt') setTestDueAt(next)
+          }}
+          onCommit={(key, raw) => saveDueField(raw, item[key], key)}
+        />
+      </section>
+
+      <section className="dossier-card">
+        <TaskChecks itemId={item.id} />
+      </section>
+
+      <section className="dossier-card">
+        <label>
+          Description
+          <textarea
+            rows={5}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onBlur={(e) => saveDescription(e.currentTarget.value)}
+          />
+          {hint('description')}
+        </label>
+      </section>
+
+      <section className="dossier-card">
+        <header>
           <h3>Priority</h3>
           <p>Drives the matrix and the schedule order.</p>
         </header>
@@ -343,41 +378,6 @@ export function TaskBrief({ item, task, onGone }: Props) {
           />
         </div>
         <TaskPacking item={item} task={task} />
-      </section>
-
-      <section className="dossier-card">
-        <label>
-          Description
-          <textarea
-            rows={5}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            onBlur={(e) => saveDescription(e.currentTarget.value)}
-          />
-          {hint('description')}
-        </label>
-      </section>
-
-      <section className="dossier-card">
-        <header>
-          <h3>Deadlines</h3>
-          <p>Task, dev, review and test dates.</p>
-        </header>
-        <TaskDueRail
-          item={item}
-          values={{ dueAt, devDueAt, reviewDueAt, testDueAt }}
-          onChange={(key, next) => {
-            if (key === 'dueAt') setDueAt(next)
-            if (key === 'devDueAt') setDevDueAt(next)
-            if (key === 'reviewDueAt') setReviewDueAt(next)
-            if (key === 'testDueAt') setTestDueAt(next)
-          }}
-          onCommit={(key, raw) => saveDueField(raw, item[key], key)}
-        />
-      </section>
-
-      <section className="dossier-card">
-        <TaskChecks itemId={item.id} />
       </section>
 
       <TaskConfirm

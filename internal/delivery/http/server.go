@@ -54,6 +54,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/items/{id}/events/annotate", s.withAuth(s.annotateItemEvent))
 	mux.HandleFunc("GET /api/items/{id}/checks", s.withAuth(s.listItemChecks))
 	mux.HandleFunc("POST /api/items/{id}/checks", s.withAuth(s.createItemCheck))
+	mux.HandleFunc("PUT /api/items/{id}/checks/order", s.withAuth(s.reorderItemChecks))
 	mux.HandleFunc("PATCH /api/items/{id}/checks/{checkId}", s.withAuth(s.patchItemCheck))
 	mux.HandleFunc("DELETE /api/items/{id}/checks/{checkId}", s.withAuth(s.deleteItemCheck))
 	mux.HandleFunc("POST /api/items/sync-active", s.withAuth(s.syncActiveItems))
@@ -145,7 +146,7 @@ func (s *Server) cors(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-			w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
 		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -821,6 +822,32 @@ func (s *Server) createItemCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, check)
+}
+
+func (s *Server) reorderItemChecks(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, err)
+		return
+	}
+	ids, err := parseIDList(body.IDs)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	checks, err := s.App.ReorderItemChecks(r.Context(), id, ids)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, checks)
 }
 
 func (s *Server) patchItemCheck(w http.ResponseWriter, r *http.Request) {

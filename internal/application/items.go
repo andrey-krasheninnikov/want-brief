@@ -351,6 +351,25 @@ func (s *Service) DeleteItemCheck(ctx context.Context, itemID, checkID uuid.UUID
 	return s.recordItemEvent(ctx, itemID, domain.ItemEventCheck, "delete", check.Body, "")
 }
 
+func (s *Service) ReorderItemChecks(ctx context.Context, itemID uuid.UUID, ids []uuid.UUID) ([]domain.ItemCheck, error) {
+	if _, err := s.GetItem(ctx, itemID); err != nil {
+		return nil, err
+	}
+	existing, err := s.ItemChecks.ListByItem(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
+	if err := domain.AssignCheckPositions(existing, ids); err != nil {
+		return nil, err
+	}
+	for _, check := range existing {
+		if _, err := s.ItemChecks.Update(ctx, check); err != nil {
+			return nil, err
+		}
+	}
+	return s.ItemChecks.ListByItem(ctx, itemID)
+}
+
 func (s *Service) SyncItem(ctx context.Context, id uuid.UUID) (domain.Item, error) {
 	item, err := s.GetItem(ctx, id)
 	if err != nil {

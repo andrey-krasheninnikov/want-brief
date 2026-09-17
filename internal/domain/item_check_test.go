@@ -32,3 +32,48 @@ func TestItemCheckSetDone(t *testing.T) {
 		t.Fatal("expected done")
 	}
 }
+
+func TestAssignCheckPositionsSwaps(t *testing.T) {
+	itemID := uuid.New()
+	a, err := NewItemCheck(itemID, "A", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := NewItemCheck(itemID, "B", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := []ItemCheck{a, b}
+	if err := AssignCheckPositions(checks, []uuid.UUID{b.ID, a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if checks[0].Position != 1 || checks[1].Position != 0 {
+		t.Fatalf("positions %d %d", checks[0].Position, checks[1].Position)
+	}
+}
+
+func TestAssignCheckPositionsRejectsAlien(t *testing.T) {
+	itemID := uuid.New()
+	a, err := NewItemCheck(itemID, "A", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := AssignCheckPositions([]ItemCheck{a}, []uuid.UUID{uuid.New()}); err == nil {
+		t.Fatal("expected invalid order")
+	}
+}
+
+func TestAssignCheckPositionsRejectsDup(t *testing.T) {
+	itemID := uuid.New()
+	a, err := NewItemCheck(itemID, "A", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := NewItemCheck(itemID, "B", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := AssignCheckPositions([]ItemCheck{a, b}, []uuid.UUID{a.ID, a.ID}); err == nil {
+		t.Fatal("expected invalid order")
+	}
+}

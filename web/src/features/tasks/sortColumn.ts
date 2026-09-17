@@ -3,22 +3,21 @@ import type { Item } from '../../types'
 
 const DUE_KEYS = ['dueAt', 'devDueAt', 'reviewDueAt', 'testDueAt'] as const
 
-export type SortableItem = Pick<
-  Item,
-  'urgent' | 'important' | 'createdAt' | 'status' | 'dueAt' | 'devDueAt' | 'reviewDueAt' | 'testDueAt'
->
+export type DueFields = Pick<Item, 'status' | 'dueAt' | 'devDueAt' | 'reviewDueAt' | 'testDueAt'>
 
-function dueTimes(item: SortableItem): number[] {
+export type SortableItem = DueFields & Pick<Item, 'urgent' | 'important' | 'createdAt'>
+
+function dueTimes(item: DueFields): number[] {
   return DUE_KEYS.map((key) => (item[key] ? new Date(item[key] as string).getTime() : NaN)).filter(
     (time) => !Number.isNaN(time),
   )
 }
 
-export function isOverdue(item: SortableItem, now = Date.now()): boolean {
+export function isOverdue(item: DueFields, now = Date.now()): boolean {
   return DUE_KEYS.some((key) => dueHeat(item[key], item.status, now) >= 1)
 }
 
-export function nearestDue(item: SortableItem): number | null {
+export function nearestDue(item: DueFields): number | null {
   const times = dueTimes(item)
   if (times.length === 0) return null
   return Math.min(...times)

@@ -138,6 +138,8 @@ export const api = {
     request<ItemCheck>(`/api/items/${id}/checks/${checkId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteItemCheck: (id: string, checkId: string) =>
     request(`/api/items/${id}/checks/${checkId}`, { method: 'DELETE' }),
+  reorderItemChecks: (id: string, ids: string[]) =>
+    request<ItemCheck[]>(`/api/items/${id}/checks/order`, { method: 'PUT', body: JSON.stringify({ ids }) }),
   syncItem: (id: string) => request<Item>(`/api/items/${id}/sync`, { method: 'POST' }),
   syncActiveItems: () =>
     request<{ synced: number; failed: number }>('/api/items/sync-active', { method: 'POST' }),

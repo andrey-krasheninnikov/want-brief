@@ -15,10 +15,11 @@
   gap: 1rem;
   align-items: start;
 }
+.today-now { grid-column: 1 / -1; }
 .today-clocks { grid-column: 1 / -1; }
-.today-priorities { grid-column: 1 / -1; }
-.today-schedule { grid-column: 1; }
-.today-projects { grid-column: 2; }
+.today-earn { grid-column: 1 / -1; }
+.today-agenda { grid-column: 1; }
+.today-risk { grid-column: 2; }
 
 .today-tile {
   padding: 5px;
@@ -35,15 +36,13 @@
   background: #12141b;
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.14);
 }
-.today-core > .panel,
-.today-core > .clocks,
-.today-core > .agenda {
+.today-core > .agenda,
+.today-core > .clocks {
   background: transparent;
   padding: 0;
   border-radius: 0;
   margin: 0;
 }
-.today-core > .panel h3,
 .today-core > .agenda h3 {
   margin: 0 0 0.85rem;
   font-size: 11px;
@@ -52,17 +51,69 @@
   text-transform: uppercase;
   color: var(--muted);
 }
-.today-window .agenda .tasks-head {
-  margin-bottom: 0.85rem;
+
+.today-window .agenda-next,
+.today-window .agenda-row {
+  display: block;
+  padding: 5px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1.1rem;
+  cursor: pointer;
 }
-.today-window .agenda .tasks-head h3 {
-  margin: 0;
+.today-window .agenda-row.static {
+  cursor: default;
 }
-.today-window .agenda .tasks-plus {
-  width: 2rem;
-  height: 2rem;
-  min-height: 0;
-  font-size: 1.2rem;
+.today-agenda-core {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.85rem 0.95rem;
+  border-radius: calc(1.1rem - 5px);
+  background: color-mix(in srgb, var(--window) 80%, var(--bg));
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+.today-window .agenda-next { padding: 5px; }
+.today-window .agenda-next .today-agenda-core { padding: 1.05rem 1.05rem 1.1rem; }
+.today-window .agenda-next time {
+  font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
+  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+  letter-spacing: -0.06em;
+}
+.today-window .agenda-chip {
+  border-radius: 999px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.today-window .agenda-chip.late {
+  background: color-mix(in srgb, #e07070 38%, transparent);
+}
+.today-window .agenda-skel {
+  background: color-mix(in srgb, var(--bg-3) 55%, transparent);
+}
+.today-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+}
+.today-empty a {
+  color: var(--ink);
+  font-weight: 600;
+}
+.today-offplan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.65rem;
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.today-offplan em {
+  font-style: normal;
+  color: var(--ink);
 }
 
 .today-window .clocks {
@@ -101,89 +152,30 @@
   line-height: 1.05;
   margin-top: 0.45rem;
 }
-
-.today-window .matrix-preview {
-  gap: 0.7rem;
-}
-.today-window a.matrix-cell {
-  padding: 5px;
-  border-radius: 1.2rem;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  transition: transform 500ms var(--motion), opacity 500ms var(--motion), background 500ms var(--motion);
-}
-.today-window a.matrix-cell:hover {
-  background: rgba(255, 255, 255, 0.06);
-  transform: translateY(-2px);
-}
-.today-window a.matrix-cell:active { transform: scale(0.98); }
-.today-cell-core {
-  flex: 1;
-  min-height: 8.5rem;
-  padding: 0.9rem 0.95rem 1rem;
-  border-radius: calc(1.2rem - 5px);
-  background: color-mix(in srgb, var(--window) 80%, var(--bg));
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  display: flex;
-  flex-direction: column;
-}
-.today-window .matrix-cell header { margin-bottom: 0.65rem; }
-.today-window .matrix-cell h3 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 15px;
-  letter-spacing: -0.03em;
-  text-transform: none;
-}
-.today-window .matrix-preview .list.dense li {
-  background: transparent;
-  padding: 0.35rem 0;
-}
-
-.today-window .agenda-next,
-.today-window .agenda-row {
+.today-earn-sub {
   display: block;
-  padding: 5px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 1.1rem;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
 }
-.today-agenda-core {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 0.85rem;
+.today-earn-rate {
+  display: flex;
   align-items: center;
-  padding: 0.85rem 0.95rem;
-  border-radius: calc(1.1rem - 5px);
-  background: color-mix(in srgb, var(--window) 80%, var(--bg));
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
-}
-.today-window .agenda-next { padding: 5px; }
-.today-window .agenda-next .today-agenda-core { padding: 1.05rem 1.05rem 1.1rem; }
-.today-window .agenda-next time {
-  font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
-  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
-  letter-spacing: -0.06em;
-}
-.today-window .agenda-chip {
-  border-radius: 999px;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+  color: var(--muted);
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.04em;
+  text-transform: none;
 }
-.today-window .agenda-skel {
-  background: color-mix(in srgb, var(--bg-3) 55%, transparent);
+.today-earn-rate input {
+  width: 4.6rem;
+  min-height: 0;
+  padding: 0.25rem 0.4rem;
+  font-size: 12px;
 }
-.agenda-form > button[type='submit'] {
-  border-radius: 999px;
-  transition: transform 400ms var(--motion), background 400ms var(--motion);
-}
-.agenda-form > button[type='submit']:active {
-  transform: scale(0.98);
-}
-
-.today-window .period-tabs { margin-bottom: 1rem; }
-.today-window .bars li { gap: 0.75rem; }
-.today-window .bars b { height: 0.42rem; border-radius: 999px; }
 
 @keyframes today-up {
   from { opacity: 0; transform: translateY(16px); }
@@ -195,19 +187,25 @@
     grid-template-columns: minmax(0, 1fr);
     width: 100%;
   }
+  .today-now,
   .today-clocks,
-  .today-priorities,
-  .today-schedule,
-  .today-projects {
+  .today-earn,
+  .today-agenda,
+  .today-risk {
     grid-column: auto;
   }
-  .today-cell-core { min-height: 0; }
+  .today-window .agenda-next .today-agenda-core {
+    grid-template-columns: auto 1fr;
+  }
+  .today-window .agenda-next .tasks-timer {
+    grid-column: 2;
+    justify-self: start;
+    margin-left: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .today-tile,
-  .today-window a.matrix-cell,
-  .agenda-form > button[type='submit'] {
+  .today-tile {
     animation: none;
     transition: none;
   }

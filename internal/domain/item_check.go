@@ -51,3 +51,31 @@ func (c *ItemCheck) SetDone(done bool) {
 	c.Done = done
 	c.UpdatedAt = time.Now().UTC()
 }
+
+func AssignCheckPositions(checks []ItemCheck, ids []uuid.UUID) error {
+	if len(checks) != len(ids) {
+		return fmt.Errorf("%w: check order", ErrInvalid)
+	}
+	index := make(map[uuid.UUID]int, len(checks))
+	for i, check := range checks {
+		if _, ok := index[check.ID]; ok {
+			return fmt.Errorf("%w: check order", ErrInvalid)
+		}
+		index[check.ID] = i
+	}
+	seen := make(map[uuid.UUID]struct{}, len(ids))
+	now := time.Now().UTC()
+	for pos, id := range ids {
+		if _, dup := seen[id]; dup {
+			return fmt.Errorf("%w: check order", ErrInvalid)
+		}
+		i, ok := index[id]
+		if !ok {
+			return fmt.Errorf("%w: check order", ErrInvalid)
+		}
+		seen[id] = struct{}{}
+		checks[i].Position = pos
+		checks[i].UpdatedAt = now
+	}
+	return nil
+}

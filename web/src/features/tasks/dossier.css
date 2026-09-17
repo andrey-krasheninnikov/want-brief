@@ -489,16 +489,33 @@ button.dossier-chip:hover {
 }
 .tasks-check {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.6rem;
   padding: 0.45rem 0.5rem;
   border-radius: 11px;
-  transition: background 200ms ease;
+  transition: background 200ms ease, opacity 200ms ease;
 }
 .tasks-check:hover { background: rgba(255, 255, 255, 0.04); }
+.tasks-check.dragging { opacity: 0.45; }
 .tasks-check.done .tasks-check-text { color: var(--muted); text-decoration: line-through; }
+.tasks-check-handle {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  min-height: 1.6rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0.5rem;
+  background: none;
+  color: var(--muted);
+  cursor: grab;
+}
+.tasks-check-handle:active { cursor: grabbing; }
 .tasks-check-text {
+  width: 100%;
+  min-width: 0;
   background: none;
   border: 0;
   padding: 0;

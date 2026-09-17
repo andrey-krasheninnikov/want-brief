@@ -16,6 +16,7 @@ import {
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
+import { EventDossierSheet } from '../features/events/EventDossier'
 import { TaskDossierSheet } from '../features/tasks/TaskPage'
 import { TaskLogProvider } from '../features/tasks/TaskLogPrompt'
 import { CheckinDialog } from '../features/today/CheckinDialog'
@@ -38,10 +39,19 @@ export function Shell() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [checkinOpen, setCheckinOpen] = useState(false)
   const taskId = searchParams.get('task')
+  const eventId = searchParams.get('event')
+  const eventOn = searchParams.get('on') ?? undefined
 
   function closeTask() {
     const next = new URLSearchParams(searchParams)
     next.delete('task')
+    setSearchParams(next, { replace: true })
+  }
+
+  function closeEvent() {
+    const next = new URLSearchParams(searchParams)
+    next.delete('event')
+    next.delete('on')
     setSearchParams(next, { replace: true })
   }
 
@@ -93,6 +103,7 @@ export function Shell() {
       </main>
       <CheckinDialog open={checkinOpen} onClose={() => setCheckinOpen(false)} />
       {taskId ? <TaskDossierSheet id={taskId} onClose={closeTask} /> : null}
+      {eventId ? <EventDossierSheet seriesId={eventId} originalOn={eventOn} onClose={closeEvent} /> : null}
     </div>
     </TaskLogProvider>
   )

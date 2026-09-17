@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChartBar } from '@phosphor-icons/react'
 import { api } from '../../api'
@@ -15,9 +15,9 @@ import { WeekGrid } from './WeekGrid'
 import './events.css'
 
 export function EventsScreen() {
-  const { id } = useParams()
-  const [params] = useSearchParams()
-  const creating = !id && params.get('new') === '1'
+  const [params, setParams] = useSearchParams()
+  const creating = params.get('new') === '1'
+  const selectedId = params.get('event') ?? undefined
   const originalOn = params.get('on') ?? undefined
   const navigate = useNavigate()
   const [anchor, setAnchor] = useState(() => new Date())
@@ -38,16 +38,23 @@ export function EventsScreen() {
     () => eventLookups(projects.data ?? [], companies.data ?? []),
     [projects.data, companies.data],
   )
-  const dossier = Boolean(id) || creating
+
+  function clearOverlay() {
+    const next = new URLSearchParams(params)
+    next.delete('event')
+    next.delete('on')
+    next.delete('new')
+    setParams(next, { replace: true })
+  }
 
   function closeSheet() {
     setStats(false)
-    navigate('/events')
+    clearOverlay()
   }
 
   function openStats() {
     setStats(true)
-    if (dossier) navigate('/events')
+    clearOverlay()
   }
 
   function pick(seriesId: string, on: string) {
@@ -88,9 +95,9 @@ export function EventsScreen() {
           </button>
           <button
             type="button"
-            className={stats && !dossier ? 'ghost on' : 'ghost'}
+            className={stats && !creating ? 'ghost on' : 'ghost'}
             aria-label="Stats"
-            aria-pressed={stats && !dossier}
+            aria-pressed={stats && !creating}
             onClick={openStats}
           >
             <ChartBar size={18} weight="light" aria-hidden />
@@ -119,7 +126,7 @@ export function EventsScreen() {
               rows={rows}
               lookups={lookups}
               today={today}
-              selectedId={id}
+              selectedId={selectedId}
               selectedOn={originalOn}
               onPick={pick}
             />
@@ -131,7 +138,7 @@ export function EventsScreen() {
               rows={rows}
               lookups={lookups}
               today={today}
-              selectedId={id}
+              selectedId={selectedId}
               selectedOn={originalOn}
               onPick={pick}
             />
@@ -139,17 +146,15 @@ export function EventsScreen() {
         </div>
       </div>
       <TaskSheet
-        open={stats || dossier}
-        kicker={dossier ? (originalOn ? 'Occurrence' : 'Series') : view === 'week' ? 'Week' : month.label}
-        title={dossier ? (id ? 'Dossier' : 'New event') : 'Stats'}
+        open={stats || creating}
+        kicker={creating ? 'Series' : view === 'week' ? 'Week' : month.label}
+        title={creating ? 'New event' : 'Stats'}
         onClose={closeSheet}
       >
-        {dossier ? (
+        {creating ? (
           <EventDossier
-            seriesId={id}
-            originalOn={originalOn}
-            onCreated={(next) => navigate(`/events/${next}`)}
-            onDeleted={() => navigate('/events')}
+            onCreated={(next) => openEvent(navigate, next)}
+            onDeleted={closeSheet}
           />
         ) : (
           <EventStats rows={rows} lookups={lookups} />

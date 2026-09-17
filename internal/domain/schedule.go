@@ -340,16 +340,22 @@ func (p *planner) collect() {
 }
 
 func scheduleEligible(item Item, kind ScheduleKind) bool {
-	if item.Kind != KindTask || item.ArchivedAt != nil || item.DeletedAt != nil {
+	if item.ArchivedAt != nil || item.DeletedAt != nil {
 		return false
 	}
 	if kind == ScheduleFollowup {
+		if item.Kind != KindTask {
+			return false
+		}
 		switch item.Status {
 		case StatusReview, StatusQA, StatusAwaitingDecision:
 			return true
 		default:
 			return false
 		}
+	}
+	if item.Kind != KindTask && item.Kind != KindRequest {
+		return false
 	}
 	switch item.Status {
 	case StatusToDo, StatusInProgress:
@@ -369,6 +375,9 @@ func packingDue(item Item, kind ScheduleKind) *time.Time {
 		default:
 			return item.DueAt
 		}
+	}
+	if item.Kind == KindRequest {
+		return item.DueAt
 	}
 	return item.DevDueAt
 }

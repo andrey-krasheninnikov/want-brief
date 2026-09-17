@@ -7,17 +7,18 @@ import { moscowYmd } from '../../shared/moscow'
 import { openTask } from '../../shared/taskOverlay'
 import type { UnplannedItem } from '../../types'
 
-function dueField(status: string, kind: 'work' | 'followup'): 'devDueAt' | 'reviewDueAt' | 'testDueAt' | 'dueAt' {
+function dueField(item: UnplannedItem['item'], kind: 'work' | 'followup'): 'devDueAt' | 'reviewDueAt' | 'testDueAt' | 'dueAt' {
+  if (item.kind === 'request') return 'dueAt'
   if (kind !== 'followup') return 'devDueAt'
-  if (status === 'review') return 'reviewDueAt'
-  if (status === 'qa') return 'testDueAt'
+  if (item.status === 'review') return 'reviewDueAt'
+  if (item.status === 'qa') return 'testDueAt'
   return 'dueAt'
 }
 
-function dueTitle(field: ReturnType<typeof dueField>): string {
+function dueTitle(field: ReturnType<typeof dueField>, itemKind: string): string {
   if (field === 'reviewDueAt') return 'Review due'
   if (field === 'testDueAt') return 'Tests due'
-  if (field === 'dueAt') return 'Task due'
+  if (field === 'dueAt') return itemKind === 'request' ? 'Due' : 'Task due'
   return 'Dev due'
 }
 
@@ -49,7 +50,7 @@ function NeedCard({ row, delay, kind }: { row: UnplannedItem; delay: number; kin
   const [due, setDue] = useState('')
   const [hours, setHours] = useState('0')
   const [minutes, setMinutes] = useState('0')
-  const field = dueField(row.item.status, kind)
+  const field = dueField(row.item, kind)
   const patch = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.patchItem(row.item.id, body),
     onSuccess: () => {
@@ -58,7 +59,7 @@ function NeedCard({ row, delay, kind }: { row: UnplannedItem; delay: number; kin
     },
   })
   const gaps: string[] = []
-  if (row.missingDevDue) gaps.push(kind === 'followup' ? 'Missing due' : 'Missing dev due')
+  if (row.missingDevDue) gaps.push(field === 'devDueAt' ? 'Missing dev due' : 'Missing due')
   if (row.missingPlan) gaps.push('Missing estimate')
 
   function saveDue(raw: string) {
@@ -89,7 +90,7 @@ function NeedCard({ row, delay, kind }: { row: UnplannedItem; delay: number; kin
         {row.missingDevDue ? (
           <>
             <label>
-              {dueTitle(field)}
+              {dueTitle(field, row.item.kind)}
               <DateField mode="datetime" value={due} onChange={setDue} onCommit={saveDue} />
             </label>
             <button type="button" className="ghost sched-need-chip" onClick={() => patch.mutate({ [field]: nextFriday1800() })}>

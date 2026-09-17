@@ -125,6 +125,10 @@ func withPackingDue(item Item, kind ScheduleKind, due time.Time) Item {
 		}
 		return item
 	}
+	if item.Kind == KindRequest {
+		item.DueAt = &at
+		return item
+	}
 	item.DevDueAt = &at
 	return item
 }

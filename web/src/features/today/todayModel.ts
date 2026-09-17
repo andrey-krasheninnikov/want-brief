@@ -4,6 +4,7 @@ import { zonedYmd, type NowPick } from '../schedule/now'
 import type { AtRiskItem, Item, ScheduleBlock, ScheduleBusy } from '../../types'
 
 export const DEFAULT_USD_RUB = 85
+export const EARN_WEEKDAYS = 20.5
 
 const DUE_KEYS = ['dueAt', 'devDueAt', 'reviewDueAt', 'testDueAt'] as const satisfies readonly DueSlot[]
 
@@ -156,6 +157,9 @@ export type EarnResult = {
 
 export type EarnDayPoint = {
   day: string
+  usd: number
+  rub: number
+  rate: number
   daily: number
 }
 
@@ -163,6 +167,13 @@ export type EarnMonthPoint = {
   month: string
   label: string
   total: number
+}
+
+export type EarnSnap = {
+  day: string
+  usd: number
+  rub: number
+  rate?: number
 }
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -199,16 +210,14 @@ function activeIncome(projects: EarnProject[]): EarnResult {
   return { usd, rub }
 }
 
-export function dailyEarn(projects: EarnProject[], ymd: string): EarnResult {
-  const weekdays = weekdaysInMonth(ymd)
-  if (weekdays <= 0) return { usd: 0, rub: 0 }
+export function dailyEarn(projects: EarnProject[]): EarnResult {
   const income = activeIncome(projects)
-  return { usd: income.usd / weekdays, rub: income.rub / weekdays }
+  return { usd: income.usd / EARN_WEEKDAYS, rub: income.rub / EARN_WEEKDAYS }
 }
 
 export function todayEarn(projects: EarnProject[], ymd: string): EarnResult {
   if (!isMoscowWeekday(ymd)) return { usd: 0, rub: 0 }
-  return dailyEarn(projects, ymd)
+  return dailyEarn(projects)
 }
 
 export function monthEarn(projects: EarnProject[]): EarnResult {
@@ -224,45 +233,91 @@ export function monthYmdsThrough(ymd: string): string[] {
   })
 }
 
+export function snapRate(row: EarnSnap | undefined, fallback: number): number {
+  if (row?.rate != null && row.rate > 0 && Number.isFinite(row.rate)) return row.rate
+  return fallback
+}
+
+export function meanRate(rates: number[], fallback = DEFAULT_USD_RUB): number {
+  const ok = rates.filter((rate) => rate > 0 && Number.isFinite(rate))
+  if (ok.length === 0) return fallback
+  return ok.reduce((sum, rate) => sum + rate, 0) / ok.length
+}
+
+export function monthAvgRate(ymd: string, snapshots: EarnSnap[], fallback: number): number {
+  const key = ymd.slice(0, 7)
+  return meanRate(
+    snapshots.filter((row) => row.day.startsWith(`${key}-`)).map((row) => snapRate(row, 0)),
+    fallback,
+  )
+}
+
+function monthSums(rows: { usd: number; rub: number }[]): EarnResult {
+  let usd = 0
+  let rub = 0
+  for (const row of rows) {
+    usd += row.usd
+    rub += row.rub
+  }
+  return { usd, rub }
+}
+
 export function earnChartDays(
   ymd: string,
-  snapshots: { day: string; usd: number; rub: number }[],
+  snapshots: EarnSnap[],
   live: EarnResult,
-  rate: number,
+  fallbackRate: number,
 ): EarnDayPoint[] {
   const byDay = new Map(snapshots.map((row) => [row.day, row]))
   return monthYmdsThrough(ymd).map((day) => {
     const snap = byDay.get(day)
-    const raw = snap ?? (isMoscowWeekday(day) ? live : { usd: 0, rub: 0 })
-    return { day, daily: earnTotals(raw.usd, raw.rub, rate).usd }
+    if (snap) {
+      const rate = snapRate(snap, fallbackRate)
+      return { day, usd: snap.usd, rub: snap.rub, rate, daily: earnTotals(snap.usd, snap.rub, rate).usd }
+    }
+    const raw = isMoscowWeekday(day) ? live : { usd: 0, rub: 0 }
+    return { day, usd: raw.usd, rub: raw.rub, rate: fallbackRate, daily: earnTotals(raw.usd, raw.rub, fallbackRate).usd }
   })
 }
 
 export function earnChartMonths(
   ymd: string,
-  snapshots: { day: string; usd: number; rub: number }[],
+  snapshots: EarnSnap[],
   live: EarnResult,
-  rate: number,
+  fallbackRate: number,
 ): EarnMonthPoint[] {
   const year = ymd.slice(0, 4)
   const current = Number(ymd.slice(5, 7))
-  const booked = new Map<string, number>()
+  const byMonth = new Map<string, EarnSnap[]>()
   for (const row of snapshots) {
     const key = row.day.slice(0, 7)
     if (!key.startsWith(`${year}-`)) continue
     const month = Number(key.slice(5, 7))
     if (month < 1 || month >= current) continue
-    booked.set(key, (booked.get(key) ?? 0) + earnTotals(row.usd, row.rub, rate).usd)
+    const list = byMonth.get(key) ?? []
+    list.push(row)
+    byMonth.set(key, list)
   }
-  const currentTotal = earnChartDays(ymd, snapshots, live, rate).reduce((sum, row) => sum + row.daily, 0)
+  const currentDays = earnChartDays(ymd, snapshots, live, fallbackRate)
+  const currentRaw = monthSums(currentDays)
+  const currentRate = monthAvgRate(ymd, snapshots, fallbackRate)
   return Array.from({ length: current }, (_, i) => {
     const month = i + 1
     const key = `${year}-${String(month).padStart(2, '0')}`
-    return {
-      month: key,
-      label: MONTH_LABELS[i],
-      total: month === current ? currentTotal : (booked.get(key) ?? 0),
+    if (month === current) {
+      return {
+        month: key,
+        label: MONTH_LABELS[i],
+        total: earnTotals(currentRaw.usd, currentRaw.rub, currentRate).usd,
+      }
     }
+    const rows = byMonth.get(key) ?? []
+    const raw = monthSums(rows)
+    const avg = meanRate(
+      rows.map((row) => snapRate(row, 0)),
+      fallbackRate,
+    )
+    return { month: key, label: MONTH_LABELS[i], total: earnTotals(raw.usd, raw.rub, avg).usd }
   })
 }
 

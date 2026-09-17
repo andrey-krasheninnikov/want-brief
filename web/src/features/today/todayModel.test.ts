@@ -6,8 +6,9 @@ import {
   earnChartDays,
   earnChartMonths,
   earnTotals,
-  monthEarn,
   featuredBlock,
+  meanRate,
+  monthEarn,
   parseUsdRubRate,
   remainingAgenda,
   todayEarn,
@@ -167,10 +168,10 @@ const projects = [
   { id: 'p3', monthlyIncomeUsd: 9999, monthlyIncomeRub: 9999, archivedAt: '2026-01-01T00:00:00Z' },
 ]
 const earned = todayEarn(projects, ymd)
-equal(earned.usd, 100, 'usd = active income / 22 weekdays')
-equal(earned.rub, 1000, 'rub independent of usd')
+equal(earned.usd, 2200 / 20.5, 'usd = active income / 20.5')
+equal(earned.rub, 22000 / 20.5, 'rub independent of usd')
 equal(todayEarn(projects, '2026-09-19').usd, 0, 'saturday is zero')
-equal(dailyEarn(projects, '2026-09-19').usd, 100, 'weekday rate still available on saturday')
+equal(dailyEarn(projects).usd, 2200 / 20.5, 'weekday rate still available on saturday')
 
 equal(monthEarn(projects), { usd: 2200, rub: 22000 }, 'full month is active income')
 
@@ -206,10 +207,40 @@ equal(
 )
 
 const totals = earnTotals(earned.usd, earned.rub, 85)
-equal(Math.round(totals.usd), 112, 'total usd adds rub/rate')
-equal(Math.round(totals.rub), 9500, 'total rub adds usd*rate')
+equal(Math.round(totals.usd * 100) / 100, Math.round((2200 / 20.5 + 22000 / 20.5 / 85) * 100) / 100, 'total usd adds rub/rate')
+equal(Math.round(totals.rub), Math.round(22000 / 20.5 + (2200 / 20.5) * 85), 'total rub adds usd*rate')
 equal(parseUsdRubRate('90'), 90, 'parses rate')
 equal(parseUsdRubRate('nope', 85), 85, 'junk keeps fallback')
 equal(parseUsdRubRate('0', 85), 85, 'non-positive ignored')
+
+equal(meanRate([80, 120]), 100, 'mean of two rates')
+equal(
+  earnChartDays(
+    '2026-09-02',
+    [
+      { day: '2026-09-01', usd: 0, rub: 8000, rate: 80 },
+      { day: '2026-09-02', usd: 0, rub: 12000, rate: 120 },
+    ],
+    { usd: 100, rub: 0 },
+    85,
+  ).map((row) => Math.round(row.daily)),
+  [100, 100],
+  'each saved day keeps its own rate',
+)
+equal(
+  Math.round(
+    earnChartMonths(
+      '2026-09-02',
+      [
+        { day: '2026-03-01', usd: 0, rub: 8500, rate: 80 },
+        { day: '2026-03-02', usd: 0, rub: 8500, rate: 120 },
+      ],
+      { usd: 0, rub: 0 },
+      85,
+    )[2].total,
+  ),
+  170,
+  'month converts sum at mean rate 100, not live 85',
+)
 
 console.log('todayModel ok')

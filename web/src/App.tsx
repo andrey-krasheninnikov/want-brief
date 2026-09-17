@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
 import { api } from './api'
 import { LoginScreen } from './features/login/LoginScreen'
 import { MatrixScreen } from './features/matrix/MatrixScreen'
@@ -22,6 +22,15 @@ const client = new QueryClient()
 function TaskNotesRedirect() {
   const { id } = useParams()
   return <Navigate to={id ? `/tasks/${id}` : '/tasks'} replace />
+}
+
+function EventPathRedirect() {
+  const { id } = useParams()
+  const [params] = useSearchParams()
+  const next = new URLSearchParams(params)
+  if (id) next.set('event', id)
+  const suffix = next.toString()
+  return <Navigate to={suffix ? `/events?${suffix}` : '/events'} replace />
 }
 
 function Gate() {
@@ -49,7 +58,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/today" replace />} />
             <Route path="/today" element={<TodayScreen />} />
             <Route path="/events" element={<EventsScreen />} />
-            <Route path="/events/:id" element={<EventsScreen />} />
+            <Route path="/events/:id" element={<EventPathRedirect />} />
             <Route path="/schedule" element={<ScheduleScreen />} />
             <Route path="/schedule/settings" element={<ScheduleSettingsScreen />} />
             <Route path="/projects" element={<ProjectsScreen />} />

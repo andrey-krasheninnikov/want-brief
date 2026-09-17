@@ -684,6 +684,7 @@ export type EarnDay = {
   day: string
   usd: number
   rub: number
+  rate: number
   updatedAt: string
 }
 

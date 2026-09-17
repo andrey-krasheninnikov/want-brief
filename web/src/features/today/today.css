@@ -169,104 +169,132 @@
   font-size: 13px;
   font-weight: 600;
 }
-.today-earn-rate {
+.today-window .today-fx-board {
+  grid-template-columns: minmax(0, 1fr);
+}
+.today-fx {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.65rem;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-top: 0.45rem;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.04em;
-  text-transform: none;
 }
-.today-earn-rate input {
-  width: 4.6rem;
-  min-height: 0;
-  padding: 0.25rem 0.4rem;
-  font-size: 12px;
+.today-fx input {
+  width: 6.75rem;
+  min-height: 2.55rem;
+  padding: 0.2rem 0.55rem;
+  font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
+  font-size: clamp(1.45rem, 2.2vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.06em;
+  line-height: 1.05;
+  color: var(--ink);
+  background: var(--bg-2);
 }
 .today-earn-board {
   display: grid;
   gap: 1rem;
   min-width: 0;
 }
-.today-earn-chart-head {
+.today-earn-plot {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+.today-earn-plot-well {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: stretch;
+  min-height: 14rem;
+  padding: 0.9rem 0.55rem 0.7rem 0.65rem;
+  border-radius: 1.35rem;
+  background: color-mix(in srgb, #0b0f16 82%, var(--window));
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.today-earn-plot-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0.1rem 0 2.7rem;
+  list-style: none;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  line-height: 1;
+  background: color-mix(in srgb, #0b0f16 82%, var(--window));
+}
+.today-earn-plot-track {
+  min-width: 0;
+  overflow-x: auto;
+  padding-right: 0.45rem;
+}
+.today-earn-plot-cols {
+  display: flex;
+  align-items: stretch;
+  gap: 0.28rem;
+  width: max-content;
+  min-height: 12.4rem;
+  margin: 0;
+  padding: 0.15rem 0 0;
+  list-style: none;
+}
+.today-earn-plot-cols li {
+  flex: 0 0 4rem;
+  display: grid;
+  grid-template-rows: minmax(9.4rem, 1fr) auto auto;
+  justify-items: center;
+  gap: 0.2rem;
+}
+.today-earn-plot-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  align-self: stretch;
+  width: 100%;
+}
+.today-earn-plot-bar span {
+  display: block;
+  width: 0.28rem;
+  max-width: 100%;
+  border-radius: 2px;
+  background: rgba(236, 240, 248, 0.9);
+}
+.today-earn-plot-cols b {
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.today-earn-plot-cols small {
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.today-earn-plot-foot {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.55rem;
+  margin-top: 0.7rem;
 }
-.today-earn-chart-head small {
-  font-size: 10px;
+.today-earn-plot-foot small {
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
   color: var(--muted);
 }
-.today-earn-chart-head strong {
+.today-earn-plot-foot strong {
   font-size: 13px;
   font-weight: 600;
-}
-.today-earn-days {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.25rem;
-  min-height: 6.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  overflow-x: auto;
-}
-.today-earn-days li {
-  flex: 1 0 0.85rem;
-  display: grid;
-  justify-items: center;
-  gap: 0.25rem;
-  min-height: 6rem;
-}
-.today-earn-days b {
-  width: 100%;
-  max-width: 0.9rem;
-  align-self: end;
-  border-radius: 999px 999px 4px 4px;
-  background: color-mix(in srgb, var(--accent) 80%, white 8%);
-  min-height: 4px;
-}
-.today-earn-days small {
-  font-size: 10px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.today-earn-months {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.35rem;
-  min-height: 6.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.today-earn-months li {
-  flex: 1 1 0;
-  display: grid;
-  justify-items: center;
-  gap: 0.25rem;
-  min-height: 6rem;
-  min-width: 0;
-}
-.today-earn-months b {
-  width: 100%;
-  max-width: 1.4rem;
-  align-self: end;
-  border-radius: 999px 999px 4px 4px;
-  background: color-mix(in srgb, var(--accent) 80%, white 8%);
-  min-height: 4px;
-}
-.today-earn-months small {
-  font-size: 10px;
-  color: var(--muted);
 }
 
 @keyframes today-up {

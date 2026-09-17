@@ -24,6 +24,11 @@ function isoOf(item: Item, key: DueKey): string | null {
   return item[key]
 }
 
+function slotLabel(item: Item, slot: (typeof slots)[number]): string {
+  if (slot.key === 'dueAt' && item.kind === 'request') return 'Due'
+  return slot.label
+}
+
 function toneClass(overdue: boolean, met: boolean): string {
   if (overdue) return 'overdue'
   if (met) return 'met'
@@ -47,7 +52,7 @@ export function TaskDueRail({ item, values, onChange, onCommit, compact }: Props
           const overdue = heat >= 1
           const met = Boolean(iso) && !stageOpen
           const when = createdLabel(iso)
-          const text = [slot.label, when, remain].filter(Boolean).join(' · ')
+          const text = [slotLabel(item, slot), when, remain].filter(Boolean).join(' · ')
           return (
             <p
               key={slot.key}
@@ -77,7 +82,7 @@ export function TaskDueRail({ item, values, onChange, onCommit, compact }: Props
             className={['tasks-due-card', toneClass(overdue, met)].filter(Boolean).join(' ')}
             style={{ '--due-heat': heat } as CSSProperties}
           >
-            <strong>{slot.label}</strong>
+            <strong>{slotLabel(item, slot)}</strong>
             {editing ? (
               <DateField
                 mode="datetime"

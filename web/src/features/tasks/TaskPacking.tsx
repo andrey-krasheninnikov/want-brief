@@ -23,8 +23,14 @@ const OCCUPANCY_NOTE: Record<Occupancy, string> = {
   waiting: 'Waiting sits on a side track next to active work.',
 }
 
+function packingDue(item: Item): string | null {
+  if (item.kind === 'request') return item.dueAt
+  if (item.kind === 'task') return item.devDueAt
+  return null
+}
+
 function packable(item: Item): boolean {
-  return item.kind === 'task' && !item.archivedAt && Boolean(item.devDueAt) && item.plannedSeconds > 0
+  return !item.archivedAt && item.plannedSeconds > 0 && Boolean(packingDue(item))
 }
 
 function signed(value: number, unit: (v: number) => string = String): string {
@@ -39,7 +45,7 @@ function deltaLabel(seconds: number): string {
 // WhatIfLine answers one question: what happens to the week if this task slips by seven days.
 function WhatIfLine({ item }: { item: Item }) {
   const week = moscowWeek(new Date())
-  const due = item.devDueAt
+  const due = packingDue(item)
   const query = useQuery({
     queryKey: ['task-whatif', item.id, due, week.from],
     enabled: Boolean(due) && packable(item),

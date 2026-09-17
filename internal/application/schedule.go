@@ -55,8 +55,7 @@ func (s *Service) scheduleInput(ctx context.Context, from, to time.Time, kind do
 	if err != nil {
 		return domain.ScheduleInput{}, err
 	}
-	taskKind := domain.KindTask
-	items, err := s.Items.List(ctx, domain.ItemFilter{Kind: &taskKind, OpenOnly: true})
+	items, err := s.Items.List(ctx, domain.ItemFilter{OpenOnly: true})
 	if err != nil {
 		return domain.ScheduleInput{}, err
 	}

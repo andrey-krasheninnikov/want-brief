@@ -7,12 +7,12 @@ import (
 	"github.com/pchkauu/want-brief/internal/domain"
 )
 
-const earnDayCols = `day, usd, rub, updated_at`
+const earnDayCols = `day, usd, rub, rate, updated_at`
 
 func scanEarnDay(scan func(dest ...any) error) (domain.EarnDay, error) {
 	var row domain.EarnDay
 	var day time.Time
-	err := scan(&day, &row.USD, &row.RUB, &row.UpdatedAt)
+	err := scan(&day, &row.USD, &row.RUB, &row.Rate, &row.UpdatedAt)
 	if err != nil {
 		return row, err
 	}
@@ -45,13 +45,14 @@ func (s *Store) ListEarnDays(ctx context.Context, from, to domain.Ymd) ([]domain
 func (s *Store) UpsertEarnDay(ctx context.Context, row domain.EarnDay) (domain.EarnDay, error) {
 	row, err := scanEarnDay(s.pool.QueryRow(ctx, `
 		INSERT INTO earn_days (`+earnDayCols+`)
-		VALUES ($1::date, $2, $3, $4)
+		VALUES ($1::date, $2, $3, $4, $5)
 		ON CONFLICT (day) DO UPDATE SET
 			usd = EXCLUDED.usd,
 			rub = EXCLUDED.rub,
+			rate = EXCLUDED.rate,
 			updated_at = EXCLUDED.updated_at
 		RETURNING `+earnDayCols+`
-	`, string(row.Day), row.USD, row.RUB, row.UpdatedAt).Scan)
+	`, string(row.Day), row.USD, row.RUB, row.Rate, row.UpdatedAt).Scan)
 	return row, mapErr(err)
 }
 

@@ -3,36 +3,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import { money } from '../../shared/format'
 import { moscowYmd } from '../../shared/moscow'
+import { TodayEarnPlot } from './TodayEarnPlot'
+import { TodayFxRate } from './TodayFxRate'
 import {
   DEFAULT_USD_RUB,
   dailyEarn,
   earnChartDays,
   earnChartMonths,
   earnTotals,
+  monthAvgRate,
   monthEarn,
-  parseUsdRubRate,
+  snapRate,
   todayEarn,
 } from './todayModel'
-
-const RATE_KEY = 'today-usd-rub'
-
-function readRate(): number {
-  try {
-    const raw = window.localStorage.getItem(RATE_KEY)
-    if (raw == null) return DEFAULT_USD_RUB
-    return parseUsdRubRate(raw)
-  } catch {
-    return DEFAULT_USD_RUB
-  }
-}
-
-function storeRate(rate: number) {
-  try {
-    window.localStorage.setItem(RATE_KEY, String(rate))
-  } catch {
-    // storage unavailable, keep in memory only
-  }
-}
 
 function monthTitle(ymd: string): string {
   return new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'Europe/Moscow' }).format(
@@ -40,50 +23,46 @@ function monthTitle(ymd: string): string {
   )
 }
 
-function barHeight(value: number, peak: number): string {
-  return `${peak > 0 ? Math.max(6, (value / peak) * 100) : 6}%`
-}
-
 export function TodayEarn() {
   const queryClient = useQueryClient()
-  const [rate, setRate] = useState(readRate)
-  const [draft, setDraft] = useState(() => String(readRate()))
   const ymd = moscowYmd()
   const yearStart = `${ymd.slice(0, 4)}-01-01`
+  const [rate, setRate] = useState<number | null>(null)
+  const [rateDay, setRateDay] = useState(ymd)
+  if (rateDay !== ymd) {
+    setRateDay(ymd)
+    setRate(null)
+  }
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const snapshots = useQuery({
     queryKey: ['earn-days', yearStart, ymd],
     queryFn: () => api.earnDays(yearStart, ymd),
   })
   const list = projects.data ?? []
-  const live = dailyEarn(list, ymd)
+  const snaps = snapshots.data ?? []
+  const todaySnap = snaps.find((row) => row.day === ymd)
+  const fx = rate ?? snapRate(todaySnap, DEFAULT_USD_RUB)
+  const live = dailyEarn(list)
   const earned = todayEarn(list, ymd)
   const month = monthEarn(list)
-  const totals = earnTotals(earned.usd, earned.rub, rate)
-  const monthTotals = earnTotals(month.usd, month.rub, rate)
-  const days = earnChartDays(ymd, snapshots.data ?? [], live, rate)
-  const months = earnChartMonths(ymd, snapshots.data ?? [], live, rate)
-  const dayPeak = Math.max(0, ...days.map((row) => row.daily))
-  const monthPeak = Math.max(0, ...months.map((row) => row.total))
-  const bookedMonth = months.at(-1)?.total ?? 0
+  const avg = monthAvgRate(ymd, snaps, fx)
+  const totals = earnTotals(earned.usd, earned.rub, fx)
+  const monthTotals = earnTotals(month.usd, month.rub, avg)
+  const days = earnChartDays(ymd, snaps, live, fx)
+  const months = earnChartMonths(ymd, snaps, live, fx)
+  const dayTotal = days.reduce((sum, row) => sum + row.daily, 0)
+  const monthPlotTotal = months.at(-1)?.total ?? 0
 
   useEffect(() => {
-    if (!projects.isSuccess) return
+    if (!projects.isSuccess || !snapshots.isSuccess) return
     let cancelled = false
-    void api.putEarnDay(ymd, { usd: earned.usd, rub: earned.rub }).then(() => {
+    void api.putEarnDay(ymd, { usd: earned.usd, rub: earned.rub, rate: fx }).then(() => {
       if (!cancelled) void queryClient.invalidateQueries({ queryKey: ['earn-days'] })
     })
     return () => {
       cancelled = true
     }
-  }, [projects.isSuccess, ymd, earned.usd, earned.rub, queryClient])
-
-  function commitRate(raw: string) {
-    const next = parseUsdRubRate(raw, rate)
-    setRate(next)
-    setDraft(String(next))
-    storeRate(next)
-  }
+  }, [projects.isSuccess, snapshots.isSuccess, ymd, earned.usd, earned.rub, fx, queryClient])
 
   return (
     <section className="today-earn-board">
@@ -105,33 +84,10 @@ export function TodayEarn() {
             <small>Total</small>
             <strong className="mono">{money(totals.usd, 'en-US')} USD</strong>
             <span className="today-earn-sub mono">{money(totals.rub, 'ru-RU')} RUB</span>
-            <label className="today-earn-rate">
-              1 USD =
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={draft}
-                aria-label="RUB per USD"
-                onChange={(event) => {
-                  const raw = event.target.value
-                  setDraft(raw)
-                  const next = Number(raw)
-                  if (Number.isFinite(next) && next > 0) {
-                    setRate(next)
-                    storeRate(next)
-                  }
-                }}
-                onBlur={(event) => commitRate(event.currentTarget.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') event.currentTarget.blur()
-                }}
-              />
-              RUB
-            </label>
           </div>
         </article>
       </section>
+      <TodayFxRate rate={fx} onChange={setRate} />
       <section className="clocks">
         <article>
           <div className="today-clock-core">
@@ -153,33 +109,24 @@ export function TodayEarn() {
           </div>
         </article>
       </section>
-      <div className="today-earn-chart">
-        <div className="today-earn-chart-head">
-          <small>{monthTitle(ymd)}</small>
-        </div>
-        <ul className="today-earn-days">
-          {days.map((row) => (
-            <li key={row.day} title={`${row.day} · ${money(row.daily, 'en-US')} USD`}>
-              <b style={{ height: barHeight(row.daily, dayPeak) }} />
-              <small>{Number(row.day.slice(8))}</small>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="today-earn-chart">
-        <div className="today-earn-chart-head">
-          <small>This year</small>
-          <strong className="mono">{money(bookedMonth, 'en-US')} USD</strong>
-        </div>
-        <ul className="today-earn-months">
-          {months.map((row) => (
-            <li key={row.month} title={`${row.month} · ${money(row.total, 'en-US')} USD`}>
-              <b style={{ height: barHeight(row.total, monthPeak) }} />
-              <small>{row.label}</small>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <TodayEarnPlot
+        title={monthTitle(ymd)}
+        total={dayTotal}
+        rows={days.map((row) => ({
+          key: row.day,
+          value: row.daily,
+          label: String(Number(row.day.slice(8))),
+        }))}
+      />
+      <TodayEarnPlot
+        title="This year"
+        total={monthPlotTotal}
+        rows={months.map((row) => ({
+          key: row.month,
+          value: row.total,
+          label: row.label,
+        }))}
+      />
     </section>
   )
 }

@@ -31,6 +31,15 @@ func taskItem(title string, project *uuid.UUID, name, color string, due time.Tim
 	return item.WithQuadrant()
 }
 
+func requestItem(title string, project *uuid.UUID, name, color string, due time.Time, plan int, status ItemStatus) Item {
+	item := taskItem(title, project, name, color, due, plan, 0, status)
+	item.Kind = KindRequest
+	item.Occupancy = OccupancyWaiting
+	item.DevDueAt = nil
+	item.DueAt = &due
+	return item
+}
+
 func planWith(items []Item, events []EventOccurrence, now, from, to time.Time, tweak func(*ScheduleInput)) Schedule {
 	in := ScheduleInput{
 		Kind:     ScheduleWork,
@@ -137,6 +146,63 @@ func TestBuildScheduleMissingPlanIsUnplanned(t *testing.T) {
 	}
 	if len(got.Lanes) != 0 {
 		t.Fatalf("lanes %d", len(got.Lanes))
+	}
+}
+
+func TestBuildSchedulePacksRequestOnWaitingTrack(t *testing.T) {
+	due := msk(2026, 9, 20, 18, 0)
+	pid := uuid.New()
+	now := msk(2026, 9, 15, 8, 0)
+	active := taskItem("Code", &pid, "Alpha", "#111", due, 3600, 0, StatusToDo)
+	active.Occupancy = OccupancyParallel
+	req := requestItem("Review AUTH", &pid, "Alpha", "#111", due, 3600, StatusToDo)
+	got := BuildSchedule([]Item{active, req}, nil, now, now, now.Add(24*time.Hour))
+	code := firstBlock(t, got, active.ID)
+	assist := firstBlock(t, got, req.ID)
+	if code.Lane != 0 {
+		t.Fatalf("active lane %d", code.Lane)
+	}
+	if assist.Lane == 0 {
+		t.Fatalf("request on active track %+v", assist)
+	}
+	wantTime(t, "active start", code.StartsAt, msk(2026, 9, 15, 10, 0))
+	wantTime(t, "request start", assist.StartsAt, msk(2026, 9, 15, 10, 0))
+}
+
+func TestBuildScheduleRequestMissingDueIsUnplanned(t *testing.T) {
+	pid := uuid.New()
+	req := requestItem("Review AUTH", &pid, "Alpha", "#111", msk(2026, 9, 20, 18, 0), 3600, StatusToDo)
+	req.DueAt = nil
+	now := msk(2026, 9, 15, 8, 0)
+	got := BuildSchedule([]Item{req}, nil, now, now, now.Add(24*time.Hour))
+	if len(got.Unplanned) != 1 || !got.Unplanned[0].MissingDevDue || got.Unplanned[0].MissingPlan {
+		t.Fatalf("%+v", got.Unplanned)
+	}
+	if len(got.Lanes) != 0 {
+		t.Fatalf("lanes %d", len(got.Lanes))
+	}
+}
+
+func TestBuildScheduleRequestSkippedOnFollowup(t *testing.T) {
+	due := msk(2026, 9, 20, 18, 0)
+	pid := uuid.New()
+	req := requestItem("Review AUTH", &pid, "Alpha", "#111", due, 3600, StatusToDo)
+	now := msk(2026, 9, 15, 8, 0)
+	got := BuildKindSchedule(ScheduleFollowup, []Item{req}, nil, now, now, now.Add(24*time.Hour))
+	if len(got.Lanes) != 0 || len(got.Unplanned) != 0 {
+		t.Fatalf("lanes=%d unplanned=%d", len(got.Lanes), len(got.Unplanned))
+	}
+}
+
+func TestBuildScheduleSkipsNote(t *testing.T) {
+	due := msk(2026, 9, 20, 18, 0)
+	pid := uuid.New()
+	note := taskItem("Note", &pid, "Alpha", "#111", due, 3600, 0, StatusToDo)
+	note.Kind = KindNote
+	now := msk(2026, 9, 15, 8, 0)
+	got := BuildSchedule([]Item{note}, nil, now, now, now.Add(24*time.Hour))
+	if len(got.Lanes) != 0 || len(got.Unplanned) != 0 {
+		t.Fatalf("lanes=%d unplanned=%d", len(got.Lanes), len(got.Unplanned))
 	}
 }
 

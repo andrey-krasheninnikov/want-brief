@@ -1,9 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
+import { openEvent } from '../../shared/taskOverlay'
 import { OpenUrl, UrlField } from '../../shared/UrlField'
 import { PeoplePicker } from '../people/PeoplePicker'
+import { TaskSheet } from '../tasks/TaskSheet'
 import {
   EVENT_TYPES,
   eventTypeLabel,
@@ -17,6 +20,7 @@ import {
   type ProjectLink,
 } from '../../types'
 import { WeekdayGrid } from './WeekdayGrid'
+import './events.css'
 
 type Props = {
   seriesId?: string
@@ -74,6 +78,28 @@ function draftFrom(row?: EventSeries) {
     links: row?.links ?? [],
     people: row?.people ?? [],
   }
+}
+
+export function EventDossierSheet({
+  seriesId,
+  originalOn,
+  onClose,
+}: {
+  seriesId: string
+  originalOn?: string
+  onClose: () => void
+}) {
+  const navigate = useNavigate()
+  return (
+    <TaskSheet open kicker={originalOn ? 'Occurrence' : 'Series'} title="Dossier" onClose={onClose}>
+      <EventDossier
+        seriesId={seriesId}
+        originalOn={originalOn}
+        onCreated={(id) => openEvent(navigate, id)}
+        onDeleted={onClose}
+      />
+    </TaskSheet>
+  )
 }
 
 export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Props) {

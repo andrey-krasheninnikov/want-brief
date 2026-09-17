@@ -154,9 +154,8 @@
   margin-left: 0;
 }
 .sched-deck-card .tasks-timer button {
-  min-height: 2.15rem;
-  padding: 0 0.9rem;
-  font-size: 12px;
+  width: 34px;
+  height: 34px;
 }
 .sched-deck-kicker {
   margin: 0.15rem 0 -0.2rem;
@@ -224,15 +223,14 @@
 .sched-deck-row .tasks-timer {
   margin-left: 0;
 }
-.sched-deck-row .tasks-timer button {
+.sched-deck-row .tasks-timer button:not(.on) {
   background: transparent;
   color: var(--ink);
   border-color: var(--line);
-  min-height: 1.7rem;
-  padding: 0 0.7rem;
-  font-size: 11px;
+  width: 28px;
+  height: 28px;
 }
-.sched-deck-row .tasks-timer button:hover {
+.sched-deck-row .tasks-timer button:not(.on):hover {
   background: var(--bg-3);
 }
 .sched-deck-empty,

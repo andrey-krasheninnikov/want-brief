@@ -37,6 +37,7 @@ type Service struct {
 	PersonAbsences    domain.PersonAbsenceRepository
 	ScheduleSettings  domain.ScheduleSettingsRepository
 	DayOverrides      domain.DayOverrideRepository
+	EarnDays          domain.EarnDayRepository
 	Snapshots         domain.ScheduleSnapshotRepository
 	ProjectNotes      domain.ProjectNoteRepository
 	ItemNotes         domain.ItemNoteRepository

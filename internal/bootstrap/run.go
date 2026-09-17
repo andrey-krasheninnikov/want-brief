@@ -99,6 +99,7 @@ func Run(ctx context.Context, cfg Config) error {
 		PersonAbsences:    postgres.PersonAbsenceRepo{Store: store},
 		ScheduleSettings:  postgres.ScheduleSettingsRepo{Store: store},
 		DayOverrides:      postgres.DayOverrideRepo{Store: store},
+		EarnDays:          postgres.EarnDayRepo{Store: store},
 		Snapshots:         postgres.ScheduleSnapshotRepo{Store: store},
 		ProjectNotes:      postgres.ProjectNoteRepo{Store: store},
 		ItemNotes:         postgres.ItemNoteRepo{Store: store},

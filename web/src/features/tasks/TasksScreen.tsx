@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState, type DragEvent, type FormEvent } from '
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../api'
-import { dueWithinWeek, itemCost } from '../../shared/format'
+import { dueStageOpen, dueWithinWeek, itemCost, type DueSlot } from '../../shared/format'
 import { moscowRange } from '../../shared/moscow'
 import {
   KINDS,
@@ -255,8 +255,8 @@ function TasksWorkspace() {
       if (onlyI && !item.important) return false
       if (
         week &&
-        !['dueAt', 'devDueAt', 'reviewDueAt', 'testDueAt'].some((key) =>
-          dueWithinWeek(item[key as 'dueAt'], now),
+        !(['dueAt', 'devDueAt', 'reviewDueAt', 'testDueAt'] as DueSlot[]).some(
+          (key) => dueStageOpen(item.status, key) && dueWithinWeek(item[key], now),
         )
       )
         return false

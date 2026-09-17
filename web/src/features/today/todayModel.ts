@@ -1,10 +1,11 @@
+import { dueStageOpen, type DueSlot } from '../../shared/format'
 import { isOverdue, nearestDue } from '../tasks/sortColumn'
 import { zonedYmd, type NowPick } from '../schedule/now'
 import type { AtRiskItem, Item, ScheduleBlock, ScheduleBusy } from '../../types'
 
 export const DEFAULT_USD_RUB = 85
 
-const DUE_KEYS = ['dueAt', 'devDueAt', 'reviewDueAt', 'testDueAt'] as const
+const DUE_KEYS = ['dueAt', 'devDueAt', 'reviewDueAt', 'testDueAt'] as const satisfies readonly DueSlot[]
 
 export const RISK_CAP = 8
 
@@ -77,7 +78,7 @@ export function remainingAgenda(
 function dueOnDay(item: DueItem, ymd: string, tz: string): boolean {
   return DUE_KEYS.some((key) => {
     const iso = item[key]
-    return iso != null && zonedYmd(iso, tz) === ymd
+    return iso != null && dueStageOpen(item.status, key) && zonedYmd(iso, tz) === ymd
   })
 }
 
@@ -145,12 +146,7 @@ export type EarnProject = {
   id: string
   monthlyIncomeUsd: number
   monthlyIncomeRub: number
-  targetHoursDay: number
-}
-
-export type EarnLoad = {
-  projectId: string | null
-  allocatedSeconds: number
+  archivedAt: string | null
 }
 
 export type EarnResult = {
@@ -158,26 +154,80 @@ export type EarnResult = {
   rub: number
 }
 
+export type EarnDayPoint = {
+  day: string
+  daily: number
+  cumulative: number
+}
+
 export function daysInYmdMonth(ymd: string): number {
   const [year, month] = ymd.split('-').map(Number)
   return new Date(Date.UTC(year, month, 0)).getUTCDate()
 }
 
-export function todayEarn(projects: EarnProject[], loads: EarnLoad[], ymd: string): EarnResult {
-  const byId = new Map(projects.map((row) => [row.id, row]))
+export function isMoscowWeekday(ymd: string): boolean {
+  const weekday = new Date(`${ymd}T12:00:00+03:00`).getUTCDay()
+  return weekday !== 0 && weekday !== 6
+}
+
+export function weekdaysInMonth(ymd: string): number {
+  const [year, month] = ymd.split('-').map(Number)
+  const days = daysInYmdMonth(ymd)
+  let count = 0
+  for (let day = 1; day <= days; day++) {
+    const stamp = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    if (isMoscowWeekday(stamp)) count += 1
+  }
+  return count
+}
+
+function activeIncome(projects: EarnProject[]): EarnResult {
   let usd = 0
   let rub = 0
-  for (const row of loads) {
-    if (!row.projectId || row.allocatedSeconds <= 0) continue
-    const project = byId.get(row.projectId)
-    if (!project || project.targetHoursDay <= 0) continue
-    const monthHours = project.targetHoursDay * daysInYmdMonth(ymd)
-    if (monthHours <= 0) continue
-    const share = row.allocatedSeconds / 3600 / monthHours
-    usd += project.monthlyIncomeUsd * share
-    rub += project.monthlyIncomeRub * share
+  for (const project of projects) {
+    if (project.archivedAt) continue
+    usd += project.monthlyIncomeUsd
+    rub += project.monthlyIncomeRub
   }
   return { usd, rub }
+}
+
+export function dailyEarn(projects: EarnProject[], ymd: string): EarnResult {
+  const weekdays = weekdaysInMonth(ymd)
+  if (weekdays <= 0) return { usd: 0, rub: 0 }
+  const income = activeIncome(projects)
+  return { usd: income.usd / weekdays, rub: income.rub / weekdays }
+}
+
+export function todayEarn(projects: EarnProject[], ymd: string): EarnResult {
+  if (!isMoscowWeekday(ymd)) return { usd: 0, rub: 0 }
+  return dailyEarn(projects, ymd)
+}
+
+export function monthYmdsThrough(ymd: string): string[] {
+  const [year, month] = ymd.split('-').map(Number)
+  const last = Number(ymd.slice(8))
+  return Array.from({ length: last }, (_, i) => {
+    const day = i + 1
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  })
+}
+
+export function earnChartDays(
+  ymd: string,
+  snapshots: { day: string; usd: number; rub: number }[],
+  live: EarnResult,
+  rate: number,
+): EarnDayPoint[] {
+  const byDay = new Map(snapshots.map((row) => [row.day, row]))
+  let cumulative = 0
+  return monthYmdsThrough(ymd).map((day) => {
+    const snap = byDay.get(day)
+    const raw = snap ?? (isMoscowWeekday(day) ? live : { usd: 0, rub: 0 })
+    const total = earnTotals(raw.usd, raw.rub, rate)
+    cumulative += total.usd
+    return { day, daily: total.usd, cumulative }
+  })
 }
 
 export function parseUsdRubRate(raw: string, fallback = DEFAULT_USD_RUB): number {

@@ -1227,9 +1227,33 @@ a.matrix-cell:hover { background: var(--bg-3); }
   margin-left: auto;
 }
 .tasks-timer button {
+  width: 34px;
+  height: 34px;
   min-height: 0;
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tasks-timer button.on {
+  color: var(--ink);
+  background: linear-gradient(
+    120deg,
+    var(--accent),
+    var(--accent-2),
+    color-mix(in srgb, var(--accent-2) 55%, #fff),
+    var(--accent)
+  );
+  background-size: 220% 220%;
+  animation: timer-wash 7s ease-in-out infinite;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.tasks-timer button.on:hover { color: var(--ink); filter: brightness(1.08); }
+@keyframes timer-wash {
+  50% { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tasks-timer button.on { animation: none; }
 }
 .tasks-track {
   display: grid;
@@ -1354,6 +1378,7 @@ a.matrix-cell:hover { background: var(--bg-3); }
   color: color-mix(in srgb, var(--muted) calc((1 - var(--due-heat, 0)) * 100%), #e8943a calc(var(--due-heat, 0) * 100%));
 }
 .tasks-due-line.overdue { color: var(--danger); font-weight: 600; }
+.tasks-due-line.met { color: var(--ok); }
 .tasks-form label.tasks-due {
   color: color-mix(in srgb, var(--muted) calc((1 - var(--due-heat, 0)) * 100%), #e8943a calc(var(--due-heat, 0) * 100%));
 }

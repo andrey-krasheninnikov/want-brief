@@ -6,6 +6,7 @@ import type {
   CheckinKind,
   DayOverride,
   DayOverrideDraft,
+  EarnDay,
   Person,
   PersonAbsence,
   PersonNote,
@@ -170,6 +171,10 @@ export const api = {
   latestCheckins: () => request<LatestCheckins>('/api/checkins/latest'),
   createCheckin: (kind: CheckinKind, level: number) =>
     request('/api/checkins', { method: 'POST', body: JSON.stringify({ kind, level }) }),
+  earnDays: (from: string, to: string) =>
+    request<EarnDay[]>(`/api/earn/days?${new URLSearchParams({ from, to })}`),
+  putEarnDay: (day: string, body: { usd: number; rub: number }) =>
+    request<EarnDay>(`/api/earn/days/${day}`, { method: 'PUT', body: JSON.stringify(body) }),
   events: (from?: string, to?: string) => {
     const params = new URLSearchParams()
     if (from) params.set('from', from)

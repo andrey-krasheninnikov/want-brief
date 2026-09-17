@@ -1,4 +1,4 @@
-import { ArrowCounterClockwise, ArrowsClockwise, ChatTeardrop, Clock, Copy, Pause, Trash } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowsClockwise, ChatTeardrop, Clock, Copy, Snowflake, Trash } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
@@ -295,7 +295,7 @@ export function TaskBrief({ item, task, onGone }: Props) {
               aria-label={item.archivedAt ? 'Restore' : 'Stall'}
               onClick={() => setModal('stall')}
             >
-              {item.archivedAt ? <ArrowCounterClockwise size={18} weight="light" /> : <Pause size={18} weight="light" />}
+              {item.archivedAt ? <ArrowCounterClockwise size={18} weight="light" /> : <Snowflake size={18} weight="light" />}
             </button>
             <button
               type="button"
@@ -309,8 +309,8 @@ export function TaskBrief({ item, task, onGone }: Props) {
             </button>
             {hint('sync')}
             {hint('delete')}
+            <TaskTimer itemId={item.id} running={running} prominent />
           </div>
-          <TaskTimer itemId={item.id} running={running} prominent />
         </div>
       </section>
 

@@ -39,8 +39,22 @@ export function elapsed(startedAt: string, now = Date.now()): string {
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
-export function dueHeat(iso: string | null, status: string, now = Date.now()): number {
-  if (!iso || status === 'done' || status === 'cancelled') return 0
+export type DueSlot = 'dueAt' | 'devDueAt' | 'reviewDueAt' | 'testDueAt'
+
+const DEV_OPEN = new Set(['backlog', 'needs_grooming', 'to_do', 'in_progress', 'blocked'])
+const REVIEW_OPEN = new Set([...DEV_OPEN, 'review'])
+const TEST_OPEN = new Set([...REVIEW_OPEN, 'qa'])
+
+export function dueStageOpen(status: string, slot: DueSlot): boolean {
+  if (status === 'done' || status === 'cancelled') return false
+  if (slot === 'dueAt') return true
+  if (slot === 'devDueAt') return DEV_OPEN.has(status)
+  if (slot === 'reviewDueAt') return REVIEW_OPEN.has(status)
+  return TEST_OPEN.has(status)
+}
+
+export function dueHeat(iso: string | null, status: string, slot: DueSlot, now = Date.now()): number {
+  if (!iso || !dueStageOpen(status, slot)) return 0
   const due = new Date(iso).getTime()
   if (Number.isNaN(due)) return 0
   if (due <= now) return 1

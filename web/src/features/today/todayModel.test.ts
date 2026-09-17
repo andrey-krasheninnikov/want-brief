@@ -1,12 +1,15 @@
 import { pickNow } from '../schedule/now'
 import {
   atRiskToday,
+  dailyEarn,
   daysInYmdMonth,
+  earnChartDays,
   earnTotals,
   featuredBlock,
   parseUsdRubRate,
   remainingAgenda,
   todayEarn,
+  weekdaysInMonth,
   type DueItem,
 } from './todayModel'
 import type { AtRiskItem, ScheduleBlock, ScheduleBusy } from '../../types'
@@ -123,6 +126,30 @@ equal(risk.find((row) => row.itemId === 'late-a')?.late, true, 'late flag')
 equal(risk.find((row) => row.itemId === 'over-d')?.overdue, true, 'overdue flag')
 equal(risk.find((row) => row.itemId === 'due-c')?.overdue, false, 'due today is not overdue at noon UTC')
 
+const closedDev = item({
+  id: 'closed-dev',
+  title: 'Closed Dev',
+  status: 'qa',
+  devDueAt: '2026-09-01T00:00:00Z',
+})
+equal(atRiskToday([], [], [closedDev], ymd, tz, now).length, 0, 'qa ignores past dev due')
+
+const qaReviewToday = item({
+  id: 'qa-rev',
+  title: 'QA review',
+  status: 'qa',
+  reviewDueAt: '2026-09-17T18:00:00Z',
+})
+equal(atRiskToday([], [], [qaReviewToday], ymd, tz, now).length, 0, 'qa ignores review due today')
+
+const qaTestToday = item({
+  id: 'qa-test',
+  title: 'QA test',
+  status: 'qa',
+  testDueAt: '2026-09-17T18:00:00Z',
+})
+equal(atRiskToday([], [], [qaTestToday], ymd, tz, now)[0]?.itemId, 'qa-test', 'qa still sees test due today')
+
 const many = Array.from({ length: 9 }, (_, i) =>
   item({ id: `cap-${i}`, title: `Cap ${i}`, dueAt: `2026-09-17T0${i}:00:00Z` }),
 )
@@ -130,25 +157,41 @@ equal(atRiskToday([], [], many, ymd, tz, now).length, 8, 'caps at 8')
 
 equal(daysInYmdMonth('2026-09-17'), 30, 'september days')
 equal(daysInYmdMonth('2026-02-01'), 28, 'february 2026')
+equal(weekdaysInMonth('2026-09-17'), 22, 'september weekdays')
 
-const earned = todayEarn(
-  [
-    { id: 'p1', monthlyIncomeUsd: 3000, monthlyIncomeRub: 255000, targetHoursDay: 2 },
-    { id: 'p2', monthlyIncomeUsd: 1000, monthlyIncomeRub: 1000, targetHoursDay: 0 },
-  ],
-  [
-    { projectId: 'p1', allocatedSeconds: 2 * 3600 },
-    { projectId: 'p2', allocatedSeconds: 2 * 3600 },
-    { projectId: null, allocatedSeconds: 3600 },
-  ],
-  ymd,
+const projects = [
+  { id: 'p1', monthlyIncomeUsd: 1200, monthlyIncomeRub: 22000, archivedAt: null },
+  { id: 'p2', monthlyIncomeUsd: 1000, monthlyIncomeRub: 0, archivedAt: null },
+  { id: 'p3', monthlyIncomeUsd: 9999, monthlyIncomeRub: 9999, archivedAt: '2026-01-01T00:00:00Z' },
+]
+const earned = todayEarn(projects, ymd)
+equal(earned.usd, 100, 'usd = active income / 22 weekdays')
+equal(earned.rub, 1000, 'rub independent of usd')
+equal(todayEarn(projects, '2026-09-19').usd, 0, 'saturday is zero')
+equal(dailyEarn(projects, '2026-09-19').usd, 100, 'weekday rate still available on saturday')
+
+const chart = earnChartDays('2026-09-03', [], { usd: 100, rub: 0 }, 85)
+equal(
+  chart.map((row) => Math.round(row.cumulative)),
+  [100, 200, 300],
+  'cumulative bars grow on weekdays 1-3 september',
 )
-equal(Math.round(earned.usd), 100, 'usd = monthly * 2h / (2h * 30d)')
-equal(Math.round(earned.rub), 8500, 'rub independent of usd')
+equal(
+  earnChartDays('2026-09-07', [], { usd: 100, rub: 0 }, 85).map((row) => Math.round(row.cumulative)),
+  [100, 200, 300, 400, 400, 400, 500],
+  'weekend days add no height',
+)
+equal(
+  earnChartDays('2026-09-02', [{ day: '2026-09-01', usd: 50, rub: 0 }], { usd: 100, rub: 0 }, 85).map((row) =>
+    Math.round(row.cumulative),
+  ),
+  [50, 150],
+  'snapshot beats live estimate',
+)
 
 const totals = earnTotals(earned.usd, earned.rub, 85)
-equal(Math.round(totals.usd), 200, 'total usd adds rub/rate')
-equal(Math.round(totals.rub), 17000, 'total rub adds usd*rate')
+equal(Math.round(totals.usd), 112, 'total usd adds rub/rate')
+equal(Math.round(totals.rub), 9500, 'total rub adds usd*rate')
 equal(parseUsdRubRate('90'), 90, 'parses rate')
 equal(parseUsdRubRate('nope', 85), 85, 'junk keeps fallback')
 equal(parseUsdRubRate('0', 85), 85, 'non-positive ignored')

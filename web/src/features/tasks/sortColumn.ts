@@ -1,20 +1,22 @@
-import { dueHeat } from '../../shared/format'
+import { dueHeat, dueStageOpen, type DueSlot } from '../../shared/format'
 import type { Item } from '../../types'
 
-const DUE_KEYS = ['dueAt', 'devDueAt', 'reviewDueAt', 'testDueAt'] as const
+const DUE_KEYS = ['dueAt', 'devDueAt', 'reviewDueAt', 'testDueAt'] as const satisfies readonly DueSlot[]
 
 export type DueFields = Pick<Item, 'status' | 'dueAt' | 'devDueAt' | 'reviewDueAt' | 'testDueAt'>
 
 export type SortableItem = DueFields & Pick<Item, 'urgent' | 'important' | 'createdAt'>
 
 function dueTimes(item: DueFields): number[] {
-  return DUE_KEYS.map((key) => (item[key] ? new Date(item[key] as string).getTime() : NaN)).filter(
-    (time) => !Number.isNaN(time),
-  )
+  return DUE_KEYS.flatMap((key) => {
+    if (!item[key] || !dueStageOpen(item.status, key)) return []
+    const time = new Date(item[key] as string).getTime()
+    return Number.isNaN(time) ? [] : [time]
+  })
 }
 
 export function isOverdue(item: DueFields, now = Date.now()): boolean {
-  return DUE_KEYS.some((key) => dueHeat(item[key], item.status, now) >= 1)
+  return DUE_KEYS.some((key) => dueHeat(item[key], item.status, key, now) >= 1)
 }
 
 export function nearestDue(item: DueFields): number | null {

@@ -1,4 +1,4 @@
-import { nearestDue, sortColumn, type SortableItem } from './sortColumn'
+import { isOverdue, nearestDue, sortColumn, type SortableItem } from './sortColumn'
 
 const now = Date.parse('2026-09-17T00:00:00Z')
 
@@ -35,4 +35,11 @@ equal(ranked[3], later, 'later due')
 equal(ranked[4], fresh, 'newer created')
 equal(ranked[5], old, 'older created last')
 equal(nearestDue(soon), Date.parse('2026-09-20T00:00:00Z'), 'nearestDue')
+equal(isOverdue(item({ status: 'review', devDueAt: '2026-09-10T00:00:00Z' }), now), false, 'closed dev due')
+equal(isOverdue(item({ status: 'review', reviewDueAt: '2026-09-10T00:00:00Z' }), now), true, 'open review due')
+equal(
+  nearestDue(item({ status: 'review', devDueAt: '2026-09-01T00:00:00Z', dueAt: '2026-09-20T00:00:00Z' })),
+  Date.parse('2026-09-20T00:00:00Z'),
+  'nearestDue skips closed slot',
+)
 console.log('sortColumn ok')

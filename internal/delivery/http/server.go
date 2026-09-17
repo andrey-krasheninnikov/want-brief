@@ -72,6 +72,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/stress", s.withAuth(s.createStress))
 	mux.HandleFunc("POST /api/checkins", s.withAuth(s.createCheckin))
 	mux.HandleFunc("GET /api/checkins/latest", s.withAuth(s.latestCheckins))
+	mux.HandleFunc("GET /api/earn/days", s.withAuth(s.listEarnDays))
+	mux.HandleFunc("PUT /api/earn/days/{day}", s.withAuth(s.putEarnDay))
 	mux.HandleFunc("GET /api/events", s.withAuth(s.listEvents))
 	mux.HandleFunc("GET /api/event-series", s.withAuth(s.listEventSeries))
 	mux.HandleFunc("POST /api/events", s.withAuth(s.createEvent))

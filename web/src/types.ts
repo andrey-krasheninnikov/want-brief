@@ -680,6 +680,13 @@ export type ScheduleSettings = {
   stabilityThresholdMin: number
 }
 
+export type EarnDay = {
+  day: string
+  usd: number
+  rub: number
+  updatedAt: string
+}
+
 export type DayOverride = {
   day: string
   off: boolean

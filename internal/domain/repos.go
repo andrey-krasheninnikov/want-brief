@@ -165,6 +165,11 @@ type DayOverrideRepository interface {
 	Delete(ctx context.Context, day Ymd) error
 }
 
+type EarnDayRepository interface {
+	ListRange(ctx context.Context, from, to Ymd) ([]EarnDay, error)
+	Upsert(ctx context.Context, day EarnDay) (EarnDay, error)
+}
+
 type ScheduleSnapshotRepository interface {
 	Get(ctx context.Context, kind ScheduleKind) (ScheduleSnapshot, error)
 	Save(ctx context.Context, snapshot ScheduleSnapshot) error

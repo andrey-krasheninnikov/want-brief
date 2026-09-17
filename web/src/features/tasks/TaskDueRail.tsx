@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import { DateField } from '../../shared/DateField'
-import { createdLabel, dueHeat, dueRemain } from '../../shared/format'
+import { createdLabel, dueHeat, dueRemain, dueStageOpen } from '../../shared/format'
 import type { Item } from '../../types'
 
 const slots = [
@@ -24,6 +24,12 @@ function isoOf(item: Item, key: DueKey): string | null {
   return item[key]
 }
 
+function toneClass(overdue: boolean, met: boolean): string {
+  if (overdue) return 'overdue'
+  if (met) return 'met'
+  return ''
+}
+
 export function TaskDueRail({ item, values, onChange, onCommit, compact }: Props) {
   const [open, setOpen] = useState<DueKey | null>(null)
   const rows = item.kind === 'task' ? slots : slots.filter((slot) => slot.key === 'dueAt')
@@ -35,15 +41,17 @@ export function TaskDueRail({ item, values, onChange, onCommit, compact }: Props
         {visible.map((slot) => {
           const iso = isoOf(item, slot.key)
           if (!iso) return null
-          const heat = dueHeat(iso, item.status)
-          const remain = dueRemain(iso)
+          const stageOpen = dueStageOpen(item.status, slot.key)
+          const heat = dueHeat(iso, item.status, slot.key)
+          const remain = stageOpen ? dueRemain(iso) : ''
           const overdue = heat >= 1
+          const met = Boolean(iso) && !stageOpen
           const when = createdLabel(iso)
           const text = [slot.label, when, remain].filter(Boolean).join(' · ')
           return (
             <p
               key={slot.key}
-              className={overdue ? 'tasks-due-line overdue' : 'tasks-due-line'}
+              className={['tasks-due-line', toneClass(overdue, met)].filter(Boolean).join(' ')}
               style={{ '--due-heat': heat } as CSSProperties}
             >
               {text}
@@ -57,14 +65,16 @@ export function TaskDueRail({ item, values, onChange, onCommit, compact }: Props
     <div className="tasks-due-rail">
       {visible.map((slot) => {
         const iso = isoOf(item, slot.key)
-        const heat = dueHeat(iso, item.status)
-        const remain = dueRemain(iso)
+        const stageOpen = dueStageOpen(item.status, slot.key)
+        const heat = dueHeat(iso, item.status, slot.key)
+        const remain = stageOpen ? dueRemain(iso) : iso ? createdLabel(iso) : ''
         const overdue = heat >= 1
+        const met = Boolean(iso) && !stageOpen
         const editing = open === slot.key
         return (
           <article
             key={slot.key}
-            className={overdue ? 'tasks-due-card overdue' : 'tasks-due-card'}
+            className={['tasks-due-card', toneClass(overdue, met)].filter(Boolean).join(' ')}
             style={{ '--due-heat': heat } as CSSProperties}
           >
             <strong>{slot.label}</strong>

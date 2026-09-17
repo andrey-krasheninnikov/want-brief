@@ -256,32 +256,50 @@ button.dossier-chip:hover {
   margin-left: 0;
   justify-self: start;
   gap: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.tasks-dossier .tasks-timer.on {
   padding: 0.25rem 0.3rem 0.25rem 0.75rem;
   border-radius: 999px;
   background: var(--dc-surface-2);
   border: 1px solid var(--dc-edge);
-  font-variant-numeric: tabular-nums;
 }
-.tasks-dossier .tasks-timer button {
-  padding: 0.4rem 0.85rem;
+.tasks-dossier .tasks-timer button.ghost {
+  width: 34px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 11px;
+  background: var(--dc-surface-2);
+  border-color: var(--dc-edge);
+}
+.tasks-dossier .tasks-timer button.ghost:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--ink);
+  filter: none;
+  transform: translateY(-1px);
+}
+.tasks-dossier .tasks-timer button.on {
+  width: 34px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent-2) 65%, var(--accent)));
+  color: var(--ink);
+  background: linear-gradient(
+    120deg,
+    var(--accent),
+    var(--accent-2),
+    color-mix(in srgb, var(--accent-2) 55%, #fff),
+    var(--accent)
+  );
+  background-size: 220% 220%;
+  animation: timer-wash 7s ease-in-out infinite;
   box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 28%, transparent);
 }
-.tasks-dossier .tasks-timer button:hover { color: var(--ink); filter: brightness(1.08); }
-.tasks-timer-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 999px;
-  background: var(--ok);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent);
-  animation: dossier-pulse 1.8s ease-in-out infinite;
-}
-@keyframes dossier-pulse {
-  50% { opacity: 0.45; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tasks-timer-dot { animation: none; }
+.tasks-dossier .tasks-timer button.on:hover {
+  color: var(--ink);
+  filter: brightness(1.08);
 }
 
 /* Flags with labels */
@@ -323,6 +341,10 @@ button.dossier-chip:hover {
 .tasks-due-card.overdue {
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.tasks-due-card.met {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 28%, transparent);
 }
 .tasks-due-card strong {
   font-size: 11px;

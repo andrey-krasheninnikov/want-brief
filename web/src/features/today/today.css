@@ -239,6 +239,35 @@
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+.today-earn-months {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  min-height: 6.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.today-earn-months li {
+  flex: 1 1 0;
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  min-height: 6rem;
+  min-width: 0;
+}
+.today-earn-months b {
+  width: 100%;
+  max-width: 1.4rem;
+  align-self: end;
+  border-radius: 999px 999px 4px 4px;
+  background: color-mix(in srgb, var(--accent) 80%, white 8%);
+  min-height: 4px;
+}
+.today-earn-months small {
+  font-size: 10px;
+  color: var(--muted);
+}
 
 @keyframes today-up {
   from { opacity: 0; transform: translateY(16px); }

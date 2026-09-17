@@ -4,7 +4,9 @@ import {
   dailyEarn,
   daysInYmdMonth,
   earnChartDays,
+  earnChartMonths,
   earnTotals,
+  monthEarn,
   featuredBlock,
   parseUsdRubRate,
   remainingAgenda,
@@ -170,23 +172,37 @@ equal(earned.rub, 1000, 'rub independent of usd')
 equal(todayEarn(projects, '2026-09-19').usd, 0, 'saturday is zero')
 equal(dailyEarn(projects, '2026-09-19').usd, 100, 'weekday rate still available on saturday')
 
+equal(monthEarn(projects), { usd: 2200, rub: 22000 }, 'full month is active income')
+
 const chart = earnChartDays('2026-09-03', [], { usd: 100, rub: 0 }, 85)
 equal(
-  chart.map((row) => Math.round(row.cumulative)),
-  [100, 200, 300],
-  'cumulative bars grow on weekdays 1-3 september',
+  chart.map((row) => Math.round(row.daily)),
+  [100, 100, 100],
+  'weekday bars are that day not a running total',
 )
 equal(
-  earnChartDays('2026-09-07', [], { usd: 100, rub: 0 }, 85).map((row) => Math.round(row.cumulative)),
-  [100, 200, 300, 400, 400, 400, 500],
-  'weekend days add no height',
+  earnChartDays('2026-09-07', [], { usd: 100, rub: 0 }, 85).map((row) => Math.round(row.daily)),
+  [100, 100, 100, 100, 0, 0, 100],
+  'weekend days are zero',
 )
 equal(
   earnChartDays('2026-09-02', [{ day: '2026-09-01', usd: 50, rub: 0 }], { usd: 100, rub: 0 }, 85).map((row) =>
-    Math.round(row.cumulative),
+    Math.round(row.daily),
   ),
-  [50, 150],
+  [50, 100],
   'snapshot beats live estimate',
+)
+
+const months = earnChartMonths(
+  '2026-09-07',
+  [{ day: '2026-03-15', usd: 50, rub: 0 }],
+  { usd: 100, rub: 0 },
+  85,
+)
+equal(
+  months.map((row) => `${row.label}:${Math.round(row.total)}`),
+  ['Jan:0', 'Feb:0', 'Mar:50', 'Apr:0', 'May:0', 'Jun:0', 'Jul:0', 'Aug:0', 'Sep:500'],
+  'past months use snapshots only; current month fills through today',
 )
 
 const totals = earnTotals(earned.usd, earned.rub, 85)

@@ -157,8 +157,15 @@ export type EarnResult = {
 export type EarnDayPoint = {
   day: string
   daily: number
-  cumulative: number
 }
+
+export type EarnMonthPoint = {
+  month: string
+  label: string
+  total: number
+}
+
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export function daysInYmdMonth(ymd: string): number {
   const [year, month] = ymd.split('-').map(Number)
@@ -204,6 +211,10 @@ export function todayEarn(projects: EarnProject[], ymd: string): EarnResult {
   return dailyEarn(projects, ymd)
 }
 
+export function monthEarn(projects: EarnProject[]): EarnResult {
+  return activeIncome(projects)
+}
+
 export function monthYmdsThrough(ymd: string): string[] {
   const [year, month] = ymd.split('-').map(Number)
   const last = Number(ymd.slice(8))
@@ -220,13 +231,38 @@ export function earnChartDays(
   rate: number,
 ): EarnDayPoint[] {
   const byDay = new Map(snapshots.map((row) => [row.day, row]))
-  let cumulative = 0
   return monthYmdsThrough(ymd).map((day) => {
     const snap = byDay.get(day)
     const raw = snap ?? (isMoscowWeekday(day) ? live : { usd: 0, rub: 0 })
-    const total = earnTotals(raw.usd, raw.rub, rate)
-    cumulative += total.usd
-    return { day, daily: total.usd, cumulative }
+    return { day, daily: earnTotals(raw.usd, raw.rub, rate).usd }
+  })
+}
+
+export function earnChartMonths(
+  ymd: string,
+  snapshots: { day: string; usd: number; rub: number }[],
+  live: EarnResult,
+  rate: number,
+): EarnMonthPoint[] {
+  const year = ymd.slice(0, 4)
+  const current = Number(ymd.slice(5, 7))
+  const booked = new Map<string, number>()
+  for (const row of snapshots) {
+    const key = row.day.slice(0, 7)
+    if (!key.startsWith(`${year}-`)) continue
+    const month = Number(key.slice(5, 7))
+    if (month < 1 || month >= current) continue
+    booked.set(key, (booked.get(key) ?? 0) + earnTotals(row.usd, row.rub, rate).usd)
+  }
+  const currentTotal = earnChartDays(ymd, snapshots, live, rate).reduce((sum, row) => sum + row.daily, 0)
+  return Array.from({ length: current }, (_, i) => {
+    const month = i + 1
+    const key = `${year}-${String(month).padStart(2, '0')}`
+    return {
+      month: key,
+      label: MONTH_LABELS[i],
+      total: month === current ? currentTotal : (booked.get(key) ?? 0),
+    }
   })
 }
 

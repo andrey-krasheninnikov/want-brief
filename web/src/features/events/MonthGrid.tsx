@@ -1,12 +1,15 @@
 import type { EventOccurrence } from '../../types'
+import { eventMeta, eventTone, type EventLookups } from './eventMeta'
 
 type Props = {
   weeks: string[][]
   month: number
   rows: EventOccurrence[]
+  lookups: EventLookups
   today: string
   selectedId?: string
-  onPick: (id: string) => void
+  selectedOn?: string
+  onPick: (seriesId: string, originalOn: string) => void
 }
 
 function ymdOf(iso: string): string {
@@ -26,7 +29,7 @@ function dayNum(ymd: string): string {
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-export function MonthGrid({ weeks, month, rows, today, selectedId, onPick }: Props) {
+export function MonthGrid({ weeks, month, rows, lookups, today, selectedId, selectedOn, onPick }: Props) {
   const byDay = new Map<string, EventOccurrence[]>()
   for (const row of rows) {
     const key = ymdOf(row.startsAt)
@@ -52,16 +55,21 @@ export function MonthGrid({ weeks, month, rows, today, selectedId, onPick }: Pro
             return (
               <div key={ymd} className={['cal-month-day', inMonth ? '' : 'out', ymd === today ? 'today' : ''].filter(Boolean).join(' ')}>
                 <strong>{dayNum(ymd)}</strong>
-                {shown.map((row) => (
-                  <button
-                    key={`${row.seriesId}-${row.startsAt}`}
-                    type="button"
-                    className={row.seriesId === selectedId ? 'cal-chip on' : 'cal-chip'}
-                    onClick={() => onPick(row.seriesId)}
-                  >
-                    {row.title}
-                  </button>
-                ))}
+                {shown.map((row) => {
+                  const meta = eventMeta(row, lookups)
+                  return (
+                    <button
+                      key={`${row.seriesId}-${row.originalOn}`}
+                      type="button"
+                      className={row.seriesId === selectedId && row.originalOn === selectedOn ? 'cal-chip on' : 'cal-chip'}
+                      style={eventTone(meta.color)}
+                      onClick={() => onPick(row.seriesId, row.originalOn)}
+                    >
+                      <span>{row.title}</span>
+                      {meta.line ? <small>{meta.line}</small> : null}
+                    </button>
+                  )
+                })}
                 {extra > 0 ? <small>+{extra}</small> : null}
               </div>
             )

@@ -5,7 +5,7 @@ type Props = {
   row: EventOccurrence
   selected: boolean
   delay: number
-  onPick: (id: string) => void
+  onPick: (seriesId: string, originalOn: string) => void
 }
 
 function formatTime(iso: string): string {
@@ -15,7 +15,7 @@ function formatTime(iso: string): string {
 export function EventCard({ row, selected, delay, onPick }: Props) {
   return (
     <article className={selected ? 'events-slot on' : 'events-slot'} style={{ '--d': delay } as CSSProperties}>
-      <div className="events-slot-core" onClick={() => onPick(row.seriesId)}>
+      <div className="events-slot-core" onClick={() => onPick(row.seriesId, row.originalOn)}>
         <time dateTime={row.startsAt}>
           {formatTime(row.startsAt)}
           <small>{formatTime(row.endsAt)}</small>

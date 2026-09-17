@@ -35,10 +35,16 @@ export function PeopleScreen() {
   const open = view === 'split' && (Boolean(id) || creating)
   const navigate = useNavigate()
   const people = useQuery({ queryKey: ['people'], queryFn: api.people })
+  const companies = useQuery({ queryKey: ['companies'], queryFn: api.companies })
   const [query, setQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
   const list = useMemo(() => (people.data ?? []).filter((person) => personMatches(person, query)), [people.data, query])
+  const companyNames = useMemo(() => {
+    const names = new Map<string, string>()
+    for (const row of companies.data ?? []) names.set(row.id, row.name)
+    return names
+  }, [companies.data])
 
   function goView(next: PeopleView) {
     navigate(peopleHref({ id, view: next, creating: creating && next === 'split' }))
@@ -150,7 +156,7 @@ export function PeopleScreen() {
               </button>
             ) : null}
             {list.map((person) => (
-              <PersonCard key={person.id} person={person} selected={person.id === id} onPick={pick} />
+              <PersonCard key={person.id} person={person} selected={person.id === id} onPick={pick} companyNames={companyNames} />
             ))}
           </div>
           <div className="people-detail">
@@ -190,8 +196,8 @@ export function PeopleScreen() {
           {people.isLoading ? <p className="muted">Loading…</p> : null}
           {people.isError ? <p className="error">{people.error.message}</p> : null}
           {empty ? <p className="people-empty">{query.trim() ? 'No matches.' : 'No people yet.'}</p> : null}
-          {!empty && view === 'list' ? <PeopleTable people={list} onPick={pick} /> : null}
-          {!empty && view === 'kanban' ? <PeopleBoard people={list} onPick={pick} /> : null}
+          {!empty && view === 'list' ? <PeopleTable people={list} companyNames={companyNames} onPick={pick} /> : null}
+          {!empty && view === 'kanban' ? <PeopleBoard people={list} companyNames={companyNames} onPick={pick} /> : null}
         </div>
       )}
     </Window>

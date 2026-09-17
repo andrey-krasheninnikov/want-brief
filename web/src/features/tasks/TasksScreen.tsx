@@ -18,7 +18,7 @@ import {
 } from '../../types'
 import { DRAG_TYPE, TaskCard, decodeTaskDrag } from './TaskCard'
 import { TaskFlag } from './TaskFlag'
-import { TaskLogProvider, useTaskLogPrompt } from './TaskLogPrompt'
+import { useTaskLogPrompt } from './TaskLogPrompt'
 import { TaskDossierSheet } from './TaskPage'
 import { TaskSheet } from './TaskSheet'
 import { useTaskUndo } from './TaskUndo'
@@ -77,11 +77,7 @@ function emptyBuckets(): Record<ItemStatus, Item[]> {
 }
 
 export function TasksScreen() {
-  return (
-    <TaskLogProvider>
-      <TasksWorkspace />
-    </TaskLogProvider>
-  )
+  return <TasksWorkspace />
 }
 
 function TasksWorkspace() {
@@ -164,7 +160,7 @@ function TasksWorkspace() {
         await api.patchItem(vars.id, { status: vars.previous })
         void queryClient.invalidateQueries({ queryKey: ['items'] })
       })
-      if (vars.status === 'done' || vars.status === 'cancelled') promptLog(vars.id)
+      promptLog(vars.id, 'status')
       void queryClient.invalidateQueries({ queryKey: ['items'] })
     },
   })

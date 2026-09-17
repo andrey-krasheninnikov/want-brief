@@ -5,6 +5,7 @@ type Props = {
   open: boolean
   title: string
   kicker?: string
+  titleSlot?: ReactNode
   onClose: () => void
   wide?: boolean
   children: ReactNode
@@ -26,7 +27,7 @@ function focusables(root: HTMLElement) {
   ].filter((node) => !node.closest('.tasks-sheet-back'))
 }
 
-export function TaskSheet({ open, title, kicker = 'New', wide, onClose, children }: Props) {
+export function TaskSheet({ open, title, kicker = 'New', titleSlot, wide, onClose, children }: Props) {
   const dialog = useRef<HTMLElement>(null)
   const prior = useRef<HTMLElement | null>(null)
 
@@ -80,12 +81,13 @@ export function TaskSheet({ open, title, kicker = 'New', wide, onClose, children
         className={wide ? 'tasks-sheet wide' : 'tasks-sheet'}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="tasks-sheet-title"
+        aria-label={titleSlot ? title : undefined}
+        aria-labelledby={titleSlot ? undefined : 'tasks-sheet-title'}
       >
         <div className="tasks-sheet-core">
           <header>
             <p className="tasks-kicker">{kicker}</p>
-            <h2 id="tasks-sheet-title">{title}</h2>
+            {titleSlot ?? <h2 id="tasks-sheet-title">{title}</h2>}
           </header>
           {children}
         </div>

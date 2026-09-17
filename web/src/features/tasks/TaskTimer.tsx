@@ -25,7 +25,7 @@ export function TaskTimer({ itemId, running, prominent }: Props) {
       void queryClient.invalidateQueries({ queryKey: ['intervals'] })
       void queryClient.invalidateQueries({ queryKey: ['items'] })
       void queryClient.invalidateQueries({ queryKey: ['load'] })
-      promptLog(itemId)
+      promptLog(itemId, 'timer_stop')
     },
   })
 
@@ -37,6 +37,7 @@ export function TaskTimer({ itemId, running, prominent }: Props) {
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
+      {running && prominent ? <span className="tasks-timer-dot" aria-hidden /> : null}
       {running ? <span className="mono">{elapsed(running.startedAt)}</span> : null}
       {running ? (
         <button type="button" disabled={stop.isPending} onClick={() => stop.mutate()}>

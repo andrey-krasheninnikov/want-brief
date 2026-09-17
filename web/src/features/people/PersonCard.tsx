@@ -1,10 +1,11 @@
 import type { Person } from '../../types'
-import { bondKindLabel, primaryContact, professionLabel } from './peopleModel'
+import { bondKindLabel, primaryContact, professionLabel, relLabels } from './peopleModel'
 
 type Props = {
   person: Person
   selected: boolean
   onPick: (id: string) => void
+  companyNames: Map<string, string>
 }
 
 export function personInitials(name: string): string {
@@ -14,8 +15,10 @@ export function personInitials(name: string): string {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
 
-export function PersonCard({ person, selected, onPick }: Props) {
+export function PersonCard({ person, selected, onPick, companyNames }: Props) {
   const primary = primaryContact(person)
+  const companies = relLabels(person.companies, companyNames)
+  const meta = [professionLabel(person) || 'No profession', primary?.value, companies].filter(Boolean).join(' · ')
   return (
     <button
       type="button"
@@ -27,10 +30,7 @@ export function PersonCard({ person, selected, onPick }: Props) {
       </span>
       <span className="people-row-copy">
         <strong>{person.name}</strong>
-        <span>
-          {professionLabel(person) || 'No profession'}
-          {primary ? ` · ${primary.value}` : ''}
-        </span>
+        <span>{meta}</span>
       </span>
       <span className="people-row-age">
         {person.age ?? ''}

@@ -1,4 +1,4 @@
-import { Heartbeat, Lightning, Sparkle, Target, type Icon } from '@phosphor-icons/react'
+import { Heartbeat, Lightning, Smiley, Sparkle, Target, type Icon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
@@ -24,6 +24,7 @@ const kpis: { id: keyof NonNullable<LoadReport['averages']>; label: string; Icon
   { id: 'focus', label: 'Focus', Icon: Target },
   { id: 'energy', label: 'Energy', Icon: Lightning },
   { id: 'interest', label: 'Interest', Icon: Sparkle },
+  { id: 'happiness', label: 'Happiness', Icon: Smiley },
 ]
 
 function score(value: number | null | undefined): string {

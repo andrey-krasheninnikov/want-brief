@@ -1,8 +1,8 @@
 import { CaretRight } from '@phosphor-icons/react'
 import { span } from '../../shared/format'
 import { TaskTimer } from '../tasks/TaskTimer'
-import type { ScheduleBlock, TimeInterval } from '../../types'
-import { clock, phaseLabel, quadrantLabel, type NowPick } from './now'
+import { scheduleReasonLabel, type ScheduleBlock, type TimeInterval } from '../../types'
+import { blockSeconds, clock, phaseLabel, quadrantLabel, topReasons, type NowPick } from './now'
 
 export type DeckProject = { name: string; color: string }
 
@@ -12,28 +12,27 @@ type Props = {
   running: TimeInterval[]
   lateCount: number
   lateId: string | null
+  tz: string
   projectOf: (itemId: string) => DeckProject | undefined
   titleOf: (itemId: string) => string | undefined
-  showNext: boolean
   onOpen: (id: string) => void
   onNextWeek: () => void
 }
 
-function blockSeconds(block: ScheduleBlock): number {
-  return Math.max(0, Math.round((new Date(block.endsAt).getTime() - new Date(block.startsAt).getTime()) / 1000))
-}
-
-function dueLabel(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'Europe/Moscow' }).format(
-    new Date(iso),
-  )
+function dueLabel(iso: string, tz: string): string {
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', timeZone: tz }).format(new Date(iso))
 }
 
 function WhyChips({ block }: { block: ScheduleBlock }) {
   return (
-    <span className="sched-block-flags">
+    <span className="sched-block-flags" title={(block.reasons ?? []).map(scheduleReasonLabel).join(' · ')}>
       {block.pinned ? <span className="sched-chip live">Pinned</span> : null}
       <span className="sched-chip">{quadrantLabel(block.quadrant)}</span>
+      {topReasons(block.reasons, 3).map((reason) => (
+        <span key={reason} className="sched-chip why">
+          {scheduleReasonLabel(reason)}
+        </span>
+      ))}
       {block.stress != null ? <span className="sched-chip">Stress {block.stress}</span> : null}
       {block.late ? <span className="sched-chip late">late</span> : null}
     </span>
@@ -44,11 +43,13 @@ function Featured({
   block,
   project,
   interval,
+  tz,
   onOpen,
 }: {
   block: ScheduleBlock
   project?: DeckProject
   interval?: TimeInterval
+  tz: string
   onOpen: (id: string) => void
 }) {
   return (
@@ -65,10 +66,10 @@ function Featured({
         </strong>
         <p className="sched-deck-facts mono">
           <span>
-            {clock(block.startsAt)}-{clock(block.endsAt)}
+            {clock(block.startsAt, tz)}-{clock(block.endsAt, tz)}
           </span>
-          <span>{span(block.remainingSeconds)} left</span>
-          <span>due {dueLabel(block.dueAt)}</span>
+          {block.kind === 'ping' ? <span>ping</span> : <span>{span(block.remainingSeconds)} left</span>}
+          <span>due {dueLabel(block.dueAt, tz)}</span>
         </p>
         <WhyChips block={block} />
       </div>
@@ -81,19 +82,19 @@ function Row({
   block,
   project,
   interval,
-  startable,
+  tz,
   onOpen,
 }: {
   block: ScheduleBlock
   project?: DeckProject
   interval?: TimeInterval
-  startable: boolean
+  tz: string
   onOpen: (id: string) => void
 }) {
   return (
     <li className="sched-deck-row" onClick={() => onOpen(block.itemId)}>
       <time className="mono" dateTime={block.startsAt}>
-        {clock(block.startsAt)}
+        {clock(block.startsAt, tz)}
       </time>
       <i className="sched-swatch" style={{ background: project?.color || 'var(--accent)' }} />
       <span className="sched-deck-row-title">
@@ -104,16 +105,15 @@ function Row({
       <span className="sched-deck-row-span mono">{span(blockSeconds(block))}</span>
       <span className="sched-deck-row-flag">{block.late ? <span className="sched-chip late">late</span> : null}</span>
       <span className="sched-deck-row-timer">
-        <TaskTimer itemId={block.itemId} running={interval} prominent={startable} />
+        <TaskTimer itemId={block.itemId} running={interval} prominent />
       </span>
     </li>
   )
 }
 
-export function NowDeck({ pick, loading, running, lateCount, lateId, projectOf, titleOf, showNext, onOpen, onNextWeek }: Props) {
+export function NowDeck({ pick, loading, running, lateCount, lateId, tz, projectOf, titleOf, onOpen, onNextWeek }: Props) {
   const featured = pick.current[0] ?? pick.upcoming[0]
   const alsoNow = pick.current.slice(1)
-  const next = showNext ? (pick.phase === 'now' ? pick.upcoming : pick.upcoming.slice(1)) : []
   const planned = new Set([...pick.current.map((row) => row.itemId), featured?.itemId].filter(Boolean))
   const offPlan = running.filter((row) => !planned.has(row.itemId))
   const intervalOf = (itemId: string) => running.find((row) => row.itemId === itemId)
@@ -123,8 +123,8 @@ export function NowDeck({ pick, loading, running, lateCount, lateId, projectOf, 
       <div className="sched-deck-core">
         <header className="sched-deck-head">
           <p className="sched-deck-phase">
-            {loading && !featured ? 'Packing' : phaseLabel(pick)}
-            {pick.phase === 'now' ? <span className="mono"> {clock(new Date().toISOString())}</span> : null}
+            {loading && !featured ? 'Packing' : phaseLabel(pick, tz)}
+            {pick.phase === 'now' ? <span className="mono"> {clock(new Date().toISOString(), tz)}</span> : null}
           </p>
           {lateCount > 0 ? (
             <p className="sched-overflow">
@@ -137,7 +137,7 @@ export function NowDeck({ pick, loading, running, lateCount, lateId, projectOf, 
         </header>
         {loading && !featured ? <div className="sched-deck-skel" aria-hidden /> : null}
         {featured ? (
-          <Featured block={featured} project={projectOf(featured.itemId)} interval={intervalOf(featured.itemId)} onOpen={onOpen} />
+          <Featured block={featured} project={projectOf(featured.itemId)} interval={intervalOf(featured.itemId)} tz={tz} onOpen={onOpen} />
         ) : null}
         {!loading && !featured ? (
           <p className="sched-deck-empty">
@@ -157,24 +157,7 @@ export function NowDeck({ pick, loading, running, lateCount, lateId, projectOf, 
                   block={row}
                   project={projectOf(row.itemId)}
                   interval={intervalOf(row.itemId)}
-                  startable
-                  onOpen={onOpen}
-                />
-              ))}
-            </ul>
-          </>
-        ) : null}
-        {next.length > 0 ? (
-          <>
-            <p className="sched-deck-kicker">Up next</p>
-            <ul className="sched-deck-list">
-              {next.map((row) => (
-                <Row
-                  key={`${row.itemId}-${row.startsAt}`}
-                  block={row}
-                  project={projectOf(row.itemId)}
-                  interval={intervalOf(row.itemId)}
-                  startable={false}
+                  tz={tz}
                   onOpen={onOpen}
                 />
               ))}

@@ -7,6 +7,7 @@ import { moscowYmd } from '../../shared/moscow'
 import type { Person } from '../../types'
 import { personInitials } from './PersonCard'
 import { PersonBonds } from './PersonBonds'
+import { PersonAbsences } from './PersonAbsences'
 import { PersonContacts } from './PersonContacts'
 import { PersonLog } from './PersonLog'
 import { PersonNotes } from './PersonNotes'
@@ -28,6 +29,7 @@ type Draft = {
   ageYears: string
   projects: Person['projects']
   events: Person['events']
+  companies: Person['companies']
   items: Person['projects']
 }
 
@@ -35,6 +37,7 @@ const SECTIONS = [
   { id: 'people-sec-overview', label: 'Overview' },
   { id: 'people-sec-professions', label: 'Professions' },
   { id: 'people-sec-contacts', label: 'Contacts' },
+  { id: 'people-sec-absences', label: 'Away' },
   { id: 'people-sec-notes', label: 'Notes' },
   { id: 'people-sec-relations', label: 'Relations' },
   { id: 'people-sec-work', label: 'Work' },
@@ -66,6 +69,7 @@ function draftFrom(row?: Person): Draft {
     ageYears: row?.age != null ? String(row.age) : '',
     projects: row?.projects ?? [],
     events: row?.events ?? [],
+    companies: row?.companies ?? [],
     items: idsToRels(row?.itemIds ?? []),
   }
 }
@@ -79,6 +83,7 @@ function payloadFrom(form: Draft) {
     ageYears: !bornOn && years !== '' ? Number(years) : null,
     projects: form.projects,
     events: form.events,
+    companies: form.companies,
     itemIds: relIds(form.items),
   }
 }
@@ -96,6 +101,7 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
     enabled: Boolean(personId),
   })
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
+  const companies = useQuery({ queryKey: ['companies'], queryFn: api.companies })
   const series = useQuery({ queryKey: ['event-series'], queryFn: api.eventSeries })
   const items = useQuery({ queryKey: ['items'], queryFn: () => api.items({ includeArchived: true }) })
   const [form, setForm] = useState(() => draftFrom())
@@ -142,6 +148,8 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
       void queryClient.invalidateQueries({ queryKey: ['events'] })
       void queryClient.invalidateQueries({ queryKey: ['event'] })
       void queryClient.invalidateQueries({ queryKey: ['items'] })
+      void queryClient.invalidateQueries({ queryKey: ['companies'] })
+      void queryClient.invalidateQueries({ queryKey: ['company'] })
       if (!personId) onCreated(row.id)
     },
     onError: (err) => {
@@ -159,6 +167,8 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
       void queryClient.invalidateQueries({ queryKey: ['event'] })
       void queryClient.invalidateQueries({ queryKey: ['event-series'] })
       void queryClient.invalidateQueries({ queryKey: ['items'] })
+      void queryClient.invalidateQueries({ queryKey: ['companies'] })
+      void queryClient.invalidateQueries({ queryKey: ['company'] })
       onDeleted()
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Could not delete.'),
@@ -295,10 +305,17 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
       {row ? <PersonProfessions personId={personId} professions={row.professions ?? []} /> : null}
       {row ? <PersonContacts personId={personId} contacts={row.contacts ?? []} /> : null}
       {row ? <PersonSites personId={personId} sites={row.sites ?? []} /> : null}
+      {row ? <PersonAbsences personId={personId} absences={row.absences ?? []} /> : null}
       {row ? <PersonNotes personId={personId} notes={notes.data ?? []} /> : null}
       {row ? <PersonBonds person={row} /> : null}
       <section id="people-sec-work" className="people-section">
         <p className="people-kicker">Work</p>
+        <RelationField
+          label="Companies"
+          options={(companies.data ?? []).map((item) => ({ id: item.id, name: item.name }))}
+          value={form.companies}
+          onChange={(next) => setForm({ ...form, companies: next })}
+        />
         <RelationField
           label="Projects"
           options={(projects.data ?? []).map((item) => ({ id: item.id, name: item.name }))}

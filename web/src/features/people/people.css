@@ -388,6 +388,12 @@
   background: rgba(255, 255, 255, 0.07);
   border-color: rgba(255, 255, 255, 0.12);
 }
+.people-rail-card.absence.now {
+  border-color: rgba(255, 176, 96, 0.45);
+}
+.people-rail-card.absence.past {
+  opacity: 0.6;
+}
 .people-rail-card strong {
   font-size: 14px;
   letter-spacing: 0;

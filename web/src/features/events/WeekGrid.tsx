@@ -1,15 +1,18 @@
 import { useEffect, useRef } from 'react'
 import type { EventOccurrence } from '../../types'
 import { moscowMinutes, moscowYmd } from '../../shared/moscow'
+import { eventMeta, eventTone, type EventLookups } from './eventMeta'
 
 const HOUR = 48
 
 type Props = {
   days: string[]
   rows: EventOccurrence[]
+  lookups: EventLookups
   today: string
   selectedId?: string
-  onPick: (id: string) => void
+  selectedOn?: string
+  onPick: (seriesId: string, originalOn: string) => void
 }
 
 function ymdOf(iso: string): string {
@@ -29,7 +32,7 @@ function dayLabel(ymd: string) {
   }
 }
 
-export function WeekGrid({ days, rows, today, selectedId, onPick }: Props) {
+export function WeekGrid({ days, rows, lookups, today, selectedId, selectedOn, onPick }: Props) {
   const scroller = useRef<HTMLDivElement>(null)
   const now = moscowYmd()
   const nowMin = moscowMinutes(new Date().toISOString())
@@ -70,15 +73,17 @@ export function WeekGrid({ days, rows, today, selectedId, onPick }: Props) {
                 .map((row) => {
                   const start = moscowMinutes(row.startsAt)
                   const dur = Math.max(row.durationSeconds / 60, 20)
+                  const meta = eventMeta(row, lookups)
                   return (
                     <button
-                      key={`${row.seriesId}-${row.startsAt}`}
+                      key={`${row.seriesId}-${row.originalOn}`}
                       type="button"
-                      className={row.seriesId === selectedId ? 'cal-block on' : 'cal-block'}
-                      style={{ top: (start / 60) * HOUR, height: (dur / 60) * HOUR }}
-                      onClick={() => onPick(row.seriesId)}
+                      className={row.seriesId === selectedId && row.originalOn === selectedOn ? 'cal-block on' : 'cal-block'}
+                      style={{ top: (start / 60) * HOUR, height: (dur / 60) * HOUR, ...eventTone(meta.color) }}
+                      onClick={() => onPick(row.seriesId, row.originalOn)}
                     >
-                      {row.title}
+                      <span>{row.title}</span>
+                      {meta.line ? <small>{meta.line}</small> : null}
                     </button>
                   )
                 })}

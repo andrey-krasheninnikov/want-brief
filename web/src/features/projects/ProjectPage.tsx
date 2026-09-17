@@ -7,6 +7,7 @@ import { hourlyRate, hours, money } from '../../shared/format'
 import { moscowRange } from '../../shared/moscow'
 import type { Project, ProjectLink } from '../../types'
 import { PeoplePicker } from '../people/PeoplePicker'
+import { RelationField } from '../people/RelationField'
 import { PlazaSheet } from './PlazaSheet'
 
 function linkCaption(link: ProjectLink): string {
@@ -62,6 +63,7 @@ export function ProjectPage() {
   const { id = '' } = useParams()
   const queryClient = useQueryClient()
   const project = useQuery({ queryKey: ['projects', id], queryFn: () => api.project(id), enabled: Boolean(id) })
+  const companies = useQuery({ queryKey: ['companies'], queryFn: api.companies })
   const notes = useQuery({
     queryKey: ['project-notes', id],
     queryFn: () => api.projectNotes(id),
@@ -74,6 +76,7 @@ export function ProjectPage() {
       return api.load(bounds.from, bounds.to)
     },
   })
+  const [name, setName] = useState('')
   const [dayHours, setDayHours] = useState('')
   const [usd, setUsd] = useState('')
   const [rub, setRub] = useState('')
@@ -88,11 +91,12 @@ export function ProjectPage() {
   const row = project.data
   useEffect(() => {
     if (!row) return
+    setName(row.name)
     setDayHours(String(row.targetHoursDay))
     setUsd(String(row.monthlyIncomeUsd))
     setRub(String(row.monthlyIncomeRub))
     setColor(normalizeColor(row.color))
-  }, [row?.id, row?.updatedAt, row?.targetHoursDay, row?.monthlyIncomeUsd, row?.monthlyIncomeRub, row?.color])
+  }, [row?.id, row?.updatedAt, row?.name, row?.targetHoursDay, row?.monthlyIncomeUsd, row?.monthlyIncomeRub, row?.color])
 
   const patch = useMutation({
     mutationFn: (body: Partial<Project> & { archived?: boolean }) => api.patchProject(id, body),
@@ -101,6 +105,8 @@ export function ProjectPage() {
       void queryClient.invalidateQueries({ queryKey: ['load'] })
       void queryClient.invalidateQueries({ queryKey: ['people'] })
       void queryClient.invalidateQueries({ queryKey: ['person'] })
+      void queryClient.invalidateQueries({ queryKey: ['companies'] })
+      void queryClient.invalidateQueries({ queryKey: ['company'] })
     },
     onError: (err) => setFormError(err instanceof Error ? err.message : 'Could not save.'),
   })
@@ -114,6 +120,16 @@ export function ProjectPage() {
     },
     onError: (err) => setFormError(err instanceof Error ? err.message : 'Could not add note.'),
   })
+
+  function saveName(raw: string) {
+    const current = row?.name ?? ''
+    const next = raw.trim()
+    if (!next || next === current) {
+      setName(current)
+      return
+    }
+    patch.mutate({ name: next })
+  }
 
   function saveNumber(field: 'targetHoursDay' | 'monthlyIncomeUsd' | 'monthlyIncomeRub', raw: string, current: number) {
     const next = Number(raw)
@@ -186,7 +202,12 @@ export function ProjectPage() {
           <p className="plaza-kicker">{row.archivedAt ? 'Archived' : 'Dossier'}</p>
           <div className="plaza-title">
             <span className="plaza-swatch" style={{ background: color }} />
-            <h1>{row.name}</h1>
+            <input
+              aria-label="Project name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              onBlur={(event) => saveName(event.currentTarget.value)}
+            />
           </div>
         </div>
         <button
@@ -259,6 +280,13 @@ export function ProjectPage() {
             <PeoplePicker
               value={row.people ?? []}
               onChange={(people) => patch.mutate({ people })}
+              requireComment
+            />
+            <RelationField
+              label="Companies"
+              options={(companies.data ?? []).map((item) => ({ id: item.id, name: item.name }))}
+              value={row.companies ?? []}
+              onChange={(next) => patch.mutate({ companies: next })}
               requireComment
             />
           </div>

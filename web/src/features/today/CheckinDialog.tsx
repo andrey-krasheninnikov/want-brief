@@ -14,9 +14,10 @@ const bars: { kind: CheckinKind; label: string }[] = [
   { kind: 'focus', label: 'Focus' },
   { kind: 'energy', label: 'Energy' },
   { kind: 'interest', label: 'Interest' },
+  { kind: 'happiness', label: 'Happiness' },
 ]
 
-const fallback: LatestCheckins = { stress: 3, focus: 3, energy: 3, interest: 3 }
+const fallback: LatestCheckins = { stress: 3, focus: 3, energy: 3, interest: 3, happiness: 3 }
 
 function dirty(latest: LatestCheckins | undefined, draft: Partial<LatestCheckins>) {
   const base = { ...fallback, ...latest }

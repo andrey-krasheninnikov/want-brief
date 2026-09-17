@@ -6,7 +6,6 @@ import { DateField } from '../../shared/DateField'
 import { moscowYmd } from '../../shared/moscow'
 import { openTask } from '../../shared/taskOverlay'
 import type { UnplannedItem } from '../../types'
-import { compareScheduleItems } from './rank'
 
 function dueField(status: string, kind: 'work' | 'followup'): 'devDueAt' | 'reviewDueAt' | 'testDueAt' | 'dueAt' {
   if (kind !== 'followup') return 'devDueAt'
@@ -151,13 +150,13 @@ function NeedCard({ row, delay, kind }: { row: UnplannedItem; delay: number; kin
   )
 }
 
+// rows arrive in packer order from the server.
 export function NeedsFields({ rows, kind }: { rows: UnplannedItem[]; kind: 'work' | 'followup' }) {
   if (rows.length === 0) return null
-  const ordered = [...rows].sort((a, b) => compareScheduleItems(a.item, b.item))
   return (
     <aside className="sched-needs">
       <p className="sched-need-kicker">Needs fields</p>
-      {ordered.map((row, i) => (
+      {rows.map((row, i) => (
         <NeedCard key={row.item.id} row={row} delay={i} kind={kind} />
       ))}
     </aside>

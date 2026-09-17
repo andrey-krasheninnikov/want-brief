@@ -3,12 +3,13 @@ import { useRef, type DragEvent } from 'react'
 import { api } from '../../api'
 import type { BondKind, Person } from '../../types'
 import { personInitials } from './PersonCard'
-import { BOND_KINDS, PERSON_DRAG, bondKindLabel, primaryContact, professionLabel } from './peopleModel'
+import { BOND_KINDS, PERSON_DRAG, bondKindLabel, primaryContact, professionLabel, relLabels } from './peopleModel'
 
 type Col = BondKind | 'unlinked'
 
 type Props = {
   people: Person[]
+  companyNames: Map<string, string>
   onPick: (id: string) => void
 }
 
@@ -21,7 +22,7 @@ function columnOf(person: Person): Col {
   return person.meBond?.kind ?? 'unlinked'
 }
 
-export function PeopleBoard({ people, onPick }: Props) {
+export function PeopleBoard({ people, companyNames, onPick }: Props) {
   const queryClient = useQueryClient()
   const dragged = useRef('')
   const move = useMutation({
@@ -103,9 +104,9 @@ export function PeopleBoard({ people, onPick }: Props) {
                   <strong>{person.name}</strong>
                   <span>{professionLabel(person) || 'No profession'}</span>
                   <span>
-                    {person.age ?? ''}
-                    {person.meBond ? ` · ${bondKindLabel(person.meBond.kind)}` : ''}
-                    {primaryContact(person) ? ` · ${primaryContact(person)!.value}` : ''}
+                    {[person.age ?? '', person.meBond ? bondKindLabel(person.meBond.kind) : '', primaryContact(person)?.value, relLabels(person.companies, companyNames)]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </span>
                 </span>
               </article>

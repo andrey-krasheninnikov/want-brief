@@ -8,15 +8,19 @@ import {
   EVENT_TYPES,
   eventTypeLabel,
   recurrenceLabel,
+  weekdaysFromStart,
   type EventKind,
+  type EventNote,
   type EventRecurrence,
   type EventSeries,
   type EventType,
   type ProjectLink,
 } from '../../types'
+import { WeekdayGrid } from './WeekdayGrid'
 
 type Props = {
   seriesId?: string
+  originalOn?: string
   onCreated: (id: string) => void
   onDeleted: () => void
 }
@@ -36,6 +40,16 @@ function emptyStart(): string {
   return toLocalInput(d.toISOString())
 }
 
+function noteStamp(iso: string): string {
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+}
+
+function slotStamp(ymd: string): string {
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'Europe/Moscow' }).format(
+    new Date(`${ymd}T12:00:00+03:00`),
+  )
+}
+
 function draftFrom(row?: EventSeries) {
   const seconds = row?.durationSeconds ?? 1800
   return {
@@ -49,6 +63,8 @@ function draftFrom(row?: EventSeries) {
     hours: String(Math.floor(seconds / 3600)),
     minutes: String(Math.floor((seconds % 3600) / 60)),
     recurrence: (row?.recurrence ?? 'once') as EventRecurrence,
+    repeatUntil: row?.repeatUntil ?? '',
+    weekdays: row?.weekdays ?? [],
     meetUrl: row?.meetUrl ?? '',
     involvement: row?.involvement ?? 5,
     activeOn: row?.activeStartOffset != null && row.activeEndOffset != null,
@@ -60,7 +76,7 @@ function draftFrom(row?: EventSeries) {
   }
 }
 
-export function EventDossier({ seriesId, onCreated, onDeleted }: Props) {
+export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Props) {
   const queryClient = useQueryClient()
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const series = useQuery({
@@ -68,7 +84,24 @@ export function EventDossier({ seriesId, onCreated, onDeleted }: Props) {
     queryFn: () => api.event(seriesId!),
     enabled: Boolean(seriesId),
   })
+  const occurrence = useQuery({
+    queryKey: ['event-occurrence', seriesId, originalOn],
+    queryFn: () => api.eventOccurrence(seriesId!, originalOn!),
+    enabled: Boolean(seriesId && originalOn),
+  })
+  const [allNotes, setAllNotes] = useState(false)
+  const notes = useQuery({
+    queryKey: ['event-notes', seriesId, allNotes ? 'all' : originalOn],
+    queryFn: () => api.eventNotes(seriesId!, allNotes ? undefined : originalOn),
+    enabled: Boolean(seriesId && originalOn),
+  })
   const [form, setForm] = useState(() => draftFrom())
+  const [occStart, setOccStart] = useState('')
+  const [occHours, setOccHours] = useState('0')
+  const [occMinutes, setOccMinutes] = useState('30')
+  const [occSkipped, setOccSkipped] = useState(false)
+  const [noteBody, setNoteBody] = useState('')
+  const [noteOpen, setNoteOpen] = useState(false)
   const [linkLabel, setLinkLabel] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
   const [error, setError] = useState('')
@@ -77,6 +110,21 @@ export function EventDossier({ seriesId, onCreated, onDeleted }: Props) {
     if (seriesId && series.data) setForm(draftFrom(series.data))
     if (!seriesId) setForm(draftFrom())
   }, [seriesId, series.data?.id, series.data?.updatedAt])
+
+  useEffect(() => {
+    setAllNotes(false)
+    setNoteOpen(false)
+    setNoteBody('')
+  }, [seriesId, originalOn])
+
+  useEffect(() => {
+    if (!occurrence.data) return
+    const seconds = occurrence.data.durationSeconds
+    setOccStart(toLocalInput(occurrence.data.startsAt))
+    setOccHours(String(Math.floor(seconds / 3600)))
+    setOccMinutes(String(Math.floor((seconds % 3600) / 60)))
+    setOccSkipped(Boolean(occurrence.data.skipped))
+  }, [occurrence.data?.startsAt, occurrence.data?.durationSeconds, occurrence.data?.skipped, occurrence.data?.originalOn])
 
   function body() {
     const duration = Math.round(Number(form.hours) || 0) * 3600 + Math.round(Number(form.minutes) || 0) * 60
@@ -92,6 +140,8 @@ export function EventDossier({ seriesId, onCreated, onDeleted }: Props) {
       startsAt: new Date(form.startsAt).toISOString(),
       durationSeconds: duration,
       recurrence: form.recurrence,
+      repeatUntil: form.recurrence === 'once' ? null : form.repeatUntil || null,
+      weekdays: form.recurrence === 'weekly' ? form.weekdays : [],
       meetUrl: form.meetUrl.trim(),
       involvement: form.involvement,
       activeStartOffset: form.activeOn ? startMin * 60 : null,
@@ -103,23 +153,61 @@ export function EventDossier({ seriesId, onCreated, onDeleted }: Props) {
   }
 
   const save = useMutation({
-    mutationFn: () =>
-      seriesId ? api.patchEvent(seriesId, body()) : api.createEvent(body()),
+    mutationFn: () => (seriesId ? api.patchEvent(seriesId, body()) : api.createEvent(body())),
     onSuccess: (row) => {
       setError('')
       void queryClient.invalidateQueries({ queryKey: ['events'] })
       void queryClient.invalidateQueries({ queryKey: ['event'] })
       void queryClient.invalidateQueries({ queryKey: ['event-series'] })
+      void queryClient.invalidateQueries({ queryKey: ['event-occurrence'] })
+      void queryClient.invalidateQueries({ queryKey: ['schedule'] })
       void queryClient.invalidateQueries({ queryKey: ['people'] })
       void queryClient.invalidateQueries({ queryKey: ['person'] })
       if (!seriesId) onCreated(row.id)
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Could not save.'),
   })
+  const saveOcc = useMutation({
+    mutationFn: () => {
+      const duration = Math.round(Number(occHours) || 0) * 3600 + Math.round(Number(occMinutes) || 0) * 60
+      return api.putEventOccurrence(seriesId!, {
+        originalOn: originalOn!,
+        startsAt: new Date(occStart).toISOString(),
+        durationSeconds: duration,
+        skipped: occSkipped,
+      })
+    },
+    onSuccess: () => {
+      setError('')
+      void queryClient.invalidateQueries({ queryKey: ['events'] })
+      void queryClient.invalidateQueries({ queryKey: ['event-occurrence'] })
+      void queryClient.invalidateQueries({ queryKey: ['schedule'] })
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Could not save occurrence.'),
+  })
+  const resetOcc = useMutation({
+    mutationFn: () => api.resetEventOccurrence(seriesId!, originalOn!),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['events'] })
+      void queryClient.invalidateQueries({ queryKey: ['event-occurrence'] })
+      void queryClient.invalidateQueries({ queryKey: ['schedule'] })
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Could not reset.'),
+  })
+  const addNote = useMutation({
+    mutationFn: () => api.createEventNote(seriesId!, originalOn!, noteBody),
+    onSuccess: () => {
+      setNoteBody('')
+      setNoteOpen(false)
+      void queryClient.invalidateQueries({ queryKey: ['event-notes'] })
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Could not add note.'),
+  })
   const remove = useMutation({
     mutationFn: () => api.deleteEvent(seriesId!),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['events'] })
+      void queryClient.invalidateQueries({ queryKey: ['schedule'] })
       onDeleted()
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Could not delete.'),
@@ -131,11 +219,23 @@ export function EventDossier({ seriesId, onCreated, onDeleted }: Props) {
       setError('Title is required.')
       return
     }
+    if (form.recurrence === 'weekly' && form.weekdays.length === 0) {
+      setError('Pick at least one weekday.')
+      return
+    }
     if (form.people.some((rel) => !rel.comment.trim())) {
       setError('Comment is required for each person.')
       return
     }
     save.mutate()
+  }
+
+  function setRecurrence(recurrence: EventRecurrence) {
+    setForm((current) => ({
+      ...current,
+      recurrence,
+      weekdays: recurrence === 'weekly' ? (current.weekdays.length ? current.weekdays : weekdaysFromStart(current.startsAt)) : [],
+    }))
   }
 
   function addLink() {
@@ -153,9 +253,79 @@ export function EventDossier({ seriesId, onCreated, onDeleted }: Props) {
   if (seriesId && series.isLoading) return <p className="muted">Loading…</p>
   if (seriesId && series.isError) return <p className="error">{series.error.message}</p>
 
+  const log = notes.data ?? []
+
   return (
     <form className="events-form" onSubmit={onSubmit}>
-      <p className="events-kicker">{seriesId ? recurrenceLabel(form.recurrence, form.startsAt) : 'New series'}</p>
+      {seriesId && originalOn ? (
+        <section className="events-block">
+          <p className="events-kicker">This occurrence</p>
+          {occurrence.isLoading ? <p className="muted">Loading…</p> : null}
+          {occurrence.isError ? <p className="error">{occurrence.error.message}</p> : null}
+          <label>
+            Starts
+            <DateField mode="datetime" value={occStart} onChange={setOccStart} />
+          </label>
+          <div className="events-pair">
+            <label>
+              Hours
+              <input type="number" min={0} value={occHours} onChange={(e) => setOccHours(e.target.value)} />
+            </label>
+            <label>
+              Minutes
+              <input type="number" min={0} max={59} value={occMinutes} onChange={(e) => setOccMinutes(e.target.value)} />
+            </label>
+          </div>
+          <label className="tasks-toggle">
+            <input type="checkbox" checked={occSkipped} onChange={(e) => setOccSkipped(e.target.checked)} />
+            Skip this slot
+          </label>
+          <div className="events-pair">
+            <button type="button" onClick={() => saveOcc.mutate()} disabled={saveOcc.isPending || !occStart}>
+              Save occurrence
+            </button>
+            <button type="button" className="ghost" onClick={() => resetOcc.mutate()} disabled={resetOcc.isPending}>
+              Reset
+            </button>
+          </div>
+          <div className="tasks-head">
+            <h3>Log</h3>
+            <div className="people-tabs">
+              <button type="button" className={allNotes ? '' : 'on'} onClick={() => setAllNotes(false)}>
+                This slot
+              </button>
+              <button type="button" className={allNotes ? 'on' : ''} onClick={() => setAllNotes(true)}>
+                All notes
+              </button>
+            </div>
+            <button type="button" className="tasks-plus" aria-label="Add note" onClick={() => setNoteOpen((on) => !on)}>
+              +
+            </button>
+          </div>
+          {noteOpen ? (
+            <div className="stack">
+              <label>
+                Note
+                <textarea rows={4} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} />
+              </label>
+              <button type="button" onClick={() => addNote.mutate()} disabled={addNote.isPending || !noteBody.trim()}>
+                Add
+              </button>
+            </div>
+          ) : null}
+          {log.length === 0 && !noteOpen ? <p className="muted">No notes yet.</p> : null}
+          {log.map((note: EventNote) => (
+            <article key={note.id} className="tasks-note">
+              <p className="tasks-kicker">
+                {noteStamp(note.createdAt)}
+                {allNotes ? ` · ${slotStamp(note.originalOn)}` : ''}
+              </p>
+              <p>{note.body}</p>
+            </article>
+          ))}
+        </section>
+      ) : null}
+      <p className="events-kicker">{seriesId ? recurrenceLabel(form.recurrence, form.weekdays) : 'New series'}</p>
       <label>
         Title
         <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} autoComplete="off" />
@@ -202,6 +372,26 @@ export function EventDossier({ seriesId, onCreated, onDeleted }: Props) {
         Starts
         <DateField mode="datetime" value={form.startsAt} onChange={(startsAt) => setForm({ ...form, startsAt })} />
       </label>
+      {form.recurrence !== 'once' ? (
+        <label>
+          Repeat until
+          <DateField mode="date" value={form.repeatUntil} onChange={(repeatUntil) => setForm({ ...form, repeatUntil })} />
+        </label>
+      ) : null}
+      <label>
+        Repeat
+        <select value={form.recurrence} onChange={(e) => setRecurrence(e.target.value as EventRecurrence)}>
+          <option value="once">Once</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </label>
+      {form.recurrence === 'weekly' ? (
+        <div className="events-days-field">
+          Days
+          <WeekdayGrid value={form.weekdays} onChange={(weekdays) => setForm({ ...form, weekdays })} />
+        </div>
+      ) : null}
       <div className="events-pair">
         <label>
           Hours
@@ -212,14 +402,6 @@ export function EventDossier({ seriesId, onCreated, onDeleted }: Props) {
           <input type="number" min={0} max={59} value={form.minutes} onChange={(e) => setForm({ ...form, minutes: e.target.value })} />
         </label>
       </div>
-      <label>
-        Repeat
-        <select value={form.recurrence} onChange={(e) => setForm({ ...form, recurrence: e.target.value as EventRecurrence })}>
-          <option value="once">Once</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-        </select>
-      </label>
       <UrlField label="Meet" value={form.meetUrl} onChange={(meetUrl) => setForm({ ...form, meetUrl })} />
       <label className="events-range">
         Involvement {form.involvement}
@@ -291,7 +473,7 @@ export function EventDossier({ seriesId, onCreated, onDeleted }: Props) {
       </button>
       {error ? <p className="error">{error}</p> : null}
       <button type="submit" disabled={save.isPending}>
-        {seriesId ? 'Save' : 'Create'}
+        {seriesId ? 'Save series' : 'Create'}
       </button>
       {seriesId ? (
         <button type="button" className="ghost" onClick={() => remove.mutate()} disabled={remove.isPending}>

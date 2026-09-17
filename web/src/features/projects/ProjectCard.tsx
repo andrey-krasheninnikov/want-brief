@@ -9,6 +9,7 @@ type Props = {
   total: number
   events: number
   people: number
+  companies: string
   delay: number
 }
 
@@ -19,6 +20,7 @@ export function ProjectCard({
   total,
   events,
   people,
+  companies,
   delay,
 }: Props) {
   const classes = ['plaza-tile']
@@ -49,6 +51,7 @@ export function ProjectCard({
           <span>
             {people} {people === 1 ? 'person' : 'people'}
           </span>
+          {companies ? <span>{companies}</span> : null}
         </p>
       </div>
     </Link>

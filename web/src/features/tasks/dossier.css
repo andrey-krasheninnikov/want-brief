@@ -1,0 +1,641 @@
+/* Task dossier sheet: glass cards, segmented tabs, stat tiles, gauge, log timeline. */
+
+.tasks-dossier {
+  --dc-surface: color-mix(in srgb, var(--window) 78%, transparent);
+  --dc-surface-2: rgba(255, 255, 255, 0.035);
+  --dc-edge: rgba(255, 255, 255, 0.09);
+  --dc-hairline: inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  --dc-shadow: 0 18px 44px color-mix(in srgb, var(--accent) 12%, rgba(4, 5, 9, 0.5));
+  --dc-warn: #e8943a;
+  display: grid;
+  gap: 0.9rem;
+}
+
+/* Sheet chrome only for sheets that host a dossier. */
+.tasks-sheet:has(.tasks-dossier) {
+  box-shadow: -26px 0 64px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.tasks-sheet:has(.tasks-dossier) .tasks-sheet-core {
+  background:
+    radial-gradient(118% 58% at 88% -10%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%),
+    radial-gradient(90% 52% at -6% 104%, color-mix(in srgb, var(--accent-2) 9%, transparent), transparent 64%),
+    color-mix(in srgb, var(--window) 92%, transparent);
+}
+
+/* Hero header */
+.tasks-hero-head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+.tasks-hero-glyph {
+  flex: 0 0 auto;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 1rem;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent-2) 70%, var(--accent)));
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--accent) 30%, transparent), var(--dc-hairline);
+}
+.tasks-sheet-title {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.tasks-sheet-title h2,
+.tasks-sheet-title input {
+  min-width: 0;
+  font-size: clamp(1.35rem, 2.6vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.tasks-sheet-title input {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0.4rem;
+  transition: background 200ms ease;
+}
+.tasks-sheet-title input:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.tasks-sheet-title input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 3px;
+}
+
+/* Segmented tabs */
+.tasks-tabs {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--window) 72%, transparent);
+  border: 1px solid var(--dc-edge);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  scrollbar-width: none;
+}
+.tasks-tabs::-webkit-scrollbar { display: none; }
+.tasks-tabs.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: color-mix(in srgb, var(--window) 94%, transparent);
+  backdrop-filter: blur(14px);
+}
+.tasks-tabs button {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0.45rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background 200ms ease, color 200ms ease, box-shadow 200ms ease;
+}
+.tasks-tabs button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+}
+.tasks-tabs button.on,
+.tasks-tabs button.on:hover {
+  color: var(--ink);
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent-2) 65%, var(--accent)));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+.tasks-tabs.small {
+  justify-self: start;
+  padding: 0.2rem;
+}
+.tasks-tabs.small button {
+  padding: 0.3rem 0.65rem;
+  font-size: 11px;
+}
+
+/* Cards */
+.dossier-card {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.15rem 1.2rem 1.25rem;
+  border-radius: 20px;
+  background: var(--dc-surface);
+  border: 1px solid var(--dc-edge);
+  box-shadow: var(--dc-hairline), var(--dc-shadow);
+  animation: dossier-rise 520ms var(--motion) both;
+}
+.dossier-card:nth-child(3) { animation-delay: 55ms; }
+.dossier-card:nth-child(4) { animation-delay: 110ms; }
+.dossier-card:nth-child(5) { animation-delay: 165ms; }
+.dossier-card:nth-child(n + 6) { animation-delay: 210ms; }
+.dossier-card > header {
+  display: grid;
+  gap: 0.15rem;
+}
+.dossier-card > header h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dossier-card > header p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.dossier-card .tasks-head {
+  margin: 0;
+  align-items: center;
+}
+.dossier-card .tasks-head h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+@keyframes dossier-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dossier-card { animation: none; }
+}
+
+/* Identity strip */
+.dossier-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.dossier-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 0;
+  padding: 0.32rem 0.6rem;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  background: var(--dc-surface-2);
+  border: 1px solid var(--dc-edge);
+}
+button.dossier-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+}
+.dossier-chip.mono { font-variant-numeric: tabular-nums; }
+.dossier-chip.tone-progress {
+  color: var(--accent-2);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.dossier-chip.tone-blocked {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.dossier-chip.tone-awaiting {
+  color: var(--dc-warn);
+  border-color: color-mix(in srgb, var(--dc-warn) 45%, transparent);
+}
+.dossier-chip.tone-stall { color: var(--muted); }
+.dossier-identity .url-open { margin-left: -0.1rem; }
+
+/* Controls row */
+.dossier-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.75rem;
+}
+.dossier-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.dossier-card .tasks-actions {
+  justify-content: flex-start;
+  align-self: center;
+  gap: 0.4rem;
+}
+.dossier-card .tasks-actions button.ghost {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--dc-surface-2);
+  border-color: var(--dc-edge);
+  transition: background 200ms ease, transform 200ms ease, color 200ms ease;
+}
+.dossier-card .tasks-actions button.ghost:hover {
+  background: rgba(255, 255, 255, 0.09);
+  transform: translateY(-1px);
+}
+.dossier-card .tasks-actions button.danger:hover {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+/* Timer */
+.tasks-dossier .tasks-timer {
+  margin-left: 0;
+  justify-self: start;
+  gap: 0.5rem;
+  padding: 0.25rem 0.3rem 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: var(--dc-surface-2);
+  border: 1px solid var(--dc-edge);
+  font-variant-numeric: tabular-nums;
+}
+.tasks-dossier .tasks-timer button {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent-2) 65%, var(--accent)));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.tasks-dossier .tasks-timer button:hover { color: var(--ink); filter: brightness(1.08); }
+.tasks-timer-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent);
+  animation: dossier-pulse 1.8s ease-in-out infinite;
+}
+@keyframes dossier-pulse {
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tasks-timer-dot { animation: none; }
+}
+
+/* Flags with labels */
+.tasks-dossier .tasks-flag {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: var(--dc-surface-2);
+  border-color: var(--dc-edge);
+  font-size: 12px;
+  font-weight: 600;
+}
+.tasks-dossier .tasks-flag.on {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, transparent), color-mix(in srgb, var(--accent-2) 34%, transparent));
+  border-color: transparent;
+}
+
+/* Due cards */
+.tasks-due-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.6rem;
+}
+.tasks-due-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.4rem;
+  padding: 0.8rem 0.85rem;
+  border-radius: 14px;
+  background: var(--dc-surface-2);
+  border: 1px solid var(--dc-edge);
+  color: color-mix(in srgb, var(--muted) calc((1 - var(--due-heat, 0)) * 100%), var(--dc-warn) calc(var(--due-heat, 0) * 100%));
+}
+.tasks-due-card.overdue {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.tasks-due-card strong {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.tasks-due-open {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  justify-self: start;
+  align-self: center;
+  font: inherit;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: none;
+  text-align: left;
+}
+.tasks-due-open:hover { background: none; color: var(--accent-2); }
+.tasks-due-clear {
+  min-height: 0;
+  padding: 0.25rem 0.55rem;
+  border-radius: 8px;
+  font-size: 11px;
+  justify-self: start;
+  align-self: end;
+}
+
+/* Stat tiles */
+.dossier-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.75rem, 1fr));
+  gap: 0.6rem;
+}
+.dossier-tile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 0.85rem;
+  border-radius: 14px;
+  background: var(--dc-surface-2);
+  border: 1px solid var(--dc-edge);
+}
+.dossier-tile-text { display: grid; gap: 0.1rem; min-width: 0; }
+.dossier-tile-text p {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dossier-tile-text strong {
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.dossier-tile-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent-2) 60%, var(--accent)));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+/* Gauge */
+.dossier-gauge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.1rem;
+}
+.dossier-ring {
+  position: relative;
+  width: 8.2rem;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.dossier-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    var(--ring-ink, var(--accent)) calc(var(--ring-p, 0) * 1%),
+    rgba(255, 255, 255, 0.07) 0
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent 70%, #000 72%);
+  mask: radial-gradient(farthest-side, transparent 70%, #000 72%);
+}
+.dossier-ring.over { --ring-ink: var(--danger); }
+.dossier-ring-value {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  text-align: center;
+}
+.dossier-ring-value strong {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+.dossier-ring-value span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dossier-gauge-facts {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+.dossier-gauge-facts p { margin: 0; }
+.dossier-gauge-facts .mono { font-variant-numeric: tabular-nums; }
+
+/* Progress bar */
+.dossier-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.dossier-progress span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width 260ms var(--motion);
+}
+.dossier-progress-row {
+  display: grid;
+  gap: 0.35rem;
+}
+.dossier-progress-row small {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Checklist */
+.tasks-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+.tasks-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 11px;
+  transition: background 200ms ease;
+}
+.tasks-check:hover { background: rgba(255, 255, 255, 0.04); }
+.tasks-check.done .tasks-check-text { color: var(--muted); text-decoration: line-through; }
+.tasks-check-text {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  font-weight: 500;
+}
+.tasks-check-text:hover { background: none; color: inherit; }
+.tasks-check-remove {
+  opacity: 0;
+  min-height: 0;
+  padding: 6px;
+  border-radius: 9px;
+}
+.tasks-check:hover .tasks-check-remove,
+.tasks-check:focus-within .tasks-check-remove { opacity: 1; }
+.tasks-check-draft { display: grid; gap: 0.35rem; }
+
+/* Links table */
+.tasks-slots { margin-top: 0.15rem; }
+.tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.tasks-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 0.5rem 0.5rem;
+}
+.tasks-table td {
+  padding: 0.65rem 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: middle;
+  transition: background 200ms ease;
+}
+.tasks-table tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
+.tasks-table a { color: inherit; }
+.tasks-table td:nth-child(2) { word-break: break-all; }
+.tasks-table td:last-child { width: 1%; text-align: right; }
+.tasks-table button.ghost {
+  min-height: 0;
+  padding: 0.3rem 0.6rem;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
+/* Log timeline */
+.dossier-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1.15rem;
+  display: grid;
+  gap: 0.95rem;
+  position: relative;
+}
+.dossier-timeline::before {
+  content: '';
+  position: absolute;
+  left: 0.24rem;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 1px;
+  background: linear-gradient(180deg, var(--dc-edge), transparent);
+}
+.dossier-entry {
+  position: relative;
+  display: grid;
+  gap: 0.3rem;
+}
+.dossier-entry::before {
+  content: '';
+  position: absolute;
+  left: -1.15rem;
+  top: 0.42rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.dossier-entry.manual::before {
+  background: var(--muted);
+  box-shadow: none;
+}
+.dossier-entry-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.dossier-entry p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dossier-badge {
+  padding: 0.1rem 0.4rem;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted);
+}
+.dossier-badge.source {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  color: var(--ink);
+}
+
+/* Meta and hints */
+.dossier-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.dossier-empty {
+  margin: 0;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px dashed var(--dc-edge);
+  color: var(--muted);
+  font-size: 13px;
+}
+.tasks-missing { display: grid; gap: 1rem; justify-items: start; }
+.tasks-key-field { flex: 0 1 12rem; }
+
+@media (max-width: 52rem) {
+  .dossier-gauge { gap: 0.8rem; }
+  .dossier-ring { width: 6.8rem; }
+}

@@ -189,10 +189,10 @@ export function TaskCard({
       <div className="tasks-card-core">
         <div className="tasks-card-top">
           <span className="tasks-kind">{kindLabel(item.kind)}</span>
-          {item.occupancy === 'parallel' ? (
-            <span className="tasks-occupancy" title={occupancyLabel('parallel')}>
+          {item.occupancy === 'parallel' || item.occupancy === 'waiting' ? (
+            <span className="tasks-occupancy" title={occupancyLabel(item.occupancy)}>
               <UsersThree size={14} weight="light" />
-              Parallel
+              {occupancyLabel(item.occupancy)}
             </span>
           ) : null}
           {item.archivedAt ? <span className="tasks-stall">Stalled</span> : null}

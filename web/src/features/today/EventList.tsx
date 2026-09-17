@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api'
 import { moscowDayRange } from '../../shared/moscow'
-import { openTask } from '../../shared/taskOverlay'
+import { openEvent, openTask } from '../../shared/taskOverlay'
 import { eventTypeLabel, type CalendarEvent, type ScheduleBlock } from '../../types'
 
 function formatTime(iso: string): string {
@@ -20,10 +20,10 @@ function AgendaRow({
 }: {
   row: CalendarEvent
   featured?: boolean
-  onOpen: (id: string) => void
+  onOpen: (row: CalendarEvent) => void
 }) {
   return (
-    <article className={featured ? 'agenda-next' : 'agenda-row'} onClick={() => onOpen(row.seriesId)}>
+    <article className={featured ? 'agenda-next' : 'agenda-row'} onClick={() => onOpen(row)}>
       <div className="today-agenda-core">
         <time className="mono" dateTime={row.startsAt}>
           {formatTime(row.startsAt)}
@@ -93,9 +93,15 @@ export function EventList() {
       {events.isError ? <p className="error">{events.error.message}</p> : null}
       {empty ? <p className="muted">Nothing scheduled.</p> : null}
       {nextWork ? <WorkRow row={nextWork} onOpen={(id) => openTask(navigate, id)} /> : null}
-      {next ? <AgendaRow row={next} featured={!nextWork} onOpen={(id) => navigate(`/events/${id}`)} /> : null}
+      {next ? (
+        <AgendaRow row={next} featured={!nextWork} onOpen={(row) => openEvent(navigate, row.seriesId, row.originalOn)} />
+      ) : null}
       {rest.map((row) => (
-        <AgendaRow key={`${row.seriesId}-${row.startsAt}`} row={row} onOpen={(id) => navigate(`/events/${id}`)} />
+        <AgendaRow
+          key={`${row.seriesId}-${row.originalOn}`}
+          row={row}
+          onOpen={(item) => openEvent(navigate, item.seriesId, item.originalOn)}
+        />
       ))}
     </section>
   )

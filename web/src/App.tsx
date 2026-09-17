@@ -10,9 +10,11 @@ import { SettingsScreen } from './features/sources/SettingsScreen'
 import { TasksScreen } from './features/tasks/TasksScreen'
 import { EventsScreen } from './features/events/EventsScreen'
 import { PeopleScreen } from './features/people/PeopleScreen'
+import { CompaniesScreen } from './features/companies/CompaniesScreen'
 import { TodayScreen } from './features/today/TodayScreen'
 import { PulseScreen } from './features/pulse/PulseScreen'
 import { ScheduleScreen } from './features/schedule/ScheduleScreen'
+import { ScheduleSettingsScreen } from './features/schedule/settings/ScheduleSettingsScreen'
 import { Shell } from './shared/Shell'
 
 const client = new QueryClient()
@@ -49,11 +51,14 @@ export default function App() {
             <Route path="/events" element={<EventsScreen />} />
             <Route path="/events/:id" element={<EventsScreen />} />
             <Route path="/schedule" element={<ScheduleScreen />} />
+            <Route path="/schedule/settings" element={<ScheduleSettingsScreen />} />
             <Route path="/projects" element={<ProjectsScreen />} />
             <Route path="/projects/:id/notes" element={<ProjectNotesPage />} />
             <Route path="/projects/:id" element={<ProjectPage />} />
             <Route path="/people" element={<PeopleScreen />} />
             <Route path="/people/:id" element={<PeopleScreen />} />
+            <Route path="/companies" element={<CompaniesScreen />} />
+            <Route path="/companies/:id" element={<CompaniesScreen />} />
             <Route path="/tasks" element={<TasksScreen />} />
             <Route path="/tasks/:id" element={<TasksScreen />} />
             <Route path="/tasks/:id/notes" element={<TaskNotesRedirect />} />

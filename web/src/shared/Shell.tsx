@@ -8,6 +8,7 @@ import {
   Plugs,
   SignOut,
   SquaresFour,
+  Buildings,
   Sun,
   Users,
   type Icon,
@@ -27,6 +28,7 @@ const links: { to: string; label: string; Icon: Icon }[] = [
   { to: '/matrix', label: 'Priorities', Icon: GridFour },
   { to: '/projects', label: 'Projects', Icon: SquaresFour },
   { to: '/people', label: 'People', Icon: Users },
+  { to: '/companies', label: 'Companies', Icon: Buildings },
   { to: '/pulse', label: 'Pulse', Icon: ChartBar },
   { to: '/settings', label: 'Sources', Icon: Plugs },
 ]

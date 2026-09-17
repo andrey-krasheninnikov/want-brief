@@ -54,6 +54,8 @@ export function TaskChecks({ itemId }: Props) {
     create.mutate(next)
   }
 
+  const done = rows.filter((row) => row.done).length
+
   return (
     <section className="tasks-checks">
       <div className="tasks-head">
@@ -62,7 +64,17 @@ export function TaskChecks({ itemId }: Props) {
           +
         </button>
       </div>
-      {rows.length === 0 && !open ? <p className="muted">No checks yet.</p> : null}
+      {rows.length > 0 ? (
+        <div className="dossier-progress-row">
+          <div className="dossier-progress">
+            <span style={{ width: `${Math.round((done / rows.length) * 100)}%` }} />
+          </div>
+          <small>
+            {done} of {rows.length} done
+          </small>
+        </div>
+      ) : null}
+      {rows.length === 0 && !open ? <p className="dossier-empty">No checks yet. Add the first step.</p> : null}
       <ul className="tasks-check-list">
         {rows.map((row) => (
           <CheckRow

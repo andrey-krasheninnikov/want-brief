@@ -2,10 +2,11 @@ type Props = {
   glyph: string
   label: string
   on?: boolean
+  showLabel?: boolean
   onClick: () => void
 }
 
-export function TaskFlag({ glyph, label, on, onClick }: Props) {
+export function TaskFlag({ glyph, label, on, showLabel, onClick }: Props) {
   return (
     <button
       type="button"
@@ -17,6 +18,7 @@ export function TaskFlag({ glyph, label, on, onClick }: Props) {
       onPointerDown={(event) => event.stopPropagation()}
     >
       <span aria-hidden>{glyph}</span>
+      {showLabel ? <span aria-hidden>{label}</span> : null}
     </button>
   )
 }

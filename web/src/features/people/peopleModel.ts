@@ -1,4 +1,4 @@
-import type { BondKind, Person, PersonContact, PersonProfession, SalaryPeriod, SiteKind } from '../../types'
+import type { BondKind, Person, PersonContact, PersonProfession, PersonRel, SalaryPeriod, SiteKind } from '../../types'
 
 export const LAST_PERSON_KEY = 'want-people-last-id'
 export const PERSON_DRAG = 'application/x-want-item'
@@ -50,6 +50,10 @@ export function professionLabel(person: Person): string {
     .map((row) => row.title)
     .filter(Boolean)
     .join(' · ')
+}
+
+export function relLabels(rels: PersonRel[] | undefined, names: Map<string, string>): string {
+  return (rels ?? []).map((rel) => names.get(rel.id)).filter((name): name is string => Boolean(name)).join(' · ')
 }
 
 export function dateOnly(iso: string | null | undefined): string {

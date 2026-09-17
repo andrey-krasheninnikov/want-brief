@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
+import type { TaskLogKind } from '../../types'
 
 type Props = {
   itemId: string | null
+  kind: TaskLogKind
   onClose: () => void
 }
 
-export function TaskLogDialog({ itemId, onClose }: Props) {
+export function TaskLogDialog({ itemId, kind, onClose }: Props) {
   const queryClient = useQueryClient()
   const [level, setLevel] = useState<number | null>(null)
   const [body, setBody] = useState('')
@@ -35,14 +37,16 @@ export function TaskLogDialog({ itemId, onClose }: Props) {
     mutationFn: async () => {
       if (!itemId) return
       const note = body.trim()
-      await Promise.all([
-        level != null ? api.createStress(level, itemId) : Promise.resolve(),
-        note ? api.createItemNote(itemId, note) : Promise.resolve(),
-      ])
+      await api.annotateItemEvent(itemId, {
+        kinds: [kind],
+        note: note || undefined,
+        stress: level ?? undefined,
+      })
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['items'] })
       void queryClient.invalidateQueries({ queryKey: ['item-notes'] })
+      void queryClient.invalidateQueries({ queryKey: ['item-events'] })
       void queryClient.invalidateQueries({ queryKey: ['load'] })
       void queryClient.invalidateQueries({ queryKey: ['journal'] })
       void queryClient.invalidateQueries({ queryKey: ['checkins'] })

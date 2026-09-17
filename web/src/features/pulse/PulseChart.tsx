@@ -5,6 +5,7 @@ const series: { kind: CheckinKind; label: string; color: string }[] = [
   { kind: 'focus', label: 'Focus', color: '#6152ed' },
   { kind: 'energy', label: 'Energy', color: '#74c991' },
   { kind: 'interest', label: 'Interest', color: '#a79fff' },
+  { kind: 'happiness', label: 'Happiness', color: '#f2c14e' },
 ]
 
 type Point = { x: number; y: number }

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
@@ -39,6 +39,7 @@ export function ProjectsScreen() {
   })
   const items = useQuery({ queryKey: ['items'], queryFn: () => api.items() })
   const series = useQuery({ queryKey: ['event-series'], queryFn: api.eventSeries })
+  const companies = useQuery({ queryKey: ['companies'], queryFn: api.companies })
   const [open, setOpen] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const [name, setName] = useState('')
@@ -67,6 +68,11 @@ export function ProjectsScreen() {
 
   const all = projects.data ?? []
   const list = showArchived ? all : all.filter((project) => !project.archivedAt)
+  const companyNames = useMemo(() => {
+    const names = new Map<string, string>()
+    for (const row of companies.data ?? []) names.set(row.id, row.name)
+    return names
+  }, [companies.data])
 
   return (
     <div className="plaza">
@@ -116,6 +122,7 @@ export function ProjectsScreen() {
                 total={counts.total}
                 events={upcomingEvents(series.data, project.id)}
                 people={project.people?.length ?? 0}
+                companies={(project.companies ?? []).map((rel) => companyNames.get(rel.id)).filter(Boolean).join(' · ')}
                 delay={index * 80}
               />
             )

@@ -1,15 +1,23 @@
 import type {
   CalendarEvent,
+  EventOccurrence,
+  EventNote,
   EventSeries,
   CheckinKind,
+  DayOverride,
+  DayOverrideDraft,
   Person,
+  PersonAbsence,
   PersonNote,
   PersonContact,
   PersonSite,
   PersonBond,
   PersonProfession,
+  Company,
+  CompanyNote,
   Item,
   ItemCheck,
+  ItemEvent,
   ItemKind,
   ItemNote,
   ItemStatus,
@@ -20,8 +28,12 @@ import type {
   Project,
   ProjectNote,
   Schedule,
+  ScheduleSettings,
+  TaskLogKind,
   Source,
   TimeInterval,
+  WhatIfResult,
+  WhatIfScenario,
 } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -115,6 +127,9 @@ export const api = {
     request<ItemNote>(`/api/items/${id}/notes`, { method: 'POST', body: JSON.stringify({ body }) }),
   deleteItemNote: (id: string, noteId: string) =>
     request(`/api/items/${id}/notes/${noteId}`, { method: 'DELETE' }),
+  itemEvents: (id: string) => request<ItemEvent[]>(`/api/items/${id}/events`),
+  annotateItemEvent: (id: string, body: { kinds: TaskLogKind[]; note?: string; stress?: number }) =>
+    request<ItemEvent>(`/api/items/${id}/events/annotate`, { method: 'POST', body: JSON.stringify(body) }),
   itemChecks: (id: string) => request<ItemCheck[]>(`/api/items/${id}/checks`),
   createItemCheck: (id: string, body: string) =>
     request<ItemCheck>(`/api/items/${id}/checks`, { method: 'POST', body: JSON.stringify({ body }) }),
@@ -165,6 +180,23 @@ export const api = {
   patchEvent: (id: string, body: Record<string, unknown>) =>
     request<EventSeries>(`/api/events/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteEvent: (id: string) => request(`/api/events/${id}`, { method: 'DELETE' }),
+  eventOccurrence: (id: string, originalOn: string) =>
+    request<EventOccurrence>(`/api/events/${id}/occurrence?on=${encodeURIComponent(originalOn)}`),
+  putEventOccurrence: (
+    id: string,
+    body: { originalOn: string; startsAt?: string; durationSeconds?: number; skipped?: boolean },
+  ) => request<EventOccurrence>(`/api/events/${id}/occurrence`, { method: 'PUT', body: JSON.stringify(body) }),
+  resetEventOccurrence: (id: string, originalOn: string) =>
+    request(`/api/events/${id}/occurrence?on=${encodeURIComponent(originalOn)}`, { method: 'DELETE' }),
+  eventNotes: (id: string, originalOn?: string) => {
+    const params = new URLSearchParams()
+    if (originalOn) params.set('on', originalOn)
+    const suffix = params.toString() ? `?${params}` : ''
+    return request<EventNote[]>(`/api/events/${id}/notes${suffix}`)
+  },
+  createEventNote: (id: string, originalOn: string, body: string) =>
+    request<EventNote>(`/api/events/${id}/notes`, { method: 'POST', body: JSON.stringify({ originalOn, body }) }),
+  deleteEventNote: (id: string, noteId: string) => request(`/api/events/${id}/notes/${noteId}`, { method: 'DELETE' }),
   eventSeries: () => request<EventSeries[]>('/api/event-series'),
   people: () => request<Person[]>('/api/people'),
   person: (id: string) => request<Person>(`/api/people/${id}`),
@@ -216,5 +248,47 @@ export const api = {
     if (kind) params.set('kind', kind)
     return request<Schedule>(`/api/schedule?${params}`)
   },
+  scheduleSettings: () => request<ScheduleSettings>('/api/schedule/settings'),
+  saveScheduleSettings: (body: ScheduleSettings) =>
+    request<ScheduleSettings>('/api/schedule/settings', { method: 'PUT', body: JSON.stringify(body) }),
+  dayOverrides: (from: string, to: string) =>
+    request<DayOverride[]>(`/api/schedule/days?${new URLSearchParams({ from, to })}`),
+  putDayOverride: (day: string, body: DayOverrideDraft) =>
+    request<DayOverride>(`/api/schedule/days/${day}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteDayOverride: (day: string) => request(`/api/schedule/days/${day}`, { method: 'DELETE' }),
+  scheduleWhatIf: (body: WhatIfScenario & { kind?: 'work' | 'followup'; from?: string; to?: string }) =>
+    request<WhatIfResult>('/api/schedule/whatif', { method: 'POST', body: JSON.stringify(body) }),
+  createPersonAbsence: (id: string, body: { startsOn: string; endsOn: string; note: string }) =>
+    request<PersonAbsence>(`/api/people/${id}/absences`, { method: 'POST', body: JSON.stringify(body) }),
+  updatePersonAbsence: (id: string, absenceId: string, body: { startsOn: string; endsOn: string; note: string }) =>
+    request<PersonAbsence>(`/api/people/${id}/absences/${absenceId}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deletePersonAbsence: (id: string, absenceId: string) =>
+    request(`/api/people/${id}/absences/${absenceId}`, { method: 'DELETE' }),
   journal: () => request<JournalEntry[]>('/api/journal'),
+  companies: () => request<Company[]>('/api/companies'),
+  company: (id: string) => request<Company>(`/api/companies/${id}`),
+  createCompany: (body: Record<string, unknown>) =>
+    request<Company>('/api/companies', { method: 'POST', body: JSON.stringify(body) }),
+  patchCompany: (id: string, body: Record<string, unknown>) =>
+    request<Company>(`/api/companies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteCompany: (id: string) => request(`/api/companies/${id}`, { method: 'DELETE' }),
+  addCompanyTitle: (id: string, body: { title: string; startedOn?: string }) =>
+    request<Company>(`/api/companies/${id}/titles`, { method: 'POST', body: JSON.stringify(body) }),
+  addCompanySalary: (id: string, body: { currency: string; amount: number; comment?: string; startedOn?: string }) =>
+    request<Company>(`/api/companies/${id}/salaries`, { method: 'POST', body: JSON.stringify(body) }),
+  setCompanyManager: (id: string, body: { personId: string | null; startedOn?: string }) =>
+    request<Company>(`/api/companies/${id}/manager`, { method: 'POST', body: JSON.stringify(body) }),
+  addCompanyReport: (id: string, body: { personId: string; startedOn?: string }) =>
+    request<Company>(`/api/companies/${id}/reports`, { method: 'POST', body: JSON.stringify(body) }),
+  endCompanyReport: (id: string, reportId: string) =>
+    request<Company>(`/api/companies/${id}/reports/${reportId}`, { method: 'DELETE' }),
+  setCompanyContract: (id: string, body: { personId?: string | null; kind: string; startedOn?: string }) =>
+    request<Company>(`/api/companies/${id}/contracts`, { method: 'POST', body: JSON.stringify(body) }),
+  companyNotes: (id: string) => request<CompanyNote[]>(`/api/companies/${id}/notes`),
+  createCompanyNote: (id: string, body: string) =>
+    request<CompanyNote>(`/api/companies/${id}/notes`, { method: 'POST', body: JSON.stringify({ body }) }),
+  patchCompanyNote: (id: string, noteId: string, body: string) =>
+    request<CompanyNote>(`/api/companies/${id}/notes/${noteId}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
+  deleteCompanyNote: (id: string, noteId: string) =>
+    request(`/api/companies/${id}/notes/${noteId}`, { method: 'DELETE' }),
 }

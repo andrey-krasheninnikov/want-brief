@@ -6,7 +6,7 @@ export type ItemKind =
   | 'initiative'
   | 'life'
 
-export type Occupancy = 'solo' | 'parallel'
+export type Occupancy = 'solo' | 'parallel' | 'waiting'
 
 export type ItemStatus =
   | 'backlog'
@@ -124,6 +124,7 @@ export type Project = {
   targetHoursWeek: number
   links: ProjectLink[]
   people: PersonRel[]
+  companies: PersonRel[]
   archivedAt: string | null
   createdAt: string
   updatedAt: string
@@ -136,11 +137,13 @@ export type Person = {
   age: number | null
   projects: PersonRel[]
   events: PersonRel[]
+  companies: PersonRel[]
   itemIds: string[]
   contacts: PersonContact[]
   sites: PersonSite[]
   bonds: PersonBond[]
   professions: PersonProfession[]
+  absences: PersonAbsence[]
   meBond: MeBond | null
   lastNoteAt: string | null
   createdAt: string
@@ -152,6 +155,94 @@ export type PersonNote = {
   personId: string
   body: string
   createdAt: string
+}
+
+export type SalaryCurrency = 'usd' | 'rub'
+export type ContractKind = 'informal' | 'gph' | 'ip' | 'labor' | 'contract'
+
+export type Tenure = {
+  years: number
+  months: number
+}
+
+export type CompanyTitle = {
+  id: string
+  companyId: string
+  title: string
+  startedOn: string
+  endedOn: string | null
+}
+
+export type CompanySalary = {
+  id: string
+  companyId: string
+  currency: SalaryCurrency
+  amount: number
+  comment: string
+  startedOn: string
+  endedOn: string | null
+}
+
+export type CompanyManager = {
+  id: string
+  companyId: string
+  personId: string
+  startedOn: string
+  endedOn: string | null
+}
+
+export type CompanyReport = {
+  id: string
+  companyId: string
+  personId: string
+  startedOn: string
+  endedOn: string | null
+}
+
+export type CompanyContract = {
+  id: string
+  companyId: string
+  personId: string | null
+  kind: ContractKind
+  startedOn: string
+  endedOn: string | null
+}
+
+export type Company = {
+  id: string
+  name: string
+  description: string
+  links: ProjectLink[]
+  projects: PersonRel[]
+  events: PersonRel[]
+  people: PersonRel[]
+  startedOn: string | null
+  endedOn: string | null
+  tenure: Tenure | null
+  titles: CompanyTitle[]
+  salaries: CompanySalary[]
+  managers: CompanyManager[]
+  reports: CompanyReport[]
+  contracts: CompanyContract[]
+  createdAt: string
+  updatedAt: string
+}
+
+export type CompanyNote = {
+  id: string
+  companyId: string
+  body: string
+  createdAt: string
+}
+
+export type PersonAbsence = {
+  id: string
+  personId: string
+  startsOn: string
+  endsOn: string
+  note: string
+  createdAt: string
+  updatedAt: string
 }
 
 export type ProjectNote = {
@@ -189,6 +280,7 @@ export type Item = {
   urgent: boolean
   important: boolean
   pinned: boolean
+  pinnedAt: string | null
   stress: number | null
   dueAt: string | null
   devDueAt: string | null
@@ -212,13 +304,14 @@ export type Item = {
   checkDone: number
 }
 
-export type CheckinKind = 'stress' | 'focus' | 'energy' | 'interest'
+export type CheckinKind = 'stress' | 'focus' | 'energy' | 'interest' | 'happiness'
 
 export type LatestCheckins = {
   stress: number
   focus: number
   energy: number
   interest: number
+  happiness: number
 }
 
 export type EventKind = 'event' | 'call'
@@ -251,6 +344,9 @@ export type EventOccurrence = {
   endsAt: string
   durationSeconds: number
   recurrence: EventRecurrence
+  originalOn: string
+  overridden: boolean
+  skipped?: boolean
   links: ProjectLink[]
   meetUrl: string
   involvement: number
@@ -272,6 +368,8 @@ export type EventSeries = {
   startsAt: string
   durationSeconds: number
   recurrence: EventRecurrence
+  repeatUntil: string | null
+  weekdays: number[]
   links: ProjectLink[]
   meetUrl: string
   involvement: number
@@ -310,11 +408,35 @@ export function eventTypeLabel(type: EventType): string {
   }
 }
 
-export function recurrenceLabel(recurrence: EventRecurrence, startsAt: string): string {
+const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+export function weekdaysFromStart(iso: string): number[] {
+  const short = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Europe/Moscow' }).format(new Date(iso))
+  const index = WEEKDAY_NAMES.indexOf(short)
+  if (index < 0) return [0, 7]
+  return [index, index + 7]
+}
+
+export function recurrenceLabel(recurrence: EventRecurrence, weekdays: number[] = []): string {
   if (recurrence === 'once') return 'Once'
   if (recurrence === 'monthly') return 'Monthly'
-  const day = new Intl.DateTimeFormat('en-GB', { weekday: 'long' }).format(new Date(startsAt))
-  return `Every ${day}`
+  const week1 = weekdays.filter((slot) => slot < 7).sort((a, b) => a - b)
+  const week2 = weekdays.filter((slot) => slot >= 7).map((slot) => slot - 7).sort((a, b) => a - b)
+  const fmt = (slots: number[]) => slots.map((slot) => WEEKDAY_NAMES[slot]).join(', ')
+  const same = week1.length === week2.length && week1.every((slot, i) => slot === week2[i])
+  if (same && week1.length) return `Weekly ${fmt(week1)}`
+  const parts: string[] = []
+  if (week1.length) parts.push(`W1 ${fmt(week1)}`)
+  if (week2.length) parts.push(`W2 ${fmt(week2)}`)
+  return parts.length ? parts.join(' ') : 'Weekly'
+}
+
+export type EventNote = {
+  id: string
+  seriesId: string
+  originalOn: string
+  body: string
+  createdAt: string
 }
 
 export type ItemCheck = {
@@ -332,6 +454,25 @@ export type ItemNote = {
   itemId: string
   body: string
   sourceKind: SourceKind
+  externalId: string
+  authorName: string
+  url: string
+  createdAt: string
+}
+
+export type ItemEventKind = 'status' | 'field' | 'timer_start' | 'timer_stop' | 'timer_log' | 'check'
+
+export type TaskLogKind = 'status' | 'timer_stop'
+
+export type ItemEvent = {
+  id: string
+  itemId: string
+  kind: ItemEventKind
+  field: string
+  from: string
+  to: string
+  note: string
+  stress: number | null
   createdAt: string
 }
 
@@ -360,6 +501,7 @@ export type LoadReport = {
     focus: number | null
     energy: number | null
     interest: number | null
+    happiness: number | null
   }
   byProject: {
     projectId: string | null
@@ -390,10 +532,13 @@ export type JournalEntry = {
   createdAt: string
 }
 
+export type ScheduleBlockKind = 'work' | 'ping'
+
 export type ScheduleBlock = {
   itemId: string
   title: string
   externalKey: string
+  kind: ScheduleBlockKind
   startsAt: string
   endsAt: string
   late: boolean
@@ -406,6 +551,14 @@ export type ScheduleBlock = {
   dueAt: string
   stress: number | null
   remainingSeconds: number
+  estimateFactor: number
+  reasons: string[]
+  people?: SchedulePerson[]
+}
+
+export type SchedulePerson = {
+  id: string
+  name: string
 }
 
 export type ScheduleLane = {
@@ -419,7 +572,13 @@ export type ScheduleBusy = {
   startsAt: string
   endsAt: string
   title: string
+  soft: boolean
   seriesId?: string
+  originalOn?: string
+  activeStartsAt?: string
+  activeEndsAt?: string
+  people?: SchedulePerson[]
+  canSkip?: boolean
 }
 
 export type UnplannedItem = {
@@ -440,12 +599,135 @@ export type ScheduleCapacity = {
   busySeconds: number
 }
 
+export type ScheduleGrid = {
+  timezone: string
+  startHour: number
+  endHour: number
+  workdays: number[]
+  workStartMin: number
+  workEndMin: number
+}
+
+export type AtRiskItem = {
+  itemId: string
+  key: string
+  title: string
+  slackSeconds: number
+}
+
+export type ScheduleScore = {
+  lateSeconds: number
+  fragments: number
+  switches: number
+  loadVariance: number
+  total: number
+}
+
 export type Schedule = {
   lanes: ScheduleLane[]
   unplanned: UnplannedItem[]
   busy: ScheduleBusy[]
   overflow: ScheduleOverflow
   capacity: ScheduleCapacity
+  grid: ScheduleGrid
+  atRisk: AtRiskItem[]
+  score: ScheduleScore
+}
+
+export type BreakWindow = {
+  startMin: number
+  endMin: number
+}
+
+export type ScheduleSettings = {
+  timezone: string
+  workStartMin: number
+  workEndMin: number
+  workdays: number[]
+  break: BreakWindow | null
+  meetingBufferMin: number
+  dailyFocusMin: number
+  maxTasksPerDay: number
+  minSliceMin: number
+  maxSliceMin: number
+  sliceBreakMin: number
+  gridMin: number
+  estimateBuffer: boolean
+  estimateMaxK: number
+  oldestFirst: boolean
+  stressShiftHours: number
+  targetLeadWorkdays: number
+  softBusy: boolean
+  waitingTracks: number
+  followupPingMin: number
+  checkWindows: string[]
+  energyAware: boolean
+  goldenHours: boolean
+  stabilityThresholdMin: number
+}
+
+export type DayOverride = {
+  day: string
+  off: boolean
+  workStartMin: number | null
+  workEndMin: number | null
+  note: string
+  updatedAt: string
+}
+
+export type DayOverrideDraft = {
+  off: boolean
+  workStartMin: number | null
+  workEndMin: number | null
+  note: string
+}
+
+export type WhatIfScenario = {
+  moveDue: { itemId: string; dueAt: string }[]
+  dropItems: string[]
+  skipEvents: string[]
+}
+
+export type WhatIfSummary = {
+  lateSeconds: number
+  overflowItems: number
+  overflowSeconds: number
+  atRisk: number
+  fragments: number
+  switches: number
+  score: number
+}
+
+export type WhatIfResult = {
+  base: WhatIfSummary
+  variant: WhatIfSummary
+  delta: WhatIfSummary
+}
+
+export const SCHEDULE_REASON_LABELS: Record<string, string> = {
+  pinned: 'Pinned',
+  pinned_at: 'Pinned to time',
+  active: 'Tracking now',
+  in_progress: 'In progress',
+  no_slack: 'No slack',
+  due_soon: 'Due soon',
+  same_project: 'Same project',
+  sticky: 'Kept in place',
+  golden_hour: 'Golden hour',
+  light_task: 'Light task',
+  soft_busy: 'Over skippable meeting',
+  person_away: 'Waits for',
+  person_busy: 'In meeting with',
+  estimate: 'Estimate',
+  pushed_by: 'Pushed by',
+}
+
+export function scheduleReasonLabel(reason: string): string {
+  const [head, ...rest] = reason.split(':')
+  const tail = rest.join(':')
+  if (head.startsWith('estimate_x')) return `Estimate ×${head.slice('estimate_x'.length)}`
+  const label = SCHEDULE_REASON_LABELS[head] ?? head.replaceAll('_', ' ')
+  return tail ? `${label} ${tail}` : label
 }
 
 export const KINDS: ItemKind[] = [
@@ -481,8 +763,12 @@ export function kindLabel(kind: ItemKind): string {
   return kind
 }
 
+export const OCCUPANCIES: Occupancy[] = ['solo', 'parallel', 'waiting']
+
 export function occupancyLabel(occupancy: Occupancy): string {
-  return occupancy === 'parallel' ? 'Parallel' : 'Solo'
+  if (occupancy === 'parallel') return 'Parallel'
+  if (occupancy === 'waiting') return 'Waiting'
+  return 'Solo'
 }
 
 export function sourceKindLabel(kind: SourceKind): string {

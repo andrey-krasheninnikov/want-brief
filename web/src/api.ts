@@ -10,6 +10,7 @@ import type {
   PersonAbsence,
   PersonNote,
   PersonContact,
+  PersonAddress,
   PersonSite,
   PersonBond,
   PersonProfession,
@@ -224,6 +225,12 @@ export const api = {
     request<PersonContact>(`/api/people/${id}/contacts/${contactId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deletePersonContact: (id: string, contactId: string) =>
     request(`/api/people/${id}/contacts/${contactId}`, { method: 'DELETE' }),
+  createPersonAddress: (id: string, body: Record<string, unknown>) =>
+    request<PersonAddress>(`/api/people/${id}/addresses`, { method: 'POST', body: JSON.stringify(body) }),
+  patchPersonAddress: (id: string, addressId: string, body: Record<string, unknown>) =>
+    request<PersonAddress>(`/api/people/${id}/addresses/${addressId}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deletePersonAddress: (id: string, addressId: string) =>
+    request(`/api/people/${id}/addresses/${addressId}`, { method: 'DELETE' }),
   createPersonSite: (id: string, body: Record<string, unknown>) =>
     request<PersonSite>(`/api/people/${id}/sites`, { method: 'POST', body: JSON.stringify(body) }),
   patchPersonSite: (id: string, siteId: string, body: Record<string, unknown>) =>

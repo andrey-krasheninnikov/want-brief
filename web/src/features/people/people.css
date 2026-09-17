@@ -438,6 +438,7 @@
   font: inherit;
   letter-spacing: 0;
   word-break: break-all;
+  white-space: pre-wrap;
 }
 .people-contact-value:hover:not(:disabled) { color: var(--accent); }
 .people-contact-value:disabled { opacity: 0.55; }

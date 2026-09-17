@@ -75,6 +75,35 @@ func TestParseItemStatusRejectsClarification(t *testing.T) {
 	}
 }
 
+func TestParseItemKindAllowsRequest(t *testing.T) {
+	kind, err := ParseItemKind("request")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kind != KindRequest {
+		t.Fatalf("kind %s", kind)
+	}
+}
+
+func TestParseItemStatusForKindRejectsReviewOnRequest(t *testing.T) {
+	if _, err := ParseItemStatusForKind(string(StatusReview), KindRequest); err == nil {
+		t.Fatal("expected invalid status")
+	}
+}
+
+func TestNewLocalItemRequestStartsWaiting(t *testing.T) {
+	item, err := NewLocalItem(uuid.New(), "Access", KindRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Occupancy != OccupancyWaiting {
+		t.Fatalf("occupancy %s", item.Occupancy)
+	}
+	if item.Kind != KindRequest {
+		t.Fatalf("kind %s", item.Kind)
+	}
+}
+
 func TestNewLocalItemStartsSolo(t *testing.T) {
 	item, err := NewLocalItem(uuid.New(), "Ship", KindTask)
 	if err != nil {

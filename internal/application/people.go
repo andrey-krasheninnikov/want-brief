@@ -128,6 +128,42 @@ func (s *Service) DeletePersonContact(ctx context.Context, personID, contactID u
 	return s.PersonContacts.Delete(ctx, contactID)
 }
 
+func (s *Service) CreatePersonAddress(ctx context.Context, personID uuid.UUID, draft domain.PersonAddressDraft) (domain.PersonAddress, error) {
+	if _, err := s.People.Get(ctx, personID); err != nil {
+		return domain.PersonAddress{}, err
+	}
+	address, err := domain.NewPersonAddress(personID, draft)
+	if err != nil {
+		return domain.PersonAddress{}, err
+	}
+	return s.PersonAddresses.Create(ctx, address)
+}
+
+func (s *Service) ReplacePersonAddress(ctx context.Context, personID, addressID uuid.UUID, draft domain.PersonAddressDraft) (domain.PersonAddress, error) {
+	address, err := s.PersonAddresses.Get(ctx, addressID)
+	if err != nil {
+		return domain.PersonAddress{}, err
+	}
+	if address.PersonID != personID {
+		return domain.PersonAddress{}, domain.ErrNotFound
+	}
+	if err := address.Apply(draft); err != nil {
+		return domain.PersonAddress{}, err
+	}
+	return s.PersonAddresses.Update(ctx, address)
+}
+
+func (s *Service) DeletePersonAddress(ctx context.Context, personID, addressID uuid.UUID) error {
+	address, err := s.PersonAddresses.Get(ctx, addressID)
+	if err != nil {
+		return err
+	}
+	if address.PersonID != personID {
+		return domain.ErrNotFound
+	}
+	return s.PersonAddresses.Delete(ctx, addressID)
+}
+
 func (s *Service) CreatePersonAbsence(ctx context.Context, personID uuid.UUID, draft domain.PersonAbsenceDraft) (domain.PersonAbsence, error) {
 	if _, err := s.People.Get(ctx, personID); err != nil {
 		return domain.PersonAbsence{}, err

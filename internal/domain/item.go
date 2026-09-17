@@ -12,6 +12,7 @@ type ItemKind string
 
 const (
 	KindTask       ItemKind = "task"
+	KindRequest    ItemKind = "request"
 	KindNote       ItemKind = "note"
 	KindAgreement  ItemKind = "agreement"
 	KindObligation ItemKind = "obligation"
@@ -96,7 +97,7 @@ type Item struct {
 func ParseItemKind(raw string) (ItemKind, error) {
 	kind := ItemKind(raw)
 	switch kind {
-	case KindTask, KindNote, KindAgreement, KindObligation, KindInitiative, KindLife:
+	case KindTask, KindRequest, KindNote, KindAgreement, KindObligation, KindInitiative, KindLife:
 		return kind, nil
 	default:
 		return "", fmt.Errorf("%w: item kind", ErrInvalid)
@@ -248,13 +249,17 @@ func NewLocalItem(sourceID uuid.UUID, title string, kind ItemKind) (Item, error)
 	if _, err := ParseItemKind(string(kind)); err != nil {
 		return Item{}, err
 	}
+	occupancy := OccupancySolo
+	if kind == KindRequest {
+		occupancy = OccupancyWaiting
+	}
 	now := time.Now().UTC()
 	return Item{
 		ID:        uuid.New(),
 		SourceID:  sourceID,
 		Title:     title,
 		Status:    StatusBacklog,
-		Occupancy: OccupancySolo,
+		Occupancy: occupancy,
 		Kind:      kind,
 		Links:     []ProjectLink{},
 		CreatedAt: now,

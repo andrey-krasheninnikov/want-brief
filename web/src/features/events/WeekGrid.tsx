@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 import type { EventOccurrence } from '../../types'
 import { moscowMinutes, moscowYmd } from '../../shared/moscow'
+import { layoutLanes } from './eventLayout'
 import { eventMeta, eventTone, type EventLookups } from './eventMeta'
 
-const HOUR = 48
+const HOUR = 96
+const GAP = 3
 
 type Props = {
   days: string[]
@@ -32,6 +34,16 @@ function dayLabel(ymd: string) {
   }
 }
 
+function blockStyle(start: number, dur: number, col: number, cols: number, color: string): CSSProperties {
+  return {
+    top: (start / 60) * HOUR,
+    height: (dur / 60) * HOUR,
+    left: `calc(${(col / cols) * 100}% + ${GAP}px)`,
+    width: `calc(${100 / cols}% - ${GAP * 2}px)`,
+    ...eventTone(color),
+  }
+}
+
 export function WeekGrid({ days, rows, lookups, today, selectedId, selectedOn, onPick }: Props) {
   const scroller = useRef<HTMLDivElement>(null)
   const now = moscowYmd()
@@ -42,7 +54,7 @@ export function WeekGrid({ days, rows, lookups, today, selectedId, selectedOn, o
   }, [days[0]])
 
   return (
-    <div className="cal-week">
+    <div className="cal-week" style={{ '--hour': `${HOUR}px` } as CSSProperties}>
       <div className="cal-week-head">
         <span />
         {days.map((ymd) => {
@@ -62,24 +74,31 @@ export function WeekGrid({ days, rows, lookups, today, selectedId, selectedOn, o
               <span key={hour}>{String(hour).padStart(2, '0')}:00</span>
             ))}
           </div>
-          {days.map((ymd) => (
-            <div key={ymd} className="cal-col">
-              {Array.from({ length: 24 }, (_, hour) => (
-                <i key={hour} />
-              ))}
-              {ymd === now ? <b className="cal-now" style={{ top: (nowMin / 60) * HOUR }} /> : null}
-              {rows
-                .filter((row) => ymdOf(row.startsAt) === ymd)
-                .map((row) => {
+          {days.map((ymd) => {
+            const dayRows = rows.filter((row) => ymdOf(row.startsAt) === ymd)
+            const lanes = layoutLanes(
+              dayRows.map((row) => {
+                const start = moscowMinutes(row.startsAt)
+                return { start, end: start + row.durationSeconds / 60 }
+              }),
+            )
+            return (
+              <div key={ymd} className="cal-col">
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <i key={hour} />
+                ))}
+                {ymd === now ? <b className="cal-now" style={{ top: (nowMin / 60) * HOUR }} /> : null}
+                {dayRows.map((row, i) => {
                   const start = moscowMinutes(row.startsAt)
-                  const dur = Math.max(row.durationSeconds / 60, 20)
+                  const dur = row.durationSeconds / 60
                   const meta = eventMeta(row, lookups)
+                  const lane = lanes[i]
                   return (
                     <button
                       key={`${row.seriesId}-${row.originalOn}`}
                       type="button"
                       className={row.seriesId === selectedId && row.originalOn === selectedOn ? 'cal-block on' : 'cal-block'}
-                      style={{ top: (start / 60) * HOUR, height: (dur / 60) * HOUR, ...eventTone(meta.color) }}
+                      style={blockStyle(start, dur, lane.col, lane.cols, meta.color)}
                       onClick={() => onPick(row.seriesId, row.originalOn)}
                     >
                       <span>{row.title}</span>
@@ -87,8 +106,9 @@ export function WeekGrid({ days, rows, lookups, today, selectedId, selectedOn, o
                     </button>
                   )
                 })}
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

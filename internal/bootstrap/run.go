@@ -92,6 +92,7 @@ func Run(ctx context.Context, cfg Config) error {
 		People:            postgres.PersonRepo{Store: store},
 		PersonNotes:       postgres.PersonNoteRepo{Store: store},
 		PersonContacts:    postgres.PersonContactRepo{Store: store},
+		PersonAddresses:   postgres.PersonAddressRepo{Store: store},
 		PersonSites:       postgres.PersonSiteRepo{Store: store},
 		PersonBonds:       postgres.PersonBondRepo{Store: store},
 		PersonProfessions: postgres.PersonProfessionRepo{Store: store},

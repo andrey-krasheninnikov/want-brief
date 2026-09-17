@@ -23,6 +23,7 @@ type Person struct {
 	Companies   []PersonRel        `json:"companies"`
 	ItemIDs     []uuid.UUID        `json:"itemIds"`
 	Contacts    []PersonContact    `json:"contacts"`
+	Addresses   []PersonAddress    `json:"addresses"`
 	Sites       []PersonSite       `json:"sites"`
 	Bonds       []PersonBond       `json:"bonds"`
 	Professions []PersonProfession `json:"professions"`
@@ -138,6 +139,9 @@ func (p Person) WithAge(now time.Time) Person {
 	}
 	if p.Contacts == nil {
 		p.Contacts = []PersonContact{}
+	}
+	if p.Addresses == nil {
+		p.Addresses = []PersonAddress{}
 	}
 	if p.Sites == nil {
 		p.Sites = []PersonSite{}

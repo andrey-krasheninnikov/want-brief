@@ -1,4 +1,4 @@
-import { Handshake, Heart, Kanban, Lightning, NotePencil, Scales } from '@phosphor-icons/react'
+import { Handshake, Heart, Hourglass, Kanban, Lightning, NotePencil, Scales } from '@phosphor-icons/react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api'
@@ -32,6 +32,8 @@ function kindIcon(kind: ItemKind): ReactNode {
   switch (kind) {
     case 'note':
       return <NotePencil size={size} weight="light" />
+    case 'request':
+      return <Hourglass size={size} weight="light" />
     case 'agreement':
       return <Handshake size={size} weight="light" />
     case 'obligation':

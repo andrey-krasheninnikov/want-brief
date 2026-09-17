@@ -30,6 +30,7 @@ type Service struct {
 	People            domain.PersonRepository
 	PersonNotes       domain.PersonNoteRepository
 	PersonContacts    domain.PersonContactRepository
+	PersonAddresses   domain.PersonAddressRepository
 	PersonSites       domain.PersonSiteRepository
 	PersonBonds       domain.PersonBondRepository
 	PersonProfessions domain.PersonProfessionRepository

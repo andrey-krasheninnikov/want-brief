@@ -186,12 +186,17 @@ func (s *Store) attachPersonListExtras(ctx context.Context, people []domain.Pers
 		ids[i] = p.ID
 		index[p.ID] = i
 		people[i].Contacts = []domain.PersonContact{}
+		people[i].Addresses = []domain.PersonAddress{}
 		people[i].Sites = []domain.PersonSite{}
 		people[i].Bonds = []domain.PersonBond{}
 		people[i].Professions = []domain.PersonProfession{}
 		people[i].Absences = []domain.PersonAbsence{}
 	}
 	contacts, err := s.contactsByPeople(ctx, ids)
+	if err != nil {
+		return err
+	}
+	addresses, err := s.addressesByPeople(ctx, ids)
 	if err != nil {
 		return err
 	}
@@ -217,6 +222,9 @@ func (s *Store) attachPersonListExtras(ctx context.Context, people []domain.Pers
 	}
 	for id, list := range contacts {
 		people[index[id]].Contacts = list
+	}
+	for id, list := range addresses {
+		people[index[id]].Addresses = list
 	}
 	for id, list := range sites {
 		people[index[id]].Sites = list

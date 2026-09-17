@@ -8,6 +8,7 @@ import type { Person } from '../../types'
 import { personInitials } from './PersonCard'
 import { PersonBonds } from './PersonBonds'
 import { PersonAbsences } from './PersonAbsences'
+import { PersonAddresses } from './PersonAddresses'
 import { PersonContacts } from './PersonContacts'
 import { PersonLog } from './PersonLog'
 import { PersonNotes } from './PersonNotes'
@@ -37,6 +38,7 @@ const SECTIONS = [
   { id: 'people-sec-overview', label: 'Overview' },
   { id: 'people-sec-professions', label: 'Professions' },
   { id: 'people-sec-contacts', label: 'Contacts' },
+  { id: 'people-sec-addresses', label: 'Addresses' },
   { id: 'people-sec-absences', label: 'Away' },
   { id: 'people-sec-notes', label: 'Notes' },
   { id: 'people-sec-relations', label: 'Relations' },
@@ -304,6 +306,7 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
       {row ? <PersonOverview person={{ ...row, name: form.name }} /> : null}
       {row ? <PersonProfessions personId={personId} professions={row.professions ?? []} /> : null}
       {row ? <PersonContacts personId={personId} contacts={row.contacts ?? []} /> : null}
+      {row ? <PersonAddresses personId={personId} addresses={row.addresses ?? []} /> : null}
       {row ? <PersonSites personId={personId} sites={row.sites ?? []} /> : null}
       {row ? <PersonAbsences personId={personId} absences={row.absences ?? []} /> : null}
       {row ? <PersonNotes personId={personId} notes={notes.data ?? []} /> : null}

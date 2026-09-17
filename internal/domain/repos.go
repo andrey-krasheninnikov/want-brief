@@ -122,6 +122,14 @@ type PersonContactRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
+type PersonAddressRepository interface {
+	Get(ctx context.Context, id uuid.UUID) (PersonAddress, error)
+	ListByPerson(ctx context.Context, personID uuid.UUID) ([]PersonAddress, error)
+	Create(ctx context.Context, address PersonAddress) (PersonAddress, error)
+	Update(ctx context.Context, address PersonAddress) (PersonAddress, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
 type PersonSiteRepository interface {
 	Get(ctx context.Context, id uuid.UUID) (PersonSite, error)
 	ListByPerson(ctx context.Context, personID uuid.UUID) ([]PersonSite, error)

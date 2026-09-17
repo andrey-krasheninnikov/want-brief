@@ -211,6 +211,10 @@ func (s *Store) attachPersonDossier(ctx context.Context, person *domain.Person) 
 	if err != nil {
 		return err
 	}
+	addresses, err := s.ListPersonAddresses(ctx, person.ID)
+	if err != nil {
+		return err
+	}
 	sites, err := s.ListPersonSites(ctx, person.ID)
 	if err != nil {
 		return err
@@ -228,6 +232,7 @@ func (s *Store) attachPersonDossier(ctx context.Context, person *domain.Person) 
 		return err
 	}
 	person.Contacts = contacts
+	person.Addresses = addresses
 	person.Sites = sites
 	person.Bonds = bonds
 	person.Professions = profs

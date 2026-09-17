@@ -81,6 +81,7 @@ export function personMatches(person: Person, raw: string): boolean {
     ...(person.professions ?? []).map((row) => row.title),
     person.meBond?.kind ?? '',
     ...(person.contacts ?? []).flatMap((row) => [row.label, row.value]),
+    ...(person.addresses ?? []).flatMap((row) => [row.label, row.value]),
     ...(person.sites ?? []).map((row) => row.url),
   ]
     .join(' ')

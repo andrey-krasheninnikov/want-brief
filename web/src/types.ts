@@ -1,5 +1,6 @@
 export type ItemKind =
   | 'task'
+  | 'request'
   | 'note'
   | 'agreement'
   | 'obligation'
@@ -34,6 +35,7 @@ export type PersonRel = {
 }
 
 export type ContactKind = 'phone' | 'telegram' | 'url'
+export type AddressKind = 'home' | 'work' | 'other'
 export type SiteKind = 'personal_site' | 'company_site' | 'github' | 'linkedin' | 'youtube' | 'telegram_channel' | 'other'
 export type BondKind = 'acquaintance' | 'colleague' | 'comrade' | 'friend' | 'relative' | 'spouse' | 'adversary' | 'other'
 export type BondAction = 'open' | 'change' | 'end'
@@ -42,6 +44,17 @@ export type PersonContact = {
   id: string
   personId: string
   kind: ContactKind
+  label: string
+  value: string
+  note: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type PersonAddress = {
+  id: string
+  personId: string
+  kind: AddressKind
   label: string
   value: string
   note: string
@@ -140,6 +153,7 @@ export type Person = {
   companies: PersonRel[]
   itemIds: string[]
   contacts: PersonContact[]
+  addresses: PersonAddress[]
   sites: PersonSite[]
   bonds: PersonBond[]
   professions: PersonProfession[]
@@ -732,6 +746,7 @@ export function scheduleReasonLabel(reason: string): string {
 
 export const KINDS: ItemKind[] = [
   'task',
+  'request',
   'note',
   'agreement',
   'obligation',
@@ -760,6 +775,7 @@ export function statusesForKind(kind: ItemKind): ItemStatus[] {
 
 export function kindLabel(kind: ItemKind): string {
   if (kind === 'task') return 'IT-ticket'
+  if (kind === 'request') return 'Request'
   return kind
 }
 

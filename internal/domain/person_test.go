@@ -111,3 +111,21 @@ func TestNewPersonRejectsEmptyLinkComment(t *testing.T) {
 		t.Fatal("expected invalid link comment")
 	}
 }
+
+func TestPersonCompaniesEmptyAndOptionalComment(t *testing.T) {
+	person, err := NewPerson(PersonDraft{Name: "Ada"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if person.Companies == nil || len(person.Companies) != 0 {
+		t.Fatalf("got %+v", person.Companies)
+	}
+	id := uuid.New()
+	person, err = NewPerson(PersonDraft{Name: "Ada", Companies: []PersonRel{{ID: id}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(person.Companies) != 1 || person.Companies[0].ID != id || person.Companies[0].Comment != "" {
+		t.Fatalf("got %+v", person.Companies)
+	}
+}

@@ -82,6 +82,7 @@ func (s *Store) CreatePerson(ctx context.Context, p domain.Person) (domain.Perso
 	}
 	p.Projects = links.Projects
 	p.Events = links.Events
+	p.Companies = links.Companies
 	p.ItemIDs = links.ItemIDs
 	if err := s.replacePersonLinks(ctx, p); err != nil {
 		return domain.Person{}, err
@@ -128,6 +129,7 @@ func (s *Store) attachPersonLinks(ctx context.Context, people []domain.Person) e
 		index[p.ID] = i
 		people[i].Projects = []domain.PersonRel{}
 		people[i].Events = []domain.PersonRel{}
+		people[i].Companies = []domain.PersonRel{}
 		people[i].ItemIDs = []uuid.UUID{}
 	}
 	projects, err := s.relsByOwners(ctx, "person_projects", "person_id", "project_id", ids)
@@ -142,6 +144,10 @@ func (s *Store) attachPersonLinks(ctx context.Context, people []domain.Person) e
 	if err != nil {
 		return err
 	}
+	companies, err := s.relsByOwners(ctx, "company_people", "person_id", "company_id", ids)
+	if err != nil {
+		return err
+	}
 	for id, list := range projects {
 		people[index[id]].Projects = list
 	}
@@ -151,6 +157,9 @@ func (s *Store) attachPersonLinks(ctx context.Context, people []domain.Person) e
 	for id, list := range items {
 		people[index[id]].ItemIDs = list
 	}
+	for id, list := range companies {
+		people[index[id]].Companies = list
+	}
 	return nil
 }
 
@@ -159,6 +168,9 @@ func (s *Store) replacePersonLinks(ctx context.Context, p domain.Person) error {
 		return err
 	}
 	if err := s.replaceRels(ctx, "person_events", "person_id", "event_id", p.ID, p.Events); err != nil {
+		return err
+	}
+	if err := s.replaceRels(ctx, "company_people", "person_id", "company_id", p.ID, p.Companies); err != nil {
 		return err
 	}
 	return s.replaceLinks(ctx, "person_items", "person_id", "item_id", p.ID, p.ItemIDs)
@@ -177,8 +189,13 @@ func (s *Store) attachPersonListExtras(ctx context.Context, people []domain.Pers
 		people[i].Sites = []domain.PersonSite{}
 		people[i].Bonds = []domain.PersonBond{}
 		people[i].Professions = []domain.PersonProfession{}
+		people[i].Absences = []domain.PersonAbsence{}
 	}
 	contacts, err := s.contactsByPeople(ctx, ids)
+	if err != nil {
+		return err
+	}
+	absences, err := s.absencesByPeople(ctx, ids)
 	if err != nil {
 		return err
 	}
@@ -206,6 +223,9 @@ func (s *Store) attachPersonListExtras(ctx context.Context, people []domain.Pers
 	}
 	for id, list := range profs {
 		people[index[id]].Professions = list
+	}
+	for id, list := range absences {
+		people[index[id]].Absences = list
 	}
 	for id, bond := range meBonds {
 		b := bond

@@ -18,6 +18,8 @@ type EventWrite struct {
 	StartsAt          time.Time
 	DurationSeconds   int
 	Recurrence        string
+	RepeatUntil       *domain.Ymd
+	Weekdays          []int
 	Links             []domain.ProjectLink
 	MeetURL           string
 	Involvement       *int
@@ -27,12 +29,28 @@ type EventWrite struct {
 	People            *[]domain.PersonRel
 }
 
+type EventOccurrenceWrite struct {
+	OriginalOn      domain.Ymd
+	StartsAt        *time.Time
+	DurationSeconds *int
+	Skipped         bool
+}
+
 func (s *Service) ListEventOccurrences(ctx context.Context, from, to time.Time) ([]domain.EventOccurrence, error) {
 	series, err := s.Events.List(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := domain.ExpandEvents(series, from, to)
+	ids := make([]uuid.UUID, 0, len(series))
+	for _, event := range series {
+		ids = append(ids, event.ID)
+	}
+	overrides, err := s.EventOverrides.ListBySeries(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	occs := domain.ExpandEvents(series, from, to)
+	out := domain.MergeOccurrences(series, occs, overrides, from, to)
 	if out == nil {
 		return []domain.EventOccurrence{}, nil
 	}
@@ -45,6 +63,88 @@ func (s *Service) ListEvents(ctx context.Context) ([]domain.Event, error) {
 
 func (s *Service) GetEvent(ctx context.Context, id uuid.UUID) (domain.Event, error) {
 	return s.Events.Get(ctx, id)
+}
+
+func (s *Service) GetEventOccurrence(ctx context.Context, id uuid.UUID, originalOn domain.Ymd) (domain.EventOccurrence, error) {
+	event, err := s.Events.Get(ctx, id)
+	if err != nil {
+		return domain.EventOccurrence{}, err
+	}
+	override, err := s.EventOverrides.Get(ctx, id, originalOn)
+	if err != nil && err != domain.ErrNotFound {
+		return domain.EventOccurrence{}, err
+	}
+	var ov *domain.EventOverride
+	if err == nil {
+		ov = &override
+	}
+	return event.SlotOccurrence(originalOn, ov)
+}
+
+func (s *Service) PutEventOccurrence(ctx context.Context, id uuid.UUID, write EventOccurrenceWrite) (domain.EventOccurrence, error) {
+	event, err := s.Events.Get(ctx, id)
+	if err != nil {
+		return domain.EventOccurrence{}, err
+	}
+	if !event.HasSlot(write.OriginalOn) {
+		return domain.EventOccurrence{}, domain.ErrNotFound
+	}
+	override, err := domain.NewEventOverride(id, write.OriginalOn, write.StartsAt, write.DurationSeconds, write.Skipped)
+	if err != nil {
+		return domain.EventOccurrence{}, err
+	}
+	saved, err := s.EventOverrides.Upsert(ctx, override)
+	if err != nil {
+		return domain.EventOccurrence{}, err
+	}
+	return event.SlotOccurrence(write.OriginalOn, &saved)
+}
+
+func (s *Service) DeleteEventOccurrence(ctx context.Context, id uuid.UUID, originalOn domain.Ymd) error {
+	if _, err := s.Events.Get(ctx, id); err != nil {
+		return err
+	}
+	err := s.EventOverrides.Delete(ctx, id, originalOn)
+	if err == domain.ErrNotFound {
+		return nil
+	}
+	return err
+}
+
+func (s *Service) ListEventNotes(ctx context.Context, id uuid.UUID, originalOn *domain.Ymd) ([]domain.EventNote, error) {
+	if _, err := s.Events.Get(ctx, id); err != nil {
+		return nil, err
+	}
+	return s.EventNotes.ListBySeries(ctx, id, originalOn)
+}
+
+func (s *Service) CreateEventNote(ctx context.Context, id uuid.UUID, originalOn domain.Ymd, body string) (domain.EventNote, error) {
+	event, err := s.Events.Get(ctx, id)
+	if err != nil {
+		return domain.EventNote{}, err
+	}
+	if !event.HasSlot(originalOn) {
+		return domain.EventNote{}, domain.ErrInvalid
+	}
+	note, err := domain.NewEventNote(id, originalOn, body)
+	if err != nil {
+		return domain.EventNote{}, err
+	}
+	return s.EventNotes.Create(ctx, note)
+}
+
+func (s *Service) DeleteEventNote(ctx context.Context, id, noteID uuid.UUID) error {
+	if _, err := s.Events.Get(ctx, id); err != nil {
+		return err
+	}
+	note, err := s.EventNotes.Get(ctx, noteID)
+	if err != nil {
+		return err
+	}
+	if note.SeriesID != id {
+		return domain.ErrNotFound
+	}
+	return s.EventNotes.Delete(ctx, noteID)
 }
 
 func (s *Service) CreateEvent(ctx context.Context, write EventWrite) (domain.Event, error) {
@@ -133,6 +233,8 @@ func draftFromWrite(write EventWrite) (domain.EventDraft, error) {
 		StartsAt:          write.StartsAt,
 		DurationSeconds:   duration,
 		Recurrence:        rec,
+		RepeatUntil:       write.RepeatUntil,
+		Weekdays:          write.Weekdays,
 		Links:             write.Links,
 		MeetURL:           write.MeetURL,
 		Involvement:       involvement,

@@ -1,0 +1,103 @@
+{
+  "blocks": [
+    {
+      "key": "FU-2",
+      "kind": "ping",
+      "start": "Tue 15 10:00",
+      "end": "Tue 15 10:20",
+      "lane": 0,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "FU-1",
+      "kind": "ping",
+      "start": "Tue 15 10:20",
+      "end": "Tue 15 10:40",
+      "lane": 0,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "FU-2",
+      "kind": "ping",
+      "start": "Wed 16 10:40",
+      "end": "Wed 16 11:00",
+      "lane": 0,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "from"
+    },
+    {
+      "key": "FU-1",
+      "kind": "ping",
+      "start": "Wed 16 11:00",
+      "end": "Wed 16 11:20",
+      "lane": 0,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "FU-3",
+      "kind": "ping",
+      "start": "Thu 17 10:00",
+      "end": "Thu 17 10:20",
+      "lane": 0,
+      "late": true,
+      "reasons": [
+        "no_slack",
+        "person_away:Bob"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "FU-1",
+      "kind": "ping",
+      "start": "Thu 17 10:20",
+      "end": "Thu 17 10:40",
+      "lane": 0,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "from"
+    },
+    {
+      "key": "FU-3",
+      "kind": "ping",
+      "start": "Fri 18 10:00",
+      "end": "Fri 18 10:20",
+      "lane": 0,
+      "late": true,
+      "reasons": [
+        "no_slack"
+      ],
+      "continue": "both"
+    }
+  ],
+  "unplanned": [],
+  "atRisk": [
+    "FU-3"
+  ],
+  "busy": [
+    "Ann 1:1 Wed 16 10:00-Wed 16 10:30"
+  ],
+  "overflow": {
+    "itemCount": 1,
+    "seconds": 3600,
+    "firstDueAt": "2026-09-14T15:00:00Z"
+  },
+  "score": {
+    "lateSeconds": 3600,
+    "fragments": 0,
+    "switches": 0,
+    "loadVariance": 0,
+    "total": 10
+  }
+}

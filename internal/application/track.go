@@ -16,7 +16,14 @@ func (s *Service) StartInterval(ctx context.Context, itemID uuid.UUID) (domain.T
 	if _, err := s.GetItem(ctx, itemID); err != nil {
 		return domain.TimeInterval{}, err
 	}
-	return s.Intervals.Create(ctx, domain.NewOpenInterval(itemID, s.now()))
+	interval, err := s.Intervals.Create(ctx, domain.NewOpenInterval(itemID, s.now()))
+	if err != nil {
+		return domain.TimeInterval{}, err
+	}
+	if err := s.recordItemEvent(ctx, itemID, domain.ItemEventTimerStart, "", "", ""); err != nil {
+		return domain.TimeInterval{}, err
+	}
+	return interval, nil
 }
 
 func (s *Service) LogInterval(ctx context.Context, itemID uuid.UUID, started, ended time.Time) (domain.TimeInterval, error) {
@@ -27,7 +34,14 @@ func (s *Service) LogInterval(ctx context.Context, itemID uuid.UUID, started, en
 	if err != nil {
 		return domain.TimeInterval{}, err
 	}
-	return s.Intervals.Create(ctx, interval)
+	created, err := s.Intervals.Create(ctx, interval)
+	if err != nil {
+		return domain.TimeInterval{}, err
+	}
+	if err := s.recordItemEvent(ctx, itemID, domain.ItemEventTimerLog, "", "", snapshotSeconds(created.Duration(s.now()))); err != nil {
+		return domain.TimeInterval{}, err
+	}
+	return created, nil
 }
 
 func (s *Service) StopInterval(ctx context.Context, id uuid.UUID) (domain.TimeInterval, error) {
@@ -39,7 +53,14 @@ func (s *Service) StopInterval(ctx context.Context, id uuid.UUID) (domain.TimeIn
 	if err != nil {
 		return domain.TimeInterval{}, err
 	}
-	return s.Intervals.Update(ctx, stopped)
+	updated, err := s.Intervals.Update(ctx, stopped)
+	if err != nil {
+		return domain.TimeInterval{}, err
+	}
+	if err := s.recordItemEvent(ctx, updated.ItemID, domain.ItemEventTimerStop, "", "", snapshotSeconds(updated.Duration(s.now()))); err != nil {
+		return domain.TimeInterval{}, err
+	}
+	return updated, nil
 }
 
 func (s *Service) CreateStress(ctx context.Context, level int, itemID *uuid.UUID, at *time.Time) (domain.StressLog, error) {

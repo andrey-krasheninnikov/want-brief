@@ -132,16 +132,22 @@ func scanProject(scan func(dest ...any) error) (domain.Project, error) {
 	return p, err
 }
 
-func (s *Store) attachProjectPeople(ctx context.Context, rows []domain.Project) error {
+func (s *Store) attachProjectLinks(ctx context.Context, rows []domain.Project) error {
 	ids := make([]uuid.UUID, len(rows))
 	index := make(map[uuid.UUID]int, len(rows))
 	for i, p := range rows {
 		ids[i] = p.ID
 		index[p.ID] = i
 		rows[i].People = []domain.PersonRel{}
+		rows[i].Companies = []domain.PersonRel{}
 	}
-	return s.attachRels(ctx, "person_projects", "project_id", "person_id", ids, func(id uuid.UUID, people []domain.PersonRel) {
+	if err := s.attachRels(ctx, "person_projects", "project_id", "person_id", ids, func(id uuid.UUID, people []domain.PersonRel) {
 		rows[index[id]].People = people
+	}); err != nil {
+		return err
+	}
+	return s.attachRels(ctx, "company_projects", "project_id", "company_id", ids, func(id uuid.UUID, companies []domain.PersonRel) {
+		rows[index[id]].Companies = companies
 	})
 }
 
@@ -151,7 +157,7 @@ func (s *Store) GetProject(ctx context.Context, id uuid.UUID) (domain.Project, e
 		return p, mapErr(err)
 	}
 	out := []domain.Project{p}
-	if err := s.attachProjectPeople(ctx, out); err != nil {
+	if err := s.attachProjectLinks(ctx, out); err != nil {
 		return domain.Project{}, err
 	}
 	return out[0], nil
@@ -174,7 +180,7 @@ func (s *Store) ListProjects(ctx context.Context) ([]domain.Project, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if err := s.attachProjectPeople(ctx, out); err != nil {
+	if err := s.attachProjectLinks(ctx, out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -186,6 +192,7 @@ func (s *Store) CreateProject(ctx context.Context, p domain.Project) (domain.Pro
 		return domain.Project{}, err
 	}
 	people := p.People
+	companies := p.Companies
 	p, err = scanProject(s.pool.QueryRow(ctx, `
 		INSERT INTO projects (`+projectCols+`)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
@@ -197,6 +204,9 @@ func (s *Store) CreateProject(ctx context.Context, p domain.Project) (domain.Pro
 	if err := s.replaceRels(ctx, "person_projects", "project_id", "person_id", p.ID, people); err != nil {
 		return domain.Project{}, err
 	}
+	if err := s.replaceRels(ctx, "company_projects", "project_id", "company_id", p.ID, companies); err != nil {
+		return domain.Project{}, err
+	}
 	return s.GetProject(ctx, p.ID)
 }
 
@@ -206,6 +216,7 @@ func (s *Store) UpdateProject(ctx context.Context, p domain.Project) (domain.Pro
 		return domain.Project{}, err
 	}
 	people := p.People
+	companies := p.Companies
 	p, err = scanProject(s.pool.QueryRow(ctx, `
 		UPDATE projects
 		SET name=$2, color=$3, description=$4, monthly_income_usd=$5, monthly_income_rub=$6, target_hours_day=$7, target_hours_week=$8, links=$9, archived_at=$10, updated_at=$11
@@ -216,6 +227,9 @@ func (s *Store) UpdateProject(ctx context.Context, p domain.Project) (domain.Pro
 		return domain.Project{}, mapErr(err)
 	}
 	if err := s.replaceRels(ctx, "person_projects", "project_id", "person_id", p.ID, people); err != nil {
+		return domain.Project{}, err
+	}
+	if err := s.replaceRels(ctx, "company_projects", "project_id", "company_id", p.ID, companies); err != nil {
 		return domain.Project{}, err
 	}
 	return s.GetProject(ctx, p.ID)
@@ -361,7 +375,7 @@ func scanItem(scanner interface {
 		&item.DevDueAt, &item.ReviewDueAt, &item.TestDueAt,
 		&item.Description, &item.PlannedSeconds, &linksRaw, &item.TrackedSeconds,
 		&item.ArchivedAt, &item.DeletedAt, &item.CreatedAt, &item.UpdatedAt, &item.SourceName, &sourceKind, &item.ProjectName, &item.ProjectColor,
-		&occupancy, &item.ExternalStatus, &item.CheckTotal, &item.CheckDone,
+		&occupancy, &item.ExternalStatus, &item.CheckTotal, &item.CheckDone, &item.PinnedAt,
 	)
 	if err != nil {
 		return item, err
@@ -389,7 +403,8 @@ SELECT
 	COALESCE(p.name, ''), COALESCE(p.color, ''),
 	i.occupancy, i.external_status,
 	COALESCE((SELECT COUNT(*)::int FROM item_checks c WHERE c.item_id = i.id), 0),
-	COALESCE((SELECT COUNT(*)::int FROM item_checks c WHERE c.item_id = i.id AND c.done), 0)
+	COALESCE((SELECT COUNT(*)::int FROM item_checks c WHERE c.item_id = i.id AND c.done), 0),
+	i.pinned_at
 FROM items i
 JOIN sources s ON s.id = i.source_id
 LEFT JOIN projects p ON p.id = i.project_id
@@ -493,11 +508,11 @@ func (s *Store) CreateItem(ctx context.Context, item domain.Item) (domain.Item, 
 			id, source_id, external_key, title, status, kind, project_id,
 			urgent, important, pinned, stress, due_at, dev_due_at, review_due_at, test_due_at,
 			description, planned_seconds, links, occupancy, external_status,
-			created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+			created_at, updated_at, pinned_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
 	`, item.ID, item.SourceID, item.ExternalKey, item.Title, string(item.Status), string(item.Kind),
 		item.ProjectID, item.Urgent, item.Important, item.Pinned, item.Stress, item.DueAt, item.DevDueAt, item.ReviewDueAt, item.TestDueAt,
-		item.Description, item.PlannedSeconds, raw, string(item.EffectiveOccupancy()), item.ExternalStatus, item.CreatedAt, item.UpdatedAt)
+		item.Description, item.PlannedSeconds, raw, string(item.EffectiveOccupancy()), item.ExternalStatus, item.CreatedAt, item.UpdatedAt, item.PinnedAt)
 	if err != nil {
 		return domain.Item{}, err
 	}
@@ -517,11 +532,11 @@ func (s *Store) UpdateItem(ctx context.Context, item domain.Item) (domain.Item, 
 			title=$2, status=$3, kind=$4, project_id=$5, urgent=$6, important=$7, pinned=$8,
 			stress=$9, due_at=$10, dev_due_at=$11, review_due_at=$12, test_due_at=$13,
 			description=$14, planned_seconds=$15, links=$16, external_key=$17, archived_at=$18, deleted_at=$19, updated_at=$20,
-			occupancy=$21, external_status=$22
+			occupancy=$21, external_status=$22, pinned_at=$23
 		WHERE id=$1
 	`, item.ID, item.Title, string(item.Status), string(item.Kind), item.ProjectID, item.Urgent, item.Important, item.Pinned,
 		item.Stress, item.DueAt, item.DevDueAt, item.ReviewDueAt, item.TestDueAt, item.Description, item.PlannedSeconds, raw,
-		item.ExternalKey, item.ArchivedAt, item.DeletedAt, item.UpdatedAt, string(item.EffectiveOccupancy()), item.ExternalStatus)
+		item.ExternalKey, item.ArchivedAt, item.DeletedAt, item.UpdatedAt, string(item.EffectiveOccupancy()), item.ExternalStatus, item.PinnedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {

@@ -56,6 +56,13 @@ type ItemCheckRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
+type ItemEventRepository interface {
+	Create(ctx context.Context, event ItemEvent) (ItemEvent, error)
+	Update(ctx context.Context, event ItemEvent) (ItemEvent, error)
+	ListByItem(ctx context.Context, itemID uuid.UUID) ([]ItemEvent, error)
+	LatestByItemAndKinds(ctx context.Context, itemID uuid.UUID, kinds []ItemEventKind) (ItemEvent, error)
+}
+
 type SourceRepository interface {
 	Get(ctx context.Context, id uuid.UUID) (Source, error)
 	List(ctx context.Context) ([]Source, error)
@@ -130,6 +137,31 @@ type PersonBondRepository interface {
 	Update(ctx context.Context, bond PersonBond, event PersonBondEvent) (PersonBond, error)
 }
 
+type PersonAbsenceRepository interface {
+	Get(ctx context.Context, id uuid.UUID) (PersonAbsence, error)
+	ListByPerson(ctx context.Context, personID uuid.UUID) ([]PersonAbsence, error)
+	ListRange(ctx context.Context, from, to time.Time) ([]PersonAbsence, error)
+	Create(ctx context.Context, absence PersonAbsence) (PersonAbsence, error)
+	Update(ctx context.Context, absence PersonAbsence) (PersonAbsence, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+type ScheduleSettingsRepository interface {
+	Get(ctx context.Context) (ScheduleSettings, error)
+	Save(ctx context.Context, settings ScheduleSettings) (ScheduleSettings, error)
+}
+
+type DayOverrideRepository interface {
+	ListRange(ctx context.Context, from, to Ymd) ([]DayOverride, error)
+	Upsert(ctx context.Context, override DayOverride) (DayOverride, error)
+	Delete(ctx context.Context, day Ymd) error
+}
+
+type ScheduleSnapshotRepository interface {
+	Get(ctx context.Context, kind ScheduleKind) (ScheduleSnapshot, error)
+	Save(ctx context.Context, snapshot ScheduleSnapshot) error
+}
+
 type PersonProfessionRepository interface {
 	Get(ctx context.Context, id uuid.UUID) (PersonProfession, error)
 	ListByPerson(ctx context.Context, personID uuid.UUID) ([]PersonProfession, error)
@@ -143,6 +175,36 @@ type EventRepository interface {
 	List(ctx context.Context) ([]Event, error)
 	Create(ctx context.Context, event Event) (Event, error)
 	Update(ctx context.Context, event Event) (Event, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+type EventOverrideRepository interface {
+	Get(ctx context.Context, seriesID uuid.UUID, originalOn Ymd) (EventOverride, error)
+	ListBySeries(ctx context.Context, seriesIDs []uuid.UUID) ([]EventOverride, error)
+	Upsert(ctx context.Context, override EventOverride) (EventOverride, error)
+	Delete(ctx context.Context, seriesID uuid.UUID, originalOn Ymd) error
+}
+
+type EventNoteRepository interface {
+	Get(ctx context.Context, id uuid.UUID) (EventNote, error)
+	ListBySeries(ctx context.Context, seriesID uuid.UUID, originalOn *Ymd) ([]EventNote, error)
+	Create(ctx context.Context, note EventNote) (EventNote, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+type CompanyRepository interface {
+	Get(ctx context.Context, id uuid.UUID) (Company, error)
+	List(ctx context.Context) ([]Company, error)
+	Create(ctx context.Context, company Company) (Company, error)
+	Update(ctx context.Context, company Company) (Company, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+type CompanyNoteRepository interface {
+	Get(ctx context.Context, id uuid.UUID) (CompanyNote, error)
+	ListByCompany(ctx context.Context, companyID uuid.UUID) ([]CompanyNote, error)
+	Create(ctx context.Context, note CompanyNote) (CompanyNote, error)
+	Update(ctx context.Context, note CompanyNote) (CompanyNote, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 

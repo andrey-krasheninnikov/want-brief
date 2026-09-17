@@ -128,6 +128,53 @@ func TestPullPagesUntilLast(t *testing.T) {
 	}
 }
 
+func TestFetchMapsComments(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/api/2/issue/WB-7" {
+			t.Fatalf("path %s", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"key": "WB-7",
+			"fields": map[string]any{
+				"summary": "Ship inbox",
+				"status":  map[string]any{"name": "In Review"},
+				"comment": map[string]any{
+					"comments": []map[string]any{
+						{
+							"id":      "10501",
+							"body":    "Looks good",
+							"author":  map[string]string{"displayName": "Ada Lovelace"},
+							"created": "2020-03-15T09:30:00.000+0000",
+						},
+						{"id": "10502", "body": "   "},
+					},
+				},
+			},
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	g := New()
+	g.Client = server.Client()
+	item, err := g.Fetch(t.Context(), domain.Source{BaseURL: server.URL}, "pat-1", "WB-7")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(item.Comments) != 1 {
+		t.Fatalf("comments %+v", item.Comments)
+	}
+	got := item.Comments[0]
+	if got.ExternalID != "10501" || got.Author != "Ada Lovelace" || got.Body != "Looks good" {
+		t.Fatalf("comment %+v", got)
+	}
+	if got.URL != server.URL+"/browse/WB-7?focusedCommentId=10501" {
+		t.Fatalf("url %s", got.URL)
+	}
+	if got.CreatedAt == nil || !got.CreatedAt.Equal(time.Date(2020, 3, 15, 9, 30, 0, 0, time.UTC)) {
+		t.Fatalf("created %+v", got.CreatedAt)
+	}
+}
+
 func TestProbeOK(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/rest/api/2/myself" || r.Method != http.MethodGet {

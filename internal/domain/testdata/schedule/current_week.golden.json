@@ -1,0 +1,181 @@
+{
+  "blocks": [
+    {
+      "key": "HB-101",
+      "kind": "work",
+      "start": "Tue 15 10:00",
+      "end": "Tue 15 12:00",
+      "lane": 0,
+      "reasons": [
+        "in_progress",
+        "estimate_x1.25"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "HB-103",
+      "kind": "work",
+      "start": "Tue 15 10:00",
+      "end": "Tue 15 12:00",
+      "lane": 1,
+      "reasons": [
+        "due_soon",
+        "estimate_x1.25"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "HB-101",
+      "kind": "work",
+      "start": "Tue 15 12:10",
+      "end": "Tue 15 14:10",
+      "lane": 0,
+      "reasons": [
+        "in_progress",
+        "estimate_x1.25"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "HB-103",
+      "kind": "work",
+      "start": "Tue 15 12:10",
+      "end": "Tue 15 13:55",
+      "lane": 1,
+      "reasons": [
+        "due_soon",
+        "estimate_x1.25",
+        "pushed_by:HB-101"
+      ],
+      "continue": "from"
+    },
+    {
+      "key": "HB-101",
+      "kind": "work",
+      "start": "Tue 15 14:20",
+      "end": "Tue 15 16:20",
+      "lane": 0,
+      "reasons": [
+        "in_progress",
+        "estimate_x1.25"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "HB-101",
+      "kind": "work",
+      "start": "Wed 16 10:00",
+      "end": "Wed 16 10:30",
+      "lane": 0,
+      "reasons": [
+        "in_progress",
+        "estimate_x1.25"
+      ],
+      "continue": "from"
+    },
+    {
+      "key": "AL-7",
+      "kind": "work",
+      "start": "Wed 16 10:30",
+      "end": "Wed 16 11:50",
+      "lane": 0,
+      "reasons": [
+        "due_soon",
+        "pushed_by:HB-101"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "AL-7",
+      "kind": "work",
+      "start": "Wed 16 13:10",
+      "end": "Wed 16 15:10",
+      "lane": 0,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "AL-7",
+      "kind": "work",
+      "start": "Wed 16 15:20",
+      "end": "Wed 16 17:00",
+      "lane": 0,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "from"
+    },
+    {
+      "key": "HB-102",
+      "kind": "work",
+      "start": "Wed 16 17:00",
+      "end": "Wed 16 17:45",
+      "lane": 0,
+      "reasons": [
+        "estimate_x1.25",
+        "pushed_by:AL-7"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "HB-102",
+      "kind": "work",
+      "start": "Thu 17 10:00",
+      "end": "Thu 17 12:00",
+      "lane": 0,
+      "reasons": [
+        "estimate_x1.25"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "HB-102",
+      "kind": "work",
+      "start": "Thu 17 12:10",
+      "end": "Thu 17 14:10",
+      "lane": 0,
+      "reasons": [
+        "estimate_x1.25"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "HB-102",
+      "kind": "work",
+      "start": "Thu 17 14:20",
+      "end": "Thu 17 14:35",
+      "lane": 0,
+      "reasons": [
+        "estimate_x1.25"
+      ],
+      "continue": "from"
+    },
+    {
+      "key": "AL-9",
+      "kind": "work",
+      "start": "Thu 17 16:10",
+      "end": "Thu 17 18:10",
+      "lane": 0
+    }
+  ],
+  "unplanned": [],
+  "atRisk": [],
+  "busy": [
+    "Sprint review Wed 16 12:00-Wed 16 13:00",
+    "Optional sync Thu 17 15:00-Thu 17 16:00"
+  ],
+  "overflow": {
+    "itemCount": 0,
+    "seconds": 0,
+    "firstDueAt": null
+  },
+  "score": {
+    "lateSeconds": 0,
+    "fragments": 9,
+    "switches": 3,
+    "loadVariance": 0.01,
+    "total": 10.51
+  }
+}

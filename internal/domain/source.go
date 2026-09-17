@@ -40,12 +40,20 @@ type RemoteItem struct {
 	Status         ItemStatus
 	ExternalStatus string
 	Description    string
-	Comments       []string
+	Comments       []RemoteComment
 	DueAt          *time.Time
 	CreatedAt      *time.Time
 	URL            string
 	HintUrgent     bool
 	HintImportant  bool
+}
+
+type RemoteComment struct {
+	ExternalID string
+	Author     string
+	Body       string
+	URL        string
+	CreatedAt  *time.Time
 }
 
 func ParseSourceKind(raw string) (SourceKind, error) {

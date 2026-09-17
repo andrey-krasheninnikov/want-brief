@@ -12,6 +12,8 @@ func TestCheckinAveragesFrom(t *testing.T) {
 		{Kind: CheckinStress, Level: 2},
 		{Kind: CheckinStress, Level: 4},
 		{Kind: CheckinFocus, Level: 5},
+		{Kind: CheckinHappiness, Level: 2},
+		{Kind: CheckinHappiness, Level: 4},
 		{Kind: "", Level: 1},
 	})
 	if got.Stress == nil || *got.Stress != 7.0/3.0 {
@@ -19,6 +21,9 @@ func TestCheckinAveragesFrom(t *testing.T) {
 	}
 	if got.Focus == nil || *got.Focus != 5 {
 		t.Fatalf("focus=%v", got.Focus)
+	}
+	if got.Happiness == nil || *got.Happiness != 3 {
+		t.Fatalf("happiness=%v", got.Happiness)
 	}
 	if got.Energy != nil || got.Interest != nil {
 		t.Fatalf("empty kinds should stay nil")

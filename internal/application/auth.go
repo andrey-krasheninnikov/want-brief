@@ -23,15 +23,24 @@ type Service struct {
 	Intervals         domain.IntervalRepository
 	Stress            domain.StressRepository
 	Events            domain.EventRepository
+	EventOverrides    domain.EventOverrideRepository
+	EventNotes        domain.EventNoteRepository
+	Companies         domain.CompanyRepository
+	CompanyNotes      domain.CompanyNoteRepository
 	People            domain.PersonRepository
 	PersonNotes       domain.PersonNoteRepository
 	PersonContacts    domain.PersonContactRepository
 	PersonSites       domain.PersonSiteRepository
 	PersonBonds       domain.PersonBondRepository
 	PersonProfessions domain.PersonProfessionRepository
+	PersonAbsences    domain.PersonAbsenceRepository
+	ScheduleSettings  domain.ScheduleSettingsRepository
+	DayOverrides      domain.DayOverrideRepository
+	Snapshots         domain.ScheduleSnapshotRepository
 	ProjectNotes      domain.ProjectNoteRepository
 	ItemNotes         domain.ItemNoteRepository
 	ItemChecks        domain.ItemCheckRepository
+	ItemEvents        domain.ItemEventRepository
 	Journal           domain.JournalRepository
 	Tokens            domain.TokenBox
 	Pullers           map[domain.SourceKind]domain.Puller

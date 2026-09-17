@@ -18,6 +18,7 @@ type ProjectWrite struct {
 	TargetHoursDay   float64
 	Links            []domain.ProjectLink
 	People           []domain.PersonRel
+	Companies        []domain.PersonRel
 }
 
 type ProjectPatch struct {
@@ -29,6 +30,7 @@ type ProjectPatch struct {
 	TargetHoursDay   *float64
 	Links            *[]domain.ProjectLink
 	People           *[]domain.PersonRel
+	Companies        *[]domain.PersonRel
 	Archived         *bool
 }
 
@@ -61,6 +63,11 @@ func (s *Service) CreateProject(ctx context.Context, in ProjectWrite) (domain.Pr
 		return domain.Project{}, err
 	}
 	project.People = people
+	companies, err := domain.NormalizePersonRels(in.Companies)
+	if err != nil {
+		return domain.Project{}, err
+	}
+	project.Companies = companies
 	return s.Projects.Create(ctx, project)
 }
 
@@ -109,6 +116,13 @@ func (s *Service) PatchProject(ctx context.Context, id uuid.UUID, in ProjectPatc
 			return domain.Project{}, err
 		}
 		project.People = people
+	}
+	if in.Companies != nil {
+		companies, err := domain.NormalizePersonRels(*in.Companies)
+		if err != nil {
+			return domain.Project{}, err
+		}
+		project.Companies = companies
 	}
 	now := s.now()
 	if in.Archived != nil {

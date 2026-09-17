@@ -11,13 +11,38 @@ import (
 
 const (
 	scheduleHorizonDays = 120
-	gridStartHour       = 8
-	workStartHour       = 10
-	lunchStartHour      = 13
-	lunchEndHour        = 14
-	workEndHour         = 19
-	lunchTitle          = "Lunch"
+	breakTitle          = "Break"
+
+	BlockKindWork = "work"
+	BlockKindPing = "ping"
 )
+
+type ScheduleKind string
+
+const (
+	ScheduleWork     ScheduleKind = "work"
+	ScheduleFollowup ScheduleKind = "followup"
+)
+
+// ScheduleInput is everything the packer needs. Only Items, Now, From and To
+// are required; the rest defaults to "no extra knowledge".
+type ScheduleInput struct {
+	Kind          ScheduleKind
+	Items         []Item
+	Events        []EventOccurrence
+	Now           time.Time
+	From          time.Time
+	To            time.Time
+	Settings      ScheduleSettings
+	Overrides     []DayOverride
+	Absences      []PersonAbsence
+	PeopleNames   map[uuid.UUID]string
+	OpenIntervals []TimeInterval
+	Factors       map[string]float64
+	History       []TimeInterval
+	Checkins      *LatestCheckins
+	Previous      []ScheduleBlock
+}
 
 type Schedule struct {
 	Lanes     []ScheduleLane   `json:"lanes"`
@@ -25,6 +50,21 @@ type Schedule struct {
 	Busy      []ScheduleBusy   `json:"busy"`
 	Overflow  ScheduleOverflow `json:"overflow"`
 	Capacity  ScheduleCapacity `json:"capacity"`
+	Grid      ScheduleGrid     `json:"grid"`
+	AtRisk    []AtRiskItem     `json:"atRisk"`
+	Score     ScheduleScore    `json:"score"`
+	// Horizon holds every packed block, not just the visible range; the
+	// application keeps it as the stability snapshot.
+	Horizon []ScheduleBlock `json:"-"`
+}
+
+type ScheduleGrid struct {
+	Timezone     string `json:"timezone"`
+	StartHour    int    `json:"startHour"`
+	EndHour      int    `json:"endHour"`
+	Workdays     []int  `json:"workdays"`
+	WorkStartMin int    `json:"workStartMin"`
+	WorkEndMin   int    `json:"workEndMin"`
 }
 
 type ScheduleLane struct {
@@ -34,30 +74,26 @@ type ScheduleLane struct {
 	Blocks       []ScheduleBlock `json:"blocks"`
 }
 
-type ScheduleKind string
-
-const (
-	ScheduleWork     ScheduleKind = "work"
-	ScheduleFollowup ScheduleKind = "followup"
-	parallelLanes                 = 3
-)
-
 type ScheduleBlock struct {
-	ItemID           uuid.UUID `json:"itemId"`
-	Title            string    `json:"title"`
-	ExternalKey      string    `json:"externalKey"`
-	StartsAt         time.Time `json:"startsAt"`
-	EndsAt           time.Time `json:"endsAt"`
-	Late             bool      `json:"late"`
-	Continued        bool      `json:"continued"`
-	Continues        bool      `json:"continues"`
-	Lane             int       `json:"lane"`
-	Occupancy        Occupancy `json:"occupancy"`
-	Pinned           bool      `json:"pinned"`
-	Quadrant         Quadrant  `json:"quadrant"`
-	DueAt            time.Time `json:"dueAt"`
-	Stress           *int      `json:"stress"`
-	RemainingSeconds int64     `json:"remainingSeconds"`
+	ItemID           uuid.UUID        `json:"itemId"`
+	Title            string           `json:"title"`
+	ExternalKey      string           `json:"externalKey"`
+	Kind             string           `json:"kind"`
+	StartsAt         time.Time        `json:"startsAt"`
+	EndsAt           time.Time        `json:"endsAt"`
+	Late             bool             `json:"late"`
+	Continued        bool             `json:"continued"`
+	Continues        bool             `json:"continues"`
+	Lane             int              `json:"lane"`
+	Occupancy        Occupancy        `json:"occupancy"`
+	Pinned           bool             `json:"pinned"`
+	Quadrant         Quadrant         `json:"quadrant"`
+	DueAt            time.Time        `json:"dueAt"`
+	Stress           *int             `json:"stress"`
+	RemainingSeconds int64            `json:"remainingSeconds"`
+	EstimateFactor   float64          `json:"estimateFactor"`
+	Reasons          []string         `json:"reasons"`
+	People           []SchedulePerson `json:"people,omitempty"`
 }
 
 type UnplannedItem struct {
@@ -66,11 +102,22 @@ type UnplannedItem struct {
 	MissingPlan   bool `json:"missingPlan"`
 }
 
+type SchedulePerson struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
 type ScheduleBusy struct {
-	StartsAt time.Time  `json:"startsAt"`
-	EndsAt   time.Time  `json:"endsAt"`
-	Title    string     `json:"title"`
-	SeriesID *uuid.UUID `json:"seriesId,omitempty"`
+	StartsAt       time.Time        `json:"startsAt"`
+	EndsAt         time.Time        `json:"endsAt"`
+	Title          string           `json:"title"`
+	Soft           bool             `json:"soft"`
+	SeriesID       *uuid.UUID       `json:"seriesId,omitempty"`
+	OriginalOn     Ymd              `json:"originalOn,omitempty"`
+	ActiveStartsAt *time.Time       `json:"activeStartsAt,omitempty"`
+	ActiveEndsAt   *time.Time       `json:"activeEndsAt,omitempty"`
+	People         []SchedulePerson `json:"people,omitempty"`
+	CanSkip        bool             `json:"canSkip,omitempty"`
 }
 
 type ScheduleOverflow struct {
@@ -85,17 +132,16 @@ type ScheduleCapacity struct {
 	BusySeconds   int64 `json:"busySeconds"`
 }
 
+type AtRiskItem struct {
+	ItemID       uuid.UUID `json:"itemId"`
+	Key          string    `json:"key"`
+	Title        string    `json:"title"`
+	SlackSeconds int64     `json:"slackSeconds"`
+}
+
 type span struct {
 	start time.Time
 	end   time.Time
-}
-
-func emptySchedule() Schedule {
-	return Schedule{
-		Lanes:     []ScheduleLane{},
-		Unplanned: []UnplannedItem{},
-		Busy:      []ScheduleBusy{},
-	}
 }
 
 func ParseScheduleKind(raw string) (ScheduleKind, error) {
@@ -111,77 +157,186 @@ func ParseScheduleKind(raw string) (ScheduleKind, error) {
 	}
 }
 
+// BuildSchedule packs work tasks with default settings.
 func BuildSchedule(items []Item, events []EventOccurrence, now, from, to time.Time) Schedule {
 	return BuildKindSchedule(ScheduleWork, items, events, now, from, to)
 }
 
+// BuildKindSchedule packs with default settings; kept for callers and tests
+// that do not care about knobs.
 func BuildKindSchedule(kind ScheduleKind, items []Item, events []EventOccurrence, now, from, to time.Time) Schedule {
-	loc := Moscow()
-	now = now.In(loc)
-	from = from.In(loc)
-	to = to.In(loc)
-	if !to.After(from) {
-		return emptySchedule()
+	return Plan(ScheduleInput{
+		Kind:     kind,
+		Items:    items,
+		Events:   events,
+		Now:      now,
+		From:     from,
+		To:       to,
+		Settings: DefaultScheduleSettings(),
+	})
+}
+
+// Plan runs the packing pipeline: calendar → order → reservations → pack →
+// explain/score. It is pure: the same input always yields the same output.
+func Plan(in ScheduleInput) Schedule {
+	p := newPlanner(in)
+	if !p.to.After(p.from) {
+		return p.empty()
 	}
+	return p.run()
+}
+
+type planner struct {
+	in       ScheduleInput
+	kind     ScheduleKind
+	settings ScheduleSettings
+	loc      *time.Location
+	now      time.Time
+	from     time.Time
+	to       time.Time
+	cal      *calendar
+	golden   *goldenHours
+
+	queue     []*ranked
+	rankOf    map[uuid.UUID]int
+	byID      map[uuid.UUID]*ranked
+	unplanned []UnplannedItem
+	meta      map[string]ScheduleLane
+	itemLane  map[uuid.UUID]string
+	active    map[uuid.UUID]bool
+}
+
+func newPlanner(in ScheduleInput) *planner {
+	settings := in.Settings
+	if settings.Timezone == "" {
+		settings = DefaultScheduleSettings()
+	}
+	kind := in.Kind
 	if kind == "" {
 		kind = ScheduleWork
 	}
+	loc := settings.Location()
+	p := &planner{
+		in:       in,
+		kind:     kind,
+		settings: settings,
+		loc:      loc,
+		now:      in.Now.In(loc).Truncate(time.Second),
+		from:     in.From.In(loc),
+		to:       in.To.In(loc),
+		rankOf:   map[uuid.UUID]int{},
+		byID:     map[uuid.UUID]*ranked{},
+		meta:     map[string]ScheduleLane{},
+		itemLane: map[uuid.UUID]string{},
+		active:   map[uuid.UUID]bool{},
+	}
+	p.cal = newCalendar(settings, in.Overrides, loc)
+	for _, interval := range in.OpenIntervals {
+		if interval.EndedAt == nil {
+			p.active[interval.ItemID] = true
+		}
+	}
+	if settings.GoldenHours && len(in.History) > 0 {
+		p.golden = newGoldenHours(in.History, loc)
+	}
+	return p
+}
 
-	var unplanned []UnplannedItem
-	var queue []Item
-	meta := map[string]ScheduleLane{}
-	itemLane := map[uuid.UUID]string{}
-	for _, item := range items {
-		if !scheduleEligible(item, kind) {
+func (p *planner) empty() Schedule {
+	return Schedule{
+		Lanes:     []ScheduleLane{},
+		Unplanned: []UnplannedItem{},
+		Busy:      []ScheduleBusy{},
+		Grid:      p.grid(),
+		AtRisk:    []AtRiskItem{},
+	}
+}
+
+func (p *planner) grid() ScheduleGrid {
+	start, end := p.cal.gridHours(p.from, p.to)
+	return ScheduleGrid{
+		Timezone:     p.loc.String(),
+		StartHour:    start,
+		EndHour:      end,
+		Workdays:     append([]int{}, p.settings.Workdays...),
+		WorkStartMin: p.settings.WorkStartMin,
+		WorkEndMin:   p.settings.WorkEndMin,
+	}
+}
+
+func (p *planner) run() Schedule {
+	p.collect()
+	free, soft := p.cal.freeSpans(p.now, p.in.Events)
+
+	var blocks []ScheduleBlock
+	if p.kind == ScheduleFollowup {
+		blocks = p.packFollowup(free)
+	} else {
+		blocks = p.packWork(free, soft)
+	}
+	sortBlocks(blocks)
+	blocks = markContinuation(blocks)
+	blocks = p.explain(blocks)
+
+	overflow := p.overflow(blocks)
+	visible := filterBlocks(blocks, p.from, p.to)
+	out := Schedule{
+		Lanes:     paintLanes(visible, p.itemLane, p.meta),
+		Unplanned: p.unplanned,
+		Busy:      p.cal.busyInRange(p.in.Events, p.from, p.to, p.in.PeopleNames),
+		Overflow:  overflow,
+		Capacity:  p.capacity(free, visible),
+		Grid:      p.grid(),
+		AtRisk:    p.atRisk(),
+		Score:     p.score(blocks, overflow),
+		Horizon:   blocks,
+	}
+	if out.Unplanned == nil {
+		out.Unplanned = []UnplannedItem{}
+	}
+	return out
+}
+
+// collect splits items into the packing queue and the unplanned list, and
+// records lane metadata per project.
+func (p *planner) collect() {
+	var queue []*ranked
+	for _, item := range p.in.Items {
+		if !scheduleEligible(item, p.kind) {
 			continue
 		}
-		due := packingDue(item, kind)
+		due := packingDue(item, p.kind)
 		missingDue := due == nil
-		missingPlan := item.PlannedSeconds <= 0
+		missingPlan := p.kind == ScheduleWork && item.PlannedSeconds <= 0
 		if missingDue || missingPlan {
-			unplanned = append(unplanned, UnplannedItem{Item: item, MissingDevDue: missingDue, MissingPlan: missingPlan})
+			p.unplanned = append(p.unplanned, UnplannedItem{Item: item, MissingDevDue: missingDue, MissingPlan: missingPlan})
 			continue
 		}
-		if remainingSeconds(item) <= 0 {
+		r := p.rank(item, *due)
+		if p.kind == ScheduleWork && r.remaining <= 0 {
 			continue
 		}
+		queue = append(queue, r)
 		key := laneKey(item.ProjectID)
-		queue = append(queue, item)
-		itemLane[item.ID] = key
-		if _, ok := meta[key]; !ok {
+		p.itemLane[item.ID] = key
+		if _, ok := p.meta[key]; !ok {
 			name := item.ProjectName
 			if name == "" {
 				name = "No project"
 			}
-			meta[key] = ScheduleLane{
-				ProjectID:    item.ProjectID,
-				ProjectName:  name,
-				ProjectColor: item.ProjectColor,
-			}
+			p.meta[key] = ScheduleLane{ProjectID: item.ProjectID, ProjectName: name, ProjectColor: item.ProjectColor}
 		}
 	}
-	sort.SliceStable(unplanned, func(i, j int) bool {
-		return scheduleLessItems(unplanned[i].Item, unplanned[j].Item, kind)
-	})
-	sort.SliceStable(queue, func(i, j int) bool {
-		return scheduleLessItems(queue[i], queue[j], kind)
-	})
-
-	free := freeWorkSlots(now, events, loc)
-	allBlocks := markContinuation(packItems(queue, cloneSpans(free), kind))
-	overflow := scheduleOverflow(queue, allBlocks, kind)
-	visible := filterBlocks(allBlocks, from, to)
-	lanes := paintLanes(visible, itemLane, meta)
-	if unplanned == nil {
-		unplanned = []UnplannedItem{}
+	sort.SliceStable(queue, func(i, j int) bool { return p.less(queue[i], queue[j]) })
+	for i, r := range queue {
+		p.rankOf[r.item.ID] = i
+		p.byID[r.item.ID] = r
 	}
-	return Schedule{
-		Lanes:     lanes,
-		Unplanned: unplanned,
-		Busy:      busyInRange(events, from, to, loc),
-		Overflow:  overflow,
-		Capacity:  scheduleCapacity(free, visible, events, from, to, loc),
-	}
+	p.queue = queue
+	sort.SliceStable(p.unplanned, func(i, j int) bool {
+		a, b := p.unplanned[i].Item, p.unplanned[j].Item
+		return p.lessItems(a, b)
+	})
 }
 
 func scheduleEligible(item Item, kind ScheduleKind) bool {
@@ -233,172 +388,165 @@ func laneKey(id *uuid.UUID) string {
 	return id.String()
 }
 
-func scheduleLessItems(a, b Item, kind ScheduleKind) bool {
-	if a.Pinned != b.Pinned {
-		return a.Pinned
-	}
-	qa, qb := quadrantRank(a.Quadrant()), quadrantRank(b.Quadrant())
-	if qa != qb {
-		return qa < qb
-	}
-	ad, bd := packingDue(a, kind), packingDue(b, kind)
-	if ad == nil && bd != nil {
-		return false
-	}
-	if ad != nil && bd == nil {
-		return true
-	}
-	if ad != nil && bd != nil && !ad.Equal(*bd) {
-		return ad.Before(*bd)
-	}
-	as, bs := -1, -1
-	if a.Stress != nil {
-		as = *a.Stress
-	}
-	if b.Stress != nil {
-		bs = *b.Stress
-	}
-	if as != bs {
-		return as > bs
-	}
-	return a.CreatedAt.After(b.CreatedAt)
-}
-
-func quadrantRank(q Quadrant) int {
-	switch q {
-	case QuadrantDo:
-		return 0
-	case QuadrantSchedule:
-		return 1
-	case QuadrantDelegate:
-		return 2
-	default:
-		return 3
+func newBlock(r *ranked, start, end time.Time, lane int, occupancy Occupancy, people []SchedulePerson) ScheduleBlock {
+	return ScheduleBlock{
+		ItemID:           r.item.ID,
+		Title:            r.item.Title,
+		ExternalKey:      r.item.ExternalKey,
+		Kind:             BlockKindWork,
+		StartsAt:         start.UTC(),
+		EndsAt:           end.UTC(),
+		Late:             end.After(r.due),
+		Lane:             lane,
+		Occupancy:        occupancy,
+		Pinned:           r.item.Pinned,
+		Quadrant:         r.item.Quadrant(),
+		DueAt:            r.due.UTC(),
+		Stress:           r.item.Stress,
+		RemainingSeconds: r.remaining,
+		EstimateFactor:   r.factor,
+		Reasons:          append([]string{}, r.reasons...),
+		People:           people,
 	}
 }
 
-func isWorkday(day time.Time, loc *time.Location) bool {
-	w := day.In(loc).Weekday()
-	return w >= time.Monday && w <= time.Friday
-}
-
-func atHour(day time.Time, hour int, loc *time.Location) time.Time {
-	y, m, d := day.In(loc).Date()
-	return time.Date(y, m, d, hour, 0, 0, 0, loc)
-}
-
-func gridBounds(day time.Time, loc *time.Location) (time.Time, time.Time) {
-	return atHour(day, gridStartHour, loc), atHour(day, workEndHour, loc)
-}
-
-func workWindows(day time.Time, loc *time.Location) []span {
-	if !isWorkday(day, loc) {
-		return nil
-	}
-	return []span{
-		{start: atHour(day, workStartHour, loc), end: atHour(day, lunchStartHour, loc)},
-		{start: atHour(day, lunchEndHour, loc), end: atHour(day, workEndHour, loc)},
-	}
-}
-
-func packCursor(now time.Time, loc *time.Location) time.Time {
-	now = now.In(loc).Truncate(time.Second)
-	for d := 0; d < 14; d++ {
-		anchor := now.AddDate(0, 0, d)
-		for _, window := range workWindows(anchor, loc) {
-			if now.Before(window.start) {
-				return window.start
-			}
-			if now.Before(window.end) {
-				return now
-			}
+func sortBlocks(blocks []ScheduleBlock) {
+	sort.SliceStable(blocks, func(i, j int) bool {
+		if !blocks[i].StartsAt.Equal(blocks[j].StartsAt) {
+			return blocks[i].StartsAt.Before(blocks[j].StartsAt)
 		}
-	}
-	return atHour(now.AddDate(0, 0, 1), workStartHour, loc)
-}
-
-func freeWorkSlots(now time.Time, events []EventOccurrence, loc *time.Location) []span {
-	cursor := packCursor(now, loc)
-	var free []span
-	for day := 0; day < scheduleHorizonDays; day++ {
-		anchor := cursor.AddDate(0, 0, day)
-		for _, window := range workWindows(anchor, loc) {
-			ws, we := window.start, window.end
-			if cursor.After(ws) {
-				ws = cursor
-			}
-			if !we.After(ws) {
-				continue
-			}
-			free = append(free, complement(ws, we, busyInWindow(events, ws, we))...)
+		if blocks[i].Lane != blocks[j].Lane {
+			return blocks[i].Lane < blocks[j].Lane
 		}
-	}
-	return free
-}
-
-func busyInWindow(events []EventOccurrence, from, to time.Time) []span {
-	var busy []span
-	for _, event := range events {
-		start, end, ok := clipInterval(event.StartsAt, event.EndsAt, from, to)
-		if !ok {
-			continue
-		}
-		busy = append(busy, span{start: start, end: end})
-	}
-	return mergeSpans(busy)
-}
-
-func busyInRange(events []EventOccurrence, from, to time.Time, loc *time.Location) []ScheduleBusy {
-	var out []ScheduleBusy
-	for _, event := range events {
-		if !event.EndsAt.After(from) || !event.StartsAt.Before(to) {
-			continue
-		}
-		y, m, d := event.StartsAt.In(loc).Date()
-		for cursor := time.Date(y, m, d, 0, 0, 0, 0, loc); cursor.Before(event.EndsAt); cursor = cursor.AddDate(0, 0, 1) {
-			gs, ge := gridBounds(cursor, loc)
-			start, end, ok := clipInterval(event.StartsAt, event.EndsAt, gs, ge)
-			if !ok {
-				continue
-			}
-			start, end, ok = clipInterval(start, end, from, to)
-			if !ok {
-				continue
-			}
-			id := event.SeriesID
-			busy := ScheduleBusy{StartsAt: start.UTC(), EndsAt: end.UTC(), Title: event.Title}
-			if id != uuid.Nil {
-				busy.SeriesID = &id
-			}
-			out = append(out, busy)
-		}
-	}
-	out = append(out, lunchInRange(from, to, loc)...)
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].StartsAt.Equal(out[j].StartsAt) {
-			return out[i].Title < out[j].Title
-		}
-		return out[i].StartsAt.Before(out[j].StartsAt)
+		return blocks[i].ItemID.String() < blocks[j].ItemID.String()
 	})
-	if out == nil {
-		return []ScheduleBusy{}
+}
+
+func markContinuation(blocks []ScheduleBlock) []ScheduleBlock {
+	counts := map[uuid.UUID]int{}
+	for _, block := range blocks {
+		counts[block.ItemID]++
+	}
+	seen := map[uuid.UUID]int{}
+	for i := range blocks {
+		id := blocks[i].ItemID
+		seen[id]++
+		blocks[i].Continued = seen[id] > 1
+		blocks[i].Continues = seen[id] < counts[id]
+	}
+	return blocks
+}
+
+func filterBlocks(blocks []ScheduleBlock, from, to time.Time) []ScheduleBlock {
+	out := []ScheduleBlock{}
+	for _, block := range blocks {
+		if !block.EndsAt.After(from) || !block.StartsAt.Before(to) {
+			continue
+		}
+		out = append(out, block)
 	}
 	return out
 }
 
-func lunchInRange(from, to time.Time, loc *time.Location) []ScheduleBusy {
-	var out []ScheduleBusy
-	y, m, d := from.In(loc).Date()
-	for cursor := time.Date(y, m, d, 0, 0, 0, 0, loc); cursor.Before(to); cursor = cursor.AddDate(0, 0, 1) {
-		if !isWorkday(cursor, loc) {
-			continue
-		}
-		start, end, ok := clipInterval(atHour(cursor, lunchStartHour, loc), atHour(cursor, lunchEndHour, loc), from, to)
-		if !ok {
-			continue
-		}
-		out = append(out, ScheduleBusy{StartsAt: start.UTC(), EndsAt: end.UTC(), Title: lunchTitle})
+func paintLanes(blocks []ScheduleBlock, itemLane map[uuid.UUID]string, meta map[string]ScheduleLane) []ScheduleLane {
+	grouped := map[string][]ScheduleBlock{}
+	for _, block := range blocks {
+		key := itemLane[block.ItemID]
+		grouped[key] = append(grouped[key], block)
 	}
+	keys := make([]string, 0, len(grouped))
+	for key := range grouped {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		a, b := meta[keys[i]], meta[keys[j]]
+		if a.ProjectID == nil && b.ProjectID != nil {
+			return false
+		}
+		if a.ProjectID != nil && b.ProjectID == nil {
+			return true
+		}
+		if a.ProjectName == b.ProjectName {
+			return keys[i] < keys[j]
+		}
+		return a.ProjectName < b.ProjectName
+	})
+	lanes := make([]ScheduleLane, 0, len(keys))
+	for _, key := range keys {
+		lane := meta[key]
+		lane.Blocks = grouped[key]
+		if len(lane.Blocks) == 0 {
+			continue
+		}
+		lanes = append(lanes, lane)
+	}
+	return lanes
+}
+
+// overflow sums late seconds of placed blocks plus whatever never fit.
+func (p *planner) overflow(blocks []ScheduleBlock) ScheduleOverflow {
+	packed := map[uuid.UUID]int64{}
+	late := map[uuid.UUID]int64{}
+	for _, block := range blocks {
+		packed[block.ItemID] += spanSeconds(block.StartsAt, block.EndsAt)
+		late[block.ItemID] += lateSeconds(block.StartsAt, block.EndsAt, block.DueAt)
+	}
+	var out ScheduleOverflow
+	for _, r := range p.queue {
+		left := int64(0)
+		if p.kind == ScheduleWork {
+			left = r.remaining - packed[r.item.ID]
+			if left < 0 {
+				left = 0
+			}
+		}
+		over := late[r.item.ID] + left
+		if over == 0 {
+			continue
+		}
+		out.ItemCount++
+		out.Seconds += over
+		at := r.due.UTC()
+		if out.FirstDueAt == nil || at.Before(*out.FirstDueAt) {
+			out.FirstDueAt = &at
+		}
+	}
+	return out
+}
+
+func (p *planner) capacity(free []span, blocks []ScheduleBlock) ScheduleCapacity {
+	var out ScheduleCapacity
+	for _, slot := range free {
+		start, end, ok := clipInterval(slot.start, slot.end, p.from, p.to)
+		if ok {
+			out.FreeSeconds += spanSeconds(start, end)
+		}
+	}
+	for _, block := range blocks {
+		start, end, ok := clipInterval(block.StartsAt, block.EndsAt, p.from, p.to)
+		if ok {
+			out.PackedSeconds += spanSeconds(start, end)
+		}
+	}
+	for _, event := range p.in.Events {
+		start, end := event.ActiveSpan()
+		start, end, ok := clipInterval(start, end, p.from, p.to)
+		if ok {
+			out.BusySeconds += spanSeconds(start, end)
+		}
+	}
+	return out
+}
+
+func (p *planner) atRisk() []AtRiskItem {
+	out := []AtRiskItem{}
+	for _, r := range p.queue {
+		if r.slack >= 0 {
+			continue
+		}
+		out = append(out, AtRiskItem{ItemID: r.item.ID, Key: r.item.ExternalKey, Title: r.item.Title, SlackSeconds: r.slack})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].SlackSeconds < out[j].SlackSeconds })
 	return out
 }
 
@@ -406,11 +554,12 @@ func mergeSpans(in []span) []span {
 	if len(in) == 0 {
 		return nil
 	}
-	sort.Slice(in, func(i, j int) bool {
-		return in[i].start.Before(in[j].start)
+	sorted := cloneSpans(in)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].start.Before(sorted[j].start)
 	})
-	out := []span{in[0]}
-	for _, next := range in[1:] {
+	out := []span{sorted[0]}
+	for _, next := range sorted[1:] {
 		last := &out[len(out)-1]
 		if next.start.After(last.end) {
 			out = append(out, next)
@@ -449,141 +598,6 @@ func cloneSpans(in []span) []span {
 	return out
 }
 
-func packItems(items []Item, slots []span, kind ScheduleKind) []ScheduleBlock {
-	exclusive := cloneSpans(slots)
-	tracks := make([][]span, parallelLanes)
-	for i := range tracks {
-		tracks[i] = cloneSpans(slots)
-	}
-	var blocks []ScheduleBlock
-	for _, item := range items {
-		due := packingDue(item, kind)
-		if due == nil {
-			continue
-		}
-		if item.EffectiveOccupancy() == OccupancyParallel {
-			blocks = append(blocks, packParallel(item, *due, &exclusive, tracks)...)
-			continue
-		}
-		blocks = append(blocks, packSolo(item, *due, &exclusive, tracks)...)
-	}
-	return blocks
-}
-
-func packSolo(item Item, due time.Time, exclusive *[]span, tracks [][]span) []ScheduleBlock {
-	left := remainingSeconds(item)
-	var blocks []ScheduleBlock
-	for left > 0 {
-		start, end, ok := takeSlice(exclusive, &left)
-		if !ok {
-			break
-		}
-		blocks = append(blocks, newBlock(item, start, end, due, 0, OccupancySolo))
-		for i := range tracks {
-			tracks[i] = subtractSpan(tracks[i], start, end)
-		}
-	}
-	return blocks
-}
-
-// packParallel places the item on the earliest free track. A single item never
-// overlaps itself: each slice starts no earlier than the previous slice ended.
-func packParallel(item Item, due time.Time, exclusive *[]span, tracks [][]span) []ScheduleBlock {
-	left := remainingSeconds(item)
-	var blocks []ScheduleBlock
-	var cursor time.Time
-	for left > 0 {
-		idx, from := earliestTrackFrom(tracks, cursor)
-		if idx < 0 {
-			break
-		}
-		start, end, ok := takeSliceFrom(&tracks[idx], from, &left)
-		if !ok {
-			break
-		}
-		blocks = append(blocks, newBlock(item, start, end, due, idx, OccupancyParallel))
-		*exclusive = subtractSpan(*exclusive, start, end)
-		cursor = end
-	}
-	return blocks
-}
-
-func newBlock(item Item, start, end, due time.Time, lane int, occupancy Occupancy) ScheduleBlock {
-	return ScheduleBlock{
-		ItemID:           item.ID,
-		Title:            item.Title,
-		ExternalKey:      item.ExternalKey,
-		StartsAt:         start.UTC(),
-		EndsAt:           end.UTC(),
-		Late:             end.After(due),
-		Lane:             lane,
-		Occupancy:        occupancy,
-		Pinned:           item.Pinned,
-		Quadrant:         item.Quadrant(),
-		DueAt:            due.UTC(),
-		Stress:           item.Stress,
-		RemainingSeconds: remainingSeconds(item),
-	}
-}
-
-func takeSlice(slots *[]span, left *int64) (time.Time, time.Time, bool) {
-	return takeSliceFrom(slots, time.Time{}, left)
-}
-
-// takeSliceFrom carves up to *left seconds out of the first free span that ends
-// after from, never starting before from. Free time before the slice stays free.
-func takeSliceFrom(slots *[]span, from time.Time, left *int64) (time.Time, time.Time, bool) {
-	start, ok := firstStartFrom(*slots, from)
-	if !ok {
-		return time.Time{}, time.Time{}, false
-	}
-	end := start
-	for _, slot := range *slots {
-		if !slot.start.After(start) && slot.end.After(start) {
-			end = slot.end
-			break
-		}
-	}
-	take := end.Sub(start)
-	max := time.Duration(*left) * time.Second
-	if take > max {
-		take = max
-	}
-	end = start.Add(take)
-	*left -= int64(take / time.Second)
-	*slots = subtractSpan(*slots, start, end)
-	return start, end, true
-}
-
-func earliestTrackFrom(tracks [][]span, from time.Time) (int, time.Time) {
-	best := -1
-	var bestStart time.Time
-	for i, slots := range tracks {
-		start, ok := firstStartFrom(slots, from)
-		if !ok {
-			continue
-		}
-		if best < 0 || start.Before(bestStart) {
-			best = i
-			bestStart = start
-		}
-	}
-	return best, bestStart
-}
-
-func firstStartFrom(slots []span, from time.Time) (time.Time, bool) {
-	for _, slot := range slots {
-		if !slot.end.After(slot.start) || !slot.end.After(from) {
-			continue
-		}
-		if slot.start.Before(from) {
-			return from, true
-		}
-		return slot.start, true
-	}
-	return time.Time{}, false
-}
-
 func subtractSpan(slots []span, start, end time.Time) []span {
 	if !end.After(start) {
 		return slots
@@ -604,150 +618,22 @@ func subtractSpan(slots []span, start, end time.Time) []span {
 	return out
 }
 
-func markContinuation(blocks []ScheduleBlock) []ScheduleBlock {
-	counts := map[uuid.UUID]int{}
-	for _, block := range blocks {
-		counts[block.ItemID]++
-	}
-	seen := map[uuid.UUID]int{}
-	for i := range blocks {
-		id := blocks[i].ItemID
-		seen[id]++
-		blocks[i].Continued = seen[id] > 1
-		blocks[i].Continues = seen[id] < counts[id]
-	}
-	return blocks
-}
-
-func filterBlocks(blocks []ScheduleBlock, from, to time.Time) []ScheduleBlock {
-	var out []ScheduleBlock
-	for _, block := range blocks {
-		if !block.EndsAt.After(from) || !block.StartsAt.Before(to) {
-			continue
-		}
-		out = append(out, block)
-	}
-	if out == nil {
-		return []ScheduleBlock{}
+func subtractAll(slots []span, holes []span) []span {
+	out := slots
+	for _, hole := range holes {
+		out = subtractSpan(out, hole.start, hole.end)
 	}
 	return out
 }
 
-func paintLanes(blocks []ScheduleBlock, itemLane map[uuid.UUID]string, meta map[string]ScheduleLane) []ScheduleLane {
-	grouped := map[string][]ScheduleBlock{}
-	for _, block := range blocks {
-		key := itemLane[block.ItemID]
-		grouped[key] = append(grouped[key], block)
-	}
-	keys := make([]string, 0, len(grouped))
-	for key := range grouped {
-		keys = append(keys, key)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		a, b := meta[keys[i]], meta[keys[j]]
-		if a.ProjectID == nil && b.ProjectID != nil {
-			return false
-		}
-		if a.ProjectID != nil && b.ProjectID == nil {
+// containsSpan reports whether [start, end) lies entirely inside one slot.
+func containsSpan(slots []span, start, end time.Time) bool {
+	for _, slot := range slots {
+		if !slot.start.After(start) && !slot.end.Before(end) {
 			return true
 		}
-		if a.ProjectName == b.ProjectName {
-			return keys[i] < keys[j]
-		}
-		return a.ProjectName < b.ProjectName
-	})
-	lanes := make([]ScheduleLane, 0, len(keys))
-	for _, key := range keys {
-		lane := meta[key]
-		lane.Blocks = grouped[key]
-		if len(lane.Blocks) == 0 {
-			continue
-		}
-		lanes = append(lanes, lane)
 	}
-	if lanes == nil {
-		return []ScheduleLane{}
-	}
-	return lanes
-}
-
-func scheduleOverflow(items []Item, blocks []ScheduleBlock, kind ScheduleKind) ScheduleOverflow {
-	packed := map[uuid.UUID]int64{}
-	late := map[uuid.UUID]int64{}
-	for _, block := range blocks {
-		packed[block.ItemID] += spanSeconds(block.StartsAt, block.EndsAt)
-	}
-	itemByID := map[uuid.UUID]Item{}
-	for _, item := range items {
-		itemByID[item.ID] = item
-	}
-	for _, block := range blocks {
-		item, ok := itemByID[block.ItemID]
-		if !ok {
-			continue
-		}
-		due := packingDue(item, kind)
-		if due == nil {
-			continue
-		}
-		late[block.ItemID] += lateSeconds(block.StartsAt, block.EndsAt, *due)
-	}
-	var out ScheduleOverflow
-	for _, item := range items {
-		left := remainingSeconds(item) - packed[item.ID]
-		if left < 0 {
-			left = 0
-		}
-		over := late[item.ID] + left
-		if over == 0 {
-			continue
-		}
-		out.ItemCount++
-		out.Seconds += over
-		due := packingDue(item, kind)
-		if due == nil {
-			continue
-		}
-		at := due.UTC()
-		if out.FirstDueAt == nil || at.Before(*out.FirstDueAt) {
-			out.FirstDueAt = &at
-		}
-	}
-	return out
-}
-
-func scheduleCapacity(free []span, blocks []ScheduleBlock, events []EventOccurrence, from, to time.Time, loc *time.Location) ScheduleCapacity {
-	var out ScheduleCapacity
-	for _, slot := range free {
-		start, end, ok := clipInterval(slot.start, slot.end, from, to)
-		if ok {
-			out.FreeSeconds += spanSeconds(start, end)
-		}
-	}
-	for _, block := range blocks {
-		start, end, ok := clipInterval(block.StartsAt, block.EndsAt, from, to)
-		if ok {
-			out.PackedSeconds += spanSeconds(start, end)
-		}
-	}
-	for _, event := range events {
-		if !event.EndsAt.After(from) || !event.StartsAt.Before(to) {
-			continue
-		}
-		y, m, d := event.StartsAt.In(loc).Date()
-		for cursor := time.Date(y, m, d, 0, 0, 0, 0, loc); cursor.Before(event.EndsAt); cursor = cursor.AddDate(0, 0, 1) {
-			gs, ge := gridBounds(cursor, loc)
-			start, end, ok := clipInterval(event.StartsAt, event.EndsAt, gs, ge)
-			if !ok {
-				continue
-			}
-			start, end, ok = clipInterval(start, end, from, to)
-			if ok {
-				out.BusySeconds += spanSeconds(start, end)
-			}
-		}
-	}
-	return out
+	return false
 }
 
 func spanSeconds(start, end time.Time) int64 {

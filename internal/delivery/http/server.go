@@ -50,6 +50,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/items/{id}/notes", s.withAuth(s.listItemNotes))
 	mux.HandleFunc("POST /api/items/{id}/notes", s.withAuth(s.createItemNote))
 	mux.HandleFunc("DELETE /api/items/{id}/notes/{noteId}", s.withAuth(s.deleteItemNote))
+	mux.HandleFunc("GET /api/items/{id}/events", s.withAuth(s.listItemEvents))
+	mux.HandleFunc("POST /api/items/{id}/events/annotate", s.withAuth(s.annotateItemEvent))
 	mux.HandleFunc("GET /api/items/{id}/checks", s.withAuth(s.listItemChecks))
 	mux.HandleFunc("POST /api/items/{id}/checks", s.withAuth(s.createItemCheck))
 	mux.HandleFunc("PATCH /api/items/{id}/checks/{checkId}", s.withAuth(s.patchItemCheck))
@@ -75,6 +77,27 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/events/{id}", s.withAuth(s.getEvent))
 	mux.HandleFunc("PATCH /api/events/{id}", s.withAuth(s.patchEvent))
 	mux.HandleFunc("DELETE /api/events/{id}", s.withAuth(s.deleteEvent))
+	mux.HandleFunc("GET /api/events/{id}/occurrence", s.withAuth(s.getEventOccurrence))
+	mux.HandleFunc("PUT /api/events/{id}/occurrence", s.withAuth(s.putEventOccurrence))
+	mux.HandleFunc("DELETE /api/events/{id}/occurrence", s.withAuth(s.deleteEventOccurrence))
+	mux.HandleFunc("GET /api/events/{id}/notes", s.withAuth(s.listEventNotes))
+	mux.HandleFunc("POST /api/events/{id}/notes", s.withAuth(s.createEventNote))
+	mux.HandleFunc("DELETE /api/events/{id}/notes/{noteId}", s.withAuth(s.deleteEventNote))
+	mux.HandleFunc("GET /api/companies", s.withAuth(s.listCompanies))
+	mux.HandleFunc("POST /api/companies", s.withAuth(s.createCompany))
+	mux.HandleFunc("GET /api/companies/{id}", s.withAuth(s.getCompany))
+	mux.HandleFunc("PATCH /api/companies/{id}", s.withAuth(s.patchCompany))
+	mux.HandleFunc("DELETE /api/companies/{id}", s.withAuth(s.deleteCompany))
+	mux.HandleFunc("POST /api/companies/{id}/titles", s.withAuth(s.createCompanyTitle))
+	mux.HandleFunc("POST /api/companies/{id}/salaries", s.withAuth(s.createCompanySalary))
+	mux.HandleFunc("POST /api/companies/{id}/manager", s.withAuth(s.putCompanyManager))
+	mux.HandleFunc("POST /api/companies/{id}/reports", s.withAuth(s.createCompanyReport))
+	mux.HandleFunc("DELETE /api/companies/{id}/reports/{reportId}", s.withAuth(s.deleteCompanyReport))
+	mux.HandleFunc("POST /api/companies/{id}/contracts", s.withAuth(s.createCompanyContract))
+	mux.HandleFunc("GET /api/companies/{id}/notes", s.withAuth(s.listCompanyNotes))
+	mux.HandleFunc("POST /api/companies/{id}/notes", s.withAuth(s.createCompanyNote))
+	mux.HandleFunc("PATCH /api/companies/{id}/notes/{noteId}", s.withAuth(s.patchCompanyNote))
+	mux.HandleFunc("DELETE /api/companies/{id}/notes/{noteId}", s.withAuth(s.deleteCompanyNote))
 	mux.HandleFunc("GET /api/people", s.withAuth(s.listPeople))
 	mux.HandleFunc("POST /api/people", s.withAuth(s.createPerson))
 	mux.HandleFunc("GET /api/people/{id}", s.withAuth(s.getPerson))
@@ -96,8 +119,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/people/{id}/bonds", s.withAuth(s.createPersonBond))
 	mux.HandleFunc("PATCH /api/people/{id}/bonds/{bondId}", s.withAuth(s.patchPersonBond))
 	mux.HandleFunc("POST /api/people/{id}/bonds/{bondId}/end", s.withAuth(s.endPersonBond))
+	mux.HandleFunc("POST /api/people/{id}/absences", s.withAuth(s.createPersonAbsence))
+	mux.HandleFunc("PATCH /api/people/{id}/absences/{absenceId}", s.withAuth(s.patchPersonAbsence))
+	mux.HandleFunc("DELETE /api/people/{id}/absences/{absenceId}", s.withAuth(s.deletePersonAbsence))
 	mux.HandleFunc("GET /api/load", s.withAuth(s.load))
 	mux.HandleFunc("GET /api/schedule", s.withAuth(s.schedule))
+	mux.HandleFunc("GET /api/schedule/settings", s.withAuth(s.getScheduleSettings))
+	mux.HandleFunc("PUT /api/schedule/settings", s.withAuth(s.putScheduleSettings))
+	mux.HandleFunc("GET /api/schedule/days", s.withAuth(s.listDayOverrides))
+	mux.HandleFunc("PUT /api/schedule/days/{date}", s.withAuth(s.putDayOverride))
+	mux.HandleFunc("DELETE /api/schedule/days/{date}", s.withAuth(s.deleteDayOverride))
+	mux.HandleFunc("POST /api/schedule/whatif", s.withAuth(s.scheduleWhatIf))
 	mux.HandleFunc("GET /api/journal", s.withAuth(s.listJournal))
 
 	return s.cors(mux)
@@ -209,12 +241,18 @@ func (s *Server) createProject(w http.ResponseWriter, r *http.Request) {
 		TargetHoursDay   float64              `json:"targetHoursDay"`
 		Links            []domain.ProjectLink `json:"links"`
 		People           []domain.PersonRel   `json:"people"`
+		Companies        []domain.PersonRel   `json:"companies"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, err)
 		return
 	}
 	people, err := domain.NormalizePersonRels(body.People)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	companies, err := domain.NormalizePersonRels(body.Companies)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -228,6 +266,7 @@ func (s *Server) createProject(w http.ResponseWriter, r *http.Request) {
 		TargetHoursDay:   body.TargetHoursDay,
 		Links:            body.Links,
 		People:           people,
+		Companies:        companies,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -251,6 +290,7 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 		TargetHoursDay   *float64              `json:"targetHoursDay"`
 		Links            *[]domain.ProjectLink `json:"links"`
 		People           *[]domain.PersonRel   `json:"people"`
+		Companies        *[]domain.PersonRel   `json:"companies"`
 		Archived         *bool                 `json:"archived"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
@@ -258,6 +298,11 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	people, err := parseOptionalPersonRels(body.People)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	companies, err := parseOptionalPersonRels(body.Companies)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -271,6 +316,7 @@ func (s *Server) patchProject(w http.ResponseWriter, r *http.Request) {
 		TargetHoursDay:   body.TargetHoursDay,
 		Links:            body.Links,
 		People:           people,
+		Companies:        companies,
 		Archived:         body.Archived,
 	})
 	if err != nil {
@@ -524,6 +570,7 @@ func (s *Server) patchItem(w http.ResponseWriter, r *http.Request) {
 		Urgent         *bool                 `json:"urgent"`
 		Important      *bool                 `json:"important"`
 		Pinned         *bool                 `json:"pinned"`
+		PinnedAt       *string               `json:"pinnedAt"`
 		Stress         *int                  `json:"stress"`
 		DueAt          *string               `json:"dueAt"`
 		DevDueAt       *string               `json:"devDueAt"`
@@ -579,6 +626,18 @@ func (s *Server) patchItem(w http.ResponseWriter, r *http.Request) {
 	if body.Stress != nil && *body.Stress == 0 {
 		patch.Stress = nil
 		patch.ClearStr = true
+	}
+	if body.PinnedAt != nil {
+		if *body.PinnedAt == "" {
+			patch.ClearPinnedAt = true
+		} else {
+			at, err := time.Parse(time.RFC3339, *body.PinnedAt)
+			if err != nil {
+				writeError(w, domain.ErrInvalid)
+				return
+			}
+			patch.PinnedAt = &at
+		}
 	}
 	if body.DueAt != nil {
 		if *body.DueAt == "" {
@@ -687,6 +746,43 @@ func (s *Server) deleteItemNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) listItemEvents(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	events, err := s.App.ListItemEvents(r.Context(), id)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, events)
+}
+
+func (s *Server) annotateItemEvent(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		Kinds  []string `json:"kinds"`
+		Note   string   `json:"note"`
+		Stress *int     `json:"stress"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, err)
+		return
+	}
+	event, err := s.App.AnnotateLatestItemEvent(r.Context(), id, body.Kinds, body.Note, body.Stress)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, event)
 }
 
 func (s *Server) listItemChecks(w http.ResponseWriter, r *http.Request) {
@@ -1118,6 +1214,158 @@ func (s *Server) deleteEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) getEventOccurrence(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	on, err := parseYmdQuery(r, "on")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	occ, err := s.App.GetEventOccurrence(r.Context(), id, on)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, occ)
+}
+
+func (s *Server) putEventOccurrence(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		OriginalOn      string  `json:"originalOn"`
+		StartsAt        *string `json:"startsAt"`
+		DurationSeconds *int    `json:"durationSeconds"`
+		Skipped         bool    `json:"skipped"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, err)
+		return
+	}
+	on, err := domain.ParseYmd(body.OriginalOn)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	var startsAt *time.Time
+	if body.StartsAt != nil && *body.StartsAt != "" {
+		parsed, err := time.Parse(time.RFC3339, *body.StartsAt)
+		if err != nil {
+			writeError(w, domain.ErrInvalid)
+			return
+		}
+		startsAt = &parsed
+	}
+	occ, err := s.App.PutEventOccurrence(r.Context(), id, application.EventOccurrenceWrite{
+		OriginalOn:      on,
+		StartsAt:        startsAt,
+		DurationSeconds: body.DurationSeconds,
+		Skipped:         body.Skipped,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, occ)
+}
+
+func (s *Server) deleteEventOccurrence(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	on, err := parseYmdQuery(r, "on")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if err := s.App.DeleteEventOccurrence(r.Context(), id, on); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) listEventNotes(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	var on *domain.Ymd
+	if raw := strings.TrimSpace(r.URL.Query().Get("on")); raw != "" {
+		parsed, err := domain.ParseYmd(raw)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		on = &parsed
+	}
+	notes, err := s.App.ListEventNotes(r.Context(), id, on)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, notes)
+}
+
+func (s *Server) createEventNote(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		Body       string `json:"body"`
+		OriginalOn string `json:"originalOn"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, err)
+		return
+	}
+	on, err := domain.ParseYmd(body.OriginalOn)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	note, err := s.App.CreateEventNote(r.Context(), id, on, body.Body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, note)
+}
+
+func (s *Server) deleteEventNote(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	noteID, err := uuid.Parse(r.PathValue("noteId"))
+	if err != nil {
+		writeError(w, domain.ErrInvalid)
+		return
+	}
+	if err := s.App.DeleteEventNote(r.Context(), id, noteID); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func parseYmdQuery(r *http.Request, key string) (domain.Ymd, error) {
+	return domain.ParseYmd(r.URL.Query().Get(key))
+}
+
 func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	var from, to time.Time
@@ -1187,6 +1435,8 @@ type eventBody struct {
 	StartsAt          string               `json:"startsAt"`
 	DurationSeconds   int                  `json:"durationSeconds"`
 	Recurrence        string               `json:"recurrence"`
+	RepeatUntil       *string              `json:"repeatUntil"`
+	Weekdays          []int                `json:"weekdays"`
 	Links             []domain.ProjectLink `json:"links"`
 	MeetURL           string               `json:"meetUrl"`
 	Involvement       *int                 `json:"involvement"`
@@ -1213,6 +1463,14 @@ func decodeEventWrite(r *http.Request) (application.EventWrite, error) {
 	if err != nil {
 		return application.EventWrite{}, err
 	}
+	var until *domain.Ymd
+	if body.RepeatUntil != nil && strings.TrimSpace(*body.RepeatUntil) != "" {
+		parsed, err := domain.ParseYmd(*body.RepeatUntil)
+		if err != nil {
+			return application.EventWrite{}, err
+		}
+		until = &parsed
+	}
 	return application.EventWrite{
 		Title:             body.Title,
 		Description:       body.Description,
@@ -1223,6 +1481,8 @@ func decodeEventWrite(r *http.Request) (application.EventWrite, error) {
 		StartsAt:          startsAt,
 		DurationSeconds:   body.DurationSeconds,
 		Recurrence:        body.Recurrence,
+		RepeatUntil:       until,
+		Weekdays:          body.Weekdays,
 		Links:             body.Links,
 		MeetURL:           body.MeetURL,
 		Involvement:       body.Involvement,
@@ -1754,12 +2014,13 @@ func parseOptionalOtherID(raw *string) (*uuid.UUID, error) {
 
 func decodePersonWrite(r *http.Request) (application.PersonWrite, error) {
 	var body struct {
-		Name     string             `json:"name"`
-		BornOn   *string            `json:"bornOn"`
-		AgeYears *int               `json:"ageYears"`
-		Projects []domain.PersonRel `json:"projects"`
-		Events   []domain.PersonRel `json:"events"`
-		ItemIDs  []string           `json:"itemIds"`
+		Name      string             `json:"name"`
+		BornOn    *string            `json:"bornOn"`
+		AgeYears  *int               `json:"ageYears"`
+		Projects  []domain.PersonRel `json:"projects"`
+		Events    []domain.PersonRel `json:"events"`
+		Companies []domain.PersonRel `json:"companies"`
+		ItemIDs   []string           `json:"itemIds"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		return application.PersonWrite{}, err
@@ -1781,12 +2042,13 @@ func decodePersonWrite(r *http.Request) (application.PersonWrite, error) {
 		return application.PersonWrite{}, err
 	}
 	return application.PersonWrite{
-		Name:     body.Name,
-		BornOn:   bornOn,
-		AgeYears: body.AgeYears,
-		Projects: projects,
-		Events:   events,
-		ItemIDs:  items,
+		Name:      body.Name,
+		BornOn:    bornOn,
+		AgeYears:  body.AgeYears,
+		Projects:  projects,
+		Events:    events,
+		Companies: domain.NormalizeOptionalRels(body.Companies),
+		ItemIDs:   items,
 	}, nil
 }
 

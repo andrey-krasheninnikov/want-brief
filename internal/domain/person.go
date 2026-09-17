@@ -20,11 +20,13 @@ type Person struct {
 	Age         *int               `json:"age"`
 	Projects    []PersonRel        `json:"projects"`
 	Events      []PersonRel        `json:"events"`
+	Companies   []PersonRel        `json:"companies"`
 	ItemIDs     []uuid.UUID        `json:"itemIds"`
 	Contacts    []PersonContact    `json:"contacts"`
 	Sites       []PersonSite       `json:"sites"`
 	Bonds       []PersonBond       `json:"bonds"`
 	Professions []PersonProfession `json:"professions"`
+	Absences    []PersonAbsence    `json:"absences"`
 	MeBond      *MeBond            `json:"meBond"`
 	LastNoteAt  *time.Time         `json:"lastNoteAt"`
 	CreatedAt   time.Time          `json:"createdAt"`
@@ -32,12 +34,13 @@ type Person struct {
 }
 
 type PersonDraft struct {
-	Name     string
-	BornOn   *time.Time
-	AgeYears *int
-	Projects []PersonRel
-	Events   []PersonRel
-	ItemIDs  []uuid.UUID
+	Name      string
+	BornOn    *time.Time
+	AgeYears  *int
+	Projects  []PersonRel
+	Events    []PersonRel
+	Companies []PersonRel
+	ItemIDs   []uuid.UUID
 }
 
 func NewPerson(draft PersonDraft) (Person, error) {
@@ -93,6 +96,7 @@ func (p *Person) apply(draft PersonDraft, now time.Time) error {
 	}
 	p.Projects = projects
 	p.Events = events
+	p.Companies = NormalizeOptionalRels(draft.Companies)
 	p.ItemIDs = NormalizeIDs(draft.ItemIDs)
 	return nil
 }
@@ -126,6 +130,9 @@ func (p Person) WithAge(now time.Time) Person {
 	if p.Events == nil {
 		p.Events = []PersonRel{}
 	}
+	if p.Companies == nil {
+		p.Companies = []PersonRel{}
+	}
 	if p.ItemIDs == nil {
 		p.ItemIDs = []uuid.UUID{}
 	}
@@ -140,6 +147,9 @@ func (p Person) WithAge(now time.Time) Person {
 	}
 	if p.Professions == nil {
 		p.Professions = []PersonProfession{}
+	}
+	if p.Absences == nil {
+		p.Absences = []PersonAbsence{}
 	}
 	return p
 }

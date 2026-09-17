@@ -19,6 +19,8 @@ type ItemPatch struct {
 	Urgent         *bool
 	Important      *bool
 	Pinned         *bool
+	PinnedAt       *time.Time
+	ClearPinnedAt  bool
 	Stress         *int
 	ClearStr       bool
 	DueAt          *time.Time
@@ -81,6 +83,7 @@ func (s *Service) PatchItem(ctx context.Context, id uuid.UUID, patch ItemPatch) 
 	if err != nil {
 		return domain.Item{}, err
 	}
+	before := itemSnapshots(item)
 	if patch.Title != nil {
 		title := strings.TrimSpace(*patch.Title)
 		if title == "" {
@@ -117,6 +120,12 @@ func (s *Service) PatchItem(ctx context.Context, id uuid.UUID, patch ItemPatch) 
 	}
 	if patch.Pinned != nil {
 		item.Pinned = *patch.Pinned
+	}
+	if patch.ClearPinnedAt {
+		item.PinnedAt = nil
+	} else if patch.PinnedAt != nil {
+		at := patch.PinnedAt.UTC()
+		item.PinnedAt = &at
 	}
 	if patch.ClearStr {
 		item.Stress = nil
@@ -186,7 +195,14 @@ func (s *Service) PatchItem(ctx context.Context, id uuid.UUID, patch ItemPatch) 
 		}
 	}
 	item.UpdatedAt = now
-	return s.Items.Update(ctx, item)
+	updated, err := s.Items.Update(ctx, item)
+	if err != nil {
+		return domain.Item{}, err
+	}
+	if err := s.recordItemChanges(ctx, updated.ID, before, itemSnapshots(updated)); err != nil {
+		return domain.Item{}, err
+	}
+	return updated, nil
 }
 
 func (s *Service) ListItemNotes(ctx context.Context, itemID uuid.UUID) ([]domain.ItemNote, error) {
@@ -271,7 +287,14 @@ func (s *Service) CreateItemCheck(ctx context.Context, itemID uuid.UUID, body st
 	if err != nil {
 		return domain.ItemCheck{}, err
 	}
-	return s.ItemChecks.Create(ctx, check)
+	created, err := s.ItemChecks.Create(ctx, check)
+	if err != nil {
+		return domain.ItemCheck{}, err
+	}
+	if err := s.recordItemEvent(ctx, itemID, domain.ItemEventCheck, "create", "", created.Body); err != nil {
+		return domain.ItemCheck{}, err
+	}
+	return created, nil
 }
 
 func (s *Service) PatchItemCheck(ctx context.Context, itemID, checkID uuid.UUID, body *string, done *bool) (domain.ItemCheck, error) {
@@ -285,6 +308,7 @@ func (s *Service) PatchItemCheck(ctx context.Context, itemID, checkID uuid.UUID,
 	if check.ItemID != itemID {
 		return domain.ItemCheck{}, domain.ErrNotFound
 	}
+	fromBody, fromDone := check.Body, snapshotBool(check.Done)
 	if body != nil {
 		if err := check.SetBody(*body); err != nil {
 			return domain.ItemCheck{}, err
@@ -293,7 +317,21 @@ func (s *Service) PatchItemCheck(ctx context.Context, itemID, checkID uuid.UUID,
 	if done != nil {
 		check.SetDone(*done)
 	}
-	return s.ItemChecks.Update(ctx, check)
+	updated, err := s.ItemChecks.Update(ctx, check)
+	if err != nil {
+		return domain.ItemCheck{}, err
+	}
+	if fromBody != updated.Body {
+		if err := s.recordItemEvent(ctx, itemID, domain.ItemEventCheck, "body", fromBody, updated.Body); err != nil {
+			return domain.ItemCheck{}, err
+		}
+	}
+	if done != nil && fromDone != snapshotBool(updated.Done) {
+		if err := s.recordItemEvent(ctx, itemID, domain.ItemEventCheck, "done", fromDone, snapshotBool(updated.Done)); err != nil {
+			return domain.ItemCheck{}, err
+		}
+	}
+	return updated, nil
 }
 
 func (s *Service) DeleteItemCheck(ctx context.Context, itemID, checkID uuid.UUID) error {
@@ -307,7 +345,10 @@ func (s *Service) DeleteItemCheck(ctx context.Context, itemID, checkID uuid.UUID
 	if check.ItemID != itemID {
 		return domain.ErrNotFound
 	}
-	return s.ItemChecks.Delete(ctx, checkID)
+	if err := s.ItemChecks.Delete(ctx, checkID); err != nil {
+		return err
+	}
+	return s.recordItemEvent(ctx, itemID, domain.ItemEventCheck, "delete", check.Body, "")
 }
 
 func (s *Service) SyncItem(ctx context.Context, id uuid.UUID) (domain.Item, error) {
@@ -356,23 +397,34 @@ func (s *Service) SyncItem(ctx context.Context, id uuid.UUID) (domain.Item, erro
 	if err != nil {
 		return domain.Item{}, err
 	}
-	seen := map[string]bool{}
+	seenBody := map[string]bool{}
+	seenExternal := map[string]bool{}
 	for _, note := range notes {
-		seen[strings.TrimSpace(note.Body)] = true
+		seenBody[strings.TrimSpace(note.Body)] = true
+		if note.ExternalID != "" {
+			seenExternal[note.ExternalID] = true
+		}
 	}
 	for _, comment := range remote.Comments {
-		body := strings.TrimSpace(comment)
-		if body == "" || seen[body] {
+		comment.Body = strings.TrimSpace(comment.Body)
+		if comment.Body == "" {
 			continue
 		}
-		note, err := domain.NewItemNote(item.ID, body, item.SourceKind)
+		// Notes synced before external ids existed carry the body only, so fall back to it.
+		if seenExternal[comment.ExternalID] || seenBody[comment.Body] {
+			continue
+		}
+		note, err := domain.NewSourceItemNote(item.ID, item.SourceKind, comment)
 		if err != nil {
 			return domain.Item{}, err
 		}
 		if _, err := s.ItemNotes.Create(ctx, note); err != nil {
 			return domain.Item{}, err
 		}
-		seen[body] = true
+		seenBody[comment.Body] = true
+		if note.ExternalID != "" {
+			seenExternal[note.ExternalID] = true
+		}
 	}
 	return s.GetItem(ctx, updated.ID)
 }

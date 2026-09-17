@@ -33,7 +33,9 @@ type task struct {
 }
 
 type comment struct {
-	Content string `json:"content"`
+	ID       string `json:"id"`
+	Content  string `json:"content"`
+	PostedAt string `json:"posted_at"`
 }
 
 func (g *Gateway) Probe(ctx context.Context, source domain.Source, token string) error {
@@ -128,7 +130,11 @@ func (g *Gateway) Fetch(ctx context.Context, source domain.Source, token, extern
 		if body == "" {
 			continue
 		}
-		item.Comments = append(item.Comments, body)
+		mapped := domain.RemoteComment{ExternalID: strings.TrimSpace(row.ID), Body: body}
+		if posted, err := time.Parse(time.RFC3339, row.PostedAt); err == nil {
+			mapped.CreatedAt = &posted
+		}
+		item.Comments = append(item.Comments, mapped)
 	}
 	return item, nil
 }

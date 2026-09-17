@@ -25,6 +25,7 @@ type Project struct {
 	TargetHoursWeek  float64       `json:"targetHoursWeek"`
 	Links            []ProjectLink `json:"links"`
 	People           []PersonRel   `json:"people"`
+	Companies        []PersonRel   `json:"companies"`
 	ArchivedAt       *time.Time    `json:"archivedAt"`
 	CreatedAt        time.Time     `json:"createdAt"`
 	UpdatedAt        time.Time     `json:"updatedAt"`
@@ -45,6 +46,7 @@ func NewProject(name, color string, targetHoursDay float64) (Project, error) {
 		Color:     color,
 		Links:     []ProjectLink{},
 		People:    []PersonRel{},
+		Companies: []PersonRel{},
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

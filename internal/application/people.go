@@ -9,12 +9,13 @@ import (
 )
 
 type PersonWrite struct {
-	Name     string
-	BornOn   *time.Time
-	AgeYears *int
-	Projects []domain.PersonRel
-	Events   []domain.PersonRel
-	ItemIDs  []uuid.UUID
+	Name      string
+	BornOn    *time.Time
+	AgeYears  *int
+	Projects  []domain.PersonRel
+	Events    []domain.PersonRel
+	Companies []domain.PersonRel
+	ItemIDs   []uuid.UUID
 }
 
 func (s *Service) ListPeople(ctx context.Context) ([]domain.Person, error) {
@@ -125,6 +126,42 @@ func (s *Service) DeletePersonContact(ctx context.Context, personID, contactID u
 		return domain.ErrNotFound
 	}
 	return s.PersonContacts.Delete(ctx, contactID)
+}
+
+func (s *Service) CreatePersonAbsence(ctx context.Context, personID uuid.UUID, draft domain.PersonAbsenceDraft) (domain.PersonAbsence, error) {
+	if _, err := s.People.Get(ctx, personID); err != nil {
+		return domain.PersonAbsence{}, err
+	}
+	absence, err := domain.NewPersonAbsence(personID, draft, s.now())
+	if err != nil {
+		return domain.PersonAbsence{}, err
+	}
+	return s.PersonAbsences.Create(ctx, absence)
+}
+
+func (s *Service) ReplacePersonAbsence(ctx context.Context, personID, absenceID uuid.UUID, draft domain.PersonAbsenceDraft) (domain.PersonAbsence, error) {
+	absence, err := s.PersonAbsences.Get(ctx, absenceID)
+	if err != nil {
+		return domain.PersonAbsence{}, err
+	}
+	if absence.PersonID != personID {
+		return domain.PersonAbsence{}, domain.ErrNotFound
+	}
+	if err := absence.Apply(draft, s.now()); err != nil {
+		return domain.PersonAbsence{}, err
+	}
+	return s.PersonAbsences.Update(ctx, absence)
+}
+
+func (s *Service) DeletePersonAbsence(ctx context.Context, personID, absenceID uuid.UUID) error {
+	absence, err := s.PersonAbsences.Get(ctx, absenceID)
+	if err != nil {
+		return err
+	}
+	if absence.PersonID != personID {
+		return domain.ErrNotFound
+	}
+	return s.PersonAbsences.Delete(ctx, absenceID)
 }
 
 func (s *Service) CreatePersonSite(ctx context.Context, personID uuid.UUID, draft domain.PersonSiteDraft) (domain.PersonSite, error) {
@@ -334,11 +371,12 @@ func (s *Service) bondForPerson(ctx context.Context, personID, bondID uuid.UUID)
 
 func draftFromPerson(write PersonWrite) domain.PersonDraft {
 	return domain.PersonDraft{
-		Name:     write.Name,
-		BornOn:   write.BornOn,
-		AgeYears: write.AgeYears,
-		Projects: write.Projects,
-		Events:   write.Events,
-		ItemIDs:  write.ItemIDs,
+		Name:      write.Name,
+		BornOn:    write.BornOn,
+		AgeYears:  write.AgeYears,
+		Projects:  write.Projects,
+		Events:    write.Events,
+		Companies: write.Companies,
+		ItemIDs:   write.ItemIDs,
 	}
 }

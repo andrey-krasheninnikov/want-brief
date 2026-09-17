@@ -7,17 +7,19 @@ import (
 	"github.com/pchkauu/want-brief/internal/domain"
 )
 
+const itemNoteColumns = `id, item_id, body, source_kind, external_id, author_name, url, created_at`
+
 func (s *Store) GetItemNote(ctx context.Context, id uuid.UUID) (domain.ItemNote, error) {
 	var n domain.ItemNote
 	err := s.pool.QueryRow(ctx, `
-		SELECT id, item_id, body, source_kind, created_at FROM item_notes WHERE id=$1
-	`, id).Scan(&n.ID, &n.ItemID, &n.Body, &n.SourceKind, &n.CreatedAt)
+		SELECT `+itemNoteColumns+` FROM item_notes WHERE id=$1
+	`, id).Scan(&n.ID, &n.ItemID, &n.Body, &n.SourceKind, &n.ExternalID, &n.AuthorName, &n.URL, &n.CreatedAt)
 	return n, mapErr(err)
 }
 
 func (s *Store) ListItemNotes(ctx context.Context, itemID uuid.UUID) ([]domain.ItemNote, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, item_id, body, source_kind, created_at
+		SELECT `+itemNoteColumns+`
 		FROM item_notes WHERE item_id=$1
 		ORDER BY created_at DESC
 	`, itemID)
@@ -28,7 +30,7 @@ func (s *Store) ListItemNotes(ctx context.Context, itemID uuid.UUID) ([]domain.I
 	out := []domain.ItemNote{}
 	for rows.Next() {
 		var n domain.ItemNote
-		if err := rows.Scan(&n.ID, &n.ItemID, &n.Body, &n.SourceKind, &n.CreatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.ItemID, &n.Body, &n.SourceKind, &n.ExternalID, &n.AuthorName, &n.URL, &n.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, n)
@@ -38,11 +40,11 @@ func (s *Store) ListItemNotes(ctx context.Context, itemID uuid.UUID) ([]domain.I
 
 func (s *Store) CreateItemNote(ctx context.Context, n domain.ItemNote) (domain.ItemNote, error) {
 	err := s.pool.QueryRow(ctx, `
-		INSERT INTO item_notes (id, item_id, body, source_kind, created_at)
-		VALUES ($1,$2,$3,$4,$5)
-		RETURNING id, item_id, body, source_kind, created_at
-	`, n.ID, n.ItemID, n.Body, n.SourceKind, n.CreatedAt).
-		Scan(&n.ID, &n.ItemID, &n.Body, &n.SourceKind, &n.CreatedAt)
+		INSERT INTO item_notes (id, item_id, body, source_kind, external_id, author_name, url, created_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		RETURNING `+itemNoteColumns+`
+	`, n.ID, n.ItemID, n.Body, n.SourceKind, n.ExternalID, n.AuthorName, n.URL, n.CreatedAt).
+		Scan(&n.ID, &n.ItemID, &n.Body, &n.SourceKind, &n.ExternalID, &n.AuthorName, &n.URL, &n.CreatedAt)
 	return n, err
 }
 

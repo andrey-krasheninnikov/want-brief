@@ -55,7 +55,12 @@ type jiraIssue struct {
 		} `json:"status"`
 		Comment *struct {
 			Comments []struct {
-				Body json.RawMessage `json:"body"`
+				ID     string          `json:"id"`
+				Body   json.RawMessage `json:"body"`
+				Author *struct {
+					DisplayName string `json:"displayName"`
+				} `json:"author"`
+				Created string `json:"created"`
 			} `json:"comments"`
 		} `json:"comment"`
 	} `json:"fields"`
@@ -318,7 +323,17 @@ func mapIssueDetailed(base string, issue jiraIssue) domain.RemoteItem {
 		if body == "" {
 			continue
 		}
-		item.Comments = append(item.Comments, body)
+		mapped := domain.RemoteComment{ExternalID: strings.TrimSpace(comment.ID), Body: body}
+		if comment.Author != nil {
+			mapped.Author = strings.TrimSpace(comment.Author.DisplayName)
+		}
+		if mapped.ExternalID != "" {
+			mapped.URL = item.URL + "?focusedCommentId=" + url.QueryEscape(mapped.ExternalID)
+		}
+		if created, err := parseJiraTime(comment.Created); err == nil {
+			mapped.CreatedAt = &created
+		}
+		item.Comments = append(item.Comments, mapped)
 	}
 	return item
 }

@@ -38,8 +38,13 @@ const (
 type Occupancy string
 
 const (
-	OccupancySolo     Occupancy = "solo"
+	// OccupancySolo takes the whole day: nothing else is packed alongside.
+	OccupancySolo Occupancy = "solo"
+	// OccupancyParallel takes the single active track; waiting tracks stay free.
 	OccupancyParallel Occupancy = "parallel"
+	// OccupancyWaiting is mostly idle time (waiting on a build, a reply); it
+	// takes one of the waiting tracks and never the active one.
+	OccupancyWaiting Occupancy = "waiting"
 )
 
 type Quadrant string
@@ -64,6 +69,7 @@ type Item struct {
 	Urgent         bool          `json:"urgent"`
 	Important      bool          `json:"important"`
 	Pinned         bool          `json:"pinned"`
+	PinnedAt       *time.Time    `json:"pinnedAt"`
 	Stress         *int          `json:"stress"`
 	DueAt          *time.Time    `json:"dueAt"`
 	DevDueAt       *time.Time    `json:"devDueAt"`
@@ -135,7 +141,7 @@ func ParseOccupancy(raw string) (Occupancy, error) {
 		return OccupancySolo, nil
 	}
 	switch occupancy {
-	case OccupancySolo, OccupancyParallel:
+	case OccupancySolo, OccupancyParallel, OccupancyWaiting:
 		return occupancy, nil
 	default:
 		return "", fmt.Errorf("%w: occupancy", ErrInvalid)
@@ -143,10 +149,12 @@ func ParseOccupancy(raw string) (Occupancy, error) {
 }
 
 func (i Item) EffectiveOccupancy() Occupancy {
-	if i.Occupancy == OccupancyParallel {
-		return OccupancyParallel
+	switch i.Occupancy {
+	case OccupancyParallel, OccupancyWaiting:
+		return i.Occupancy
+	default:
+		return OccupancySolo
 	}
-	return OccupancySolo
 }
 
 func (i *Item) SetOccupancy(raw string) error {

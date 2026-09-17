@@ -1,0 +1,162 @@
+{
+  "blocks": [
+    {
+      "key": "OV-4",
+      "kind": "work",
+      "start": "Tue 15 10:00",
+      "end": "Tue 15 12:00",
+      "lane": 0,
+      "reasons": [
+        "no_slack"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "OV-4",
+      "kind": "work",
+      "start": "Tue 15 12:10",
+      "end": "Tue 15 14:10",
+      "lane": 0,
+      "reasons": [
+        "no_slack"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "OV-4",
+      "kind": "work",
+      "start": "Tue 15 14:20",
+      "end": "Tue 15 16:20",
+      "lane": 0,
+      "reasons": [
+        "no_slack"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "OV-4",
+      "kind": "work",
+      "start": "Wed 16 10:00",
+      "end": "Wed 16 12:00",
+      "lane": 0,
+      "reasons": [
+        "no_slack"
+      ],
+      "continue": "from"
+    },
+    {
+      "key": "OV-3",
+      "kind": "work",
+      "start": "Wed 16 12:00",
+      "end": "Wed 16 14:00",
+      "lane": 0,
+      "reasons": [
+        "no_slack",
+        "pushed_by:OV-4"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "OV-3",
+      "kind": "work",
+      "start": "Wed 16 14:10",
+      "end": "Wed 16 16:10",
+      "lane": 0,
+      "reasons": [
+        "no_slack"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "OV-3",
+      "kind": "work",
+      "start": "Thu 17 10:00",
+      "end": "Thu 17 12:00",
+      "lane": 0,
+      "late": true,
+      "reasons": [
+        "no_slack"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "OV-3",
+      "kind": "work",
+      "start": "Thu 17 12:10",
+      "end": "Thu 17 14:10",
+      "lane": 0,
+      "late": true,
+      "reasons": [
+        "no_slack"
+      ],
+      "continue": "from"
+    },
+    {
+      "key": "OV-1",
+      "kind": "work",
+      "start": "Thu 17 14:10",
+      "end": "Thu 17 16:10",
+      "lane": 0,
+      "late": true,
+      "reasons": [
+        "due_soon",
+        "pushed_by:OV-3"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "OV-1",
+      "kind": "work",
+      "start": "Fri 18 10:00",
+      "end": "Fri 18 12:00",
+      "lane": 0,
+      "late": true,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "OV-1",
+      "kind": "work",
+      "start": "Fri 18 12:10",
+      "end": "Fri 18 14:10",
+      "lane": 0,
+      "late": true,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "OV-1",
+      "kind": "work",
+      "start": "Fri 18 14:20",
+      "end": "Fri 18 16:20",
+      "lane": 0,
+      "late": true,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "from"
+    }
+  ],
+  "unplanned": [],
+  "atRisk": [
+    "OV-4",
+    "OV-3"
+  ],
+  "busy": [],
+  "overflow": {
+    "itemCount": 4,
+    "seconds": 100800,
+    "firstDueAt": "2026-09-16T15:00:00Z"
+  },
+  "score": {
+    "lateSeconds": 100800,
+    "fragments": 15,
+    "switches": 0,
+    "loadVariance": 0.49,
+    "total": 295.49
+  }
+}

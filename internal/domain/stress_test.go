@@ -13,6 +13,10 @@ func TestParseCheckinKind(t *testing.T) {
 	if err != nil || kind != CheckinFocus {
 		t.Fatalf("got %s %v", kind, err)
 	}
+	kind, err = ParseCheckinKind("happiness")
+	if err != nil || kind != CheckinHappiness {
+		t.Fatalf("got %s %v", kind, err)
+	}
 }
 
 func TestLatestFromLogsPrefersFirstPerKind(t *testing.T) {
@@ -22,7 +26,7 @@ func TestLatestFromLogsPrefersFirstPerKind(t *testing.T) {
 		{Kind: CheckinEnergy, Level: 2},
 	}
 	got := LatestFromLogs(logs)
-	if got.Focus != 5 || got.Energy != 2 || got.Stress != 3 {
+	if got.Focus != 5 || got.Energy != 2 || got.Stress != 3 || got.Happiness != 3 {
 		t.Fatalf("got %+v", got)
 	}
 }

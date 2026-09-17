@@ -223,10 +223,15 @@ func (s *Store) attachPersonDossier(ctx context.Context, person *domain.Person) 
 	if err != nil {
 		return err
 	}
+	absences, err := s.ListPersonAbsences(ctx, person.ID)
+	if err != nil {
+		return err
+	}
 	person.Contacts = contacts
 	person.Sites = sites
 	person.Bonds = bonds
 	person.Professions = profs
+	person.Absences = absences
 	for _, bond := range bonds {
 		if bond.PersonAID == nil && bond.EndedOn == nil {
 			person.MeBond = &domain.MeBond{ID: bond.ID, Kind: bond.Kind}

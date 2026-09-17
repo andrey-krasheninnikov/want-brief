@@ -13,6 +13,9 @@ type ItemNote struct {
 	ItemID     uuid.UUID  `json:"itemId"`
 	Body       string     `json:"body"`
 	SourceKind SourceKind `json:"sourceKind"`
+	ExternalID string     `json:"externalId"`
+	AuthorName string     `json:"authorName"`
+	URL        string     `json:"url"`
 	CreatedAt  time.Time  `json:"createdAt"`
 }
 
@@ -35,4 +38,18 @@ func NewItemNote(itemID uuid.UUID, body string, sourceKind SourceKind) (ItemNote
 		SourceKind: kind,
 		CreatedAt:  time.Now().UTC(),
 	}, nil
+}
+
+func NewSourceItemNote(itemID uuid.UUID, sourceKind SourceKind, comment RemoteComment) (ItemNote, error) {
+	note, err := NewItemNote(itemID, comment.Body, sourceKind)
+	if err != nil {
+		return ItemNote{}, err
+	}
+	note.ExternalID = strings.TrimSpace(comment.ExternalID)
+	note.AuthorName = strings.TrimSpace(comment.Author)
+	note.URL = strings.TrimSpace(comment.URL)
+	if comment.CreatedAt != nil {
+		note.CreatedAt = comment.CreatedAt.UTC()
+	}
+	return note, nil
 }

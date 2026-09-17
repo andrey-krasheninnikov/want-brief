@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -44,6 +45,7 @@ const (
 	DefaultEventDuration = 30 * 60
 	maxEventExpand       = 8 * 7 * 24 * time.Hour
 	maxEventInvolvement  = 10
+	weekdayCycleDays     = 14
 )
 
 type Event struct {
@@ -57,6 +59,8 @@ type Event struct {
 	StartsAt          time.Time       `json:"startsAt"`
 	DurationSeconds   int             `json:"durationSeconds"`
 	Recurrence        EventRecurrence `json:"recurrence"`
+	RepeatUntil       *Ymd            `json:"repeatUntil"`
+	Weekdays          []int           `json:"weekdays"`
 	Links             []ProjectLink   `json:"links"`
 	MeetURL           string          `json:"meetUrl"`
 	Involvement       int             `json:"involvement"`
@@ -81,6 +85,9 @@ type EventOccurrence struct {
 	EndsAt            time.Time       `json:"endsAt"`
 	DurationSeconds   int             `json:"durationSeconds"`
 	Recurrence        EventRecurrence `json:"recurrence"`
+	OriginalOn        Ymd             `json:"originalOn"`
+	Overridden        bool            `json:"overridden"`
+	Skipped           bool            `json:"skipped,omitempty"`
 	Links             []ProjectLink   `json:"links"`
 	MeetURL           string          `json:"meetUrl"`
 	Involvement       int             `json:"involvement"`
@@ -101,6 +108,8 @@ type EventDraft struct {
 	StartsAt          time.Time
 	DurationSeconds   int
 	Recurrence        EventRecurrence
+	RepeatUntil       *Ymd
+	Weekdays          []int
 	Links             []ProjectLink
 	MeetURL           string
 	Involvement       int
@@ -144,6 +153,23 @@ func ParseEventRecurrence(raw string) (EventRecurrence, error) {
 	default:
 		return "", fmt.Errorf("%w: event recurrence", ErrInvalid)
 	}
+}
+
+func NormalizeWeekdays(raw []int) ([]int, error) {
+	seen := map[int]bool{}
+	out := make([]int, 0, len(raw))
+	for _, slot := range raw {
+		if slot < 0 || slot >= weekdayCycleDays {
+			return nil, fmt.Errorf("%w: weekday", ErrInvalid)
+		}
+		if seen[slot] {
+			continue
+		}
+		seen[slot] = true
+		out = append(out, slot)
+	}
+	sort.Ints(out)
+	return out, nil
 }
 
 func NewEvent(title string, kind EventKind, startsAt time.Time, endsAt *time.Time) (Event, error) {
@@ -211,6 +237,29 @@ func (e *Event) apply(draft EventDraft) error {
 	if err != nil {
 		return err
 	}
+	weekdays, err := NormalizeWeekdays(draft.Weekdays)
+	if err != nil {
+		return err
+	}
+	if rec == RecurrenceWeekly {
+		if len(weekdays) == 0 {
+			return fmt.Errorf("%w: weekdays", ErrInvalid)
+		}
+	} else {
+		weekdays = []int{}
+	}
+	var until *Ymd
+	if draft.RepeatUntil != nil && strings.TrimSpace(string(*draft.RepeatUntil)) != "" {
+		parsed, err := ParseYmd(string(*draft.RepeatUntil))
+		if err != nil {
+			return err
+		}
+		startDay := YmdOf(draft.StartsAt, Moscow())
+		if parsed < startDay {
+			return fmt.Errorf("%w: repeatUntil", ErrInvalid)
+		}
+		until = &parsed
+	}
 	if draft.Involvement < 0 || draft.Involvement > maxEventInvolvement {
 		return fmt.Errorf("%w: involvement", ErrInvalid)
 	}
@@ -234,6 +283,8 @@ func (e *Event) apply(draft EventDraft) error {
 	e.StartsAt = draft.StartsAt.UTC()
 	e.DurationSeconds = duration
 	e.Recurrence = rec
+	e.RepeatUntil = until
+	e.Weekdays = weekdays
 	e.Links = links
 	e.MeetURL = meet
 	e.Involvement = draft.Involvement
@@ -272,6 +323,20 @@ func (e Event) EndsAt() time.Time {
 	return e.StartsAt.Add(time.Duration(e.DurationSeconds) * time.Second)
 }
 
+// ActiveSpan is the part of the occurrence that actually occupies people.
+// Offsets are seconds from StartsAt; missing offsets mean the full interval.
+func (e EventOccurrence) ActiveSpan() (time.Time, time.Time) {
+	if e.ActiveStartOffset == nil || e.ActiveEndOffset == nil {
+		return e.StartsAt, e.EndsAt
+	}
+	start := e.StartsAt.Add(time.Duration(*e.ActiveStartOffset) * time.Second)
+	end := e.StartsAt.Add(time.Duration(*e.ActiveEndOffset) * time.Second)
+	if !end.After(start) {
+		return e.StartsAt, e.EndsAt
+	}
+	return start, end
+}
+
 func (e Event) Occurrence(at time.Time) EventOccurrence {
 	start := at.UTC()
 	return EventOccurrence{
@@ -287,6 +352,7 @@ func (e Event) Occurrence(at time.Time) EventOccurrence {
 		EndsAt:            start.Add(time.Duration(e.DurationSeconds) * time.Second),
 		DurationSeconds:   e.DurationSeconds,
 		Recurrence:        e.Recurrence,
+		OriginalOn:        YmdOf(start, Moscow()),
 		Links:             e.Links,
 		MeetURL:           e.MeetURL,
 		Involvement:       e.Involvement,
@@ -298,40 +364,141 @@ func (e Event) Occurrence(at time.Time) EventOccurrence {
 	}
 }
 
+func (e Event) OccurrenceOn(day Ymd) EventOccurrence {
+	loc := Moscow()
+	h, m, s := e.StartsAt.In(loc).Clock()
+	midnight := day.Midnight(loc)
+	start := time.Date(midnight.Year(), midnight.Month(), midnight.Day(), h, m, s, 0, loc)
+	occ := e.Occurrence(start)
+	occ.OriginalOn = day
+	return occ
+}
+
+func (e Event) HasSlot(day Ymd) bool {
+	if _, err := ParseYmd(string(day)); err != nil {
+		return false
+	}
+	loc := Moscow()
+	startDay := YmdOf(e.StartsAt, loc)
+	if day < startDay {
+		return false
+	}
+	if e.RepeatUntil != nil && day > *e.RepeatUntil {
+		return false
+	}
+	switch e.Recurrence {
+	case RecurrenceOnce:
+		return day == startDay
+	case RecurrenceMonthly:
+		return e.monthlyHits(day, loc)
+	default:
+		return containsInt(e.Weekdays, weekdaySlot(startDay, day, loc))
+	}
+}
+
+func (e Event) SlotOccurrence(day Ymd, override *EventOverride) (EventOccurrence, error) {
+	if !e.HasSlot(day) {
+		return EventOccurrence{}, ErrNotFound
+	}
+	occ := e.OccurrenceOn(day)
+	if override == nil {
+		return occ, nil
+	}
+	if override.Skipped {
+		occ.Skipped = true
+		occ.Overridden = true
+		return occ, nil
+	}
+	return override.Apply(occ), nil
+}
+
 func (e Event) Expand(from, to time.Time) []EventOccurrence {
-	from, to = clampEventRange(from, to)
+	from, to = e.clampRange(from, to)
 	switch e.Recurrence {
 	case RecurrenceWeekly:
-		return e.expandStep(from, to, func(at time.Time) time.Time { return at.AddDate(0, 0, 7) })
+		return e.expandWeekly(from, to)
 	case RecurrenceMonthly:
-		return e.expandStep(from, to, func(at time.Time) time.Time { return at.AddDate(0, 1, 0) })
+		return e.expandMonthly(from, to)
 	default:
 		if !e.StartsAt.Before(from) && e.StartsAt.Before(to) {
-			return []EventOccurrence{e.Occurrence(e.StartsAt)}
+			return []EventOccurrence{e.OccurrenceOn(YmdOf(e.StartsAt, Moscow()))}
 		}
 		return nil
 	}
 }
 
-func (e Event) expandStep(from, to time.Time, next func(time.Time) time.Time) []EventOccurrence {
+func (e Event) expandWeekly(from, to time.Time) []EventOccurrence {
+	loc := Moscow()
+	startDay := YmdOf(e.StartsAt, loc)
+	cursor := civilDay(from.In(loc), loc)
+	startMidnight := startDay.Midnight(loc)
+	if cursor.Before(startMidnight) {
+		cursor = startMidnight
+	}
+	var out []EventOccurrence
+	for cursor.Before(to) {
+		day := YmdOf(cursor, loc)
+		if e.HasSlot(day) {
+			occ := e.OccurrenceOn(day)
+			if !occ.StartsAt.Before(from) && occ.StartsAt.Before(to) {
+				out = append(out, occ)
+			}
+		}
+		cursor = cursor.AddDate(0, 0, 1)
+	}
+	return out
+}
+
+func (e Event) expandMonthly(from, to time.Time) []EventOccurrence {
 	start := e.StartsAt
 	for start.Before(from) {
-		n := next(start)
-		if !n.After(start) {
+		next := start.AddDate(0, 1, 0)
+		if !next.After(start) {
 			return nil
 		}
-		start = n
+		start = next
 	}
 	var out []EventOccurrence
 	for start.Before(to) {
-		out = append(out, e.Occurrence(start))
-		n := next(start)
-		if !n.After(start) {
+		day := YmdOf(start, Moscow())
+		if e.HasSlot(day) {
+			out = append(out, e.OccurrenceOn(day))
+		}
+		next := start.AddDate(0, 1, 0)
+		if !next.After(start) {
 			break
 		}
-		start = n
+		start = next
 	}
 	return out
+}
+
+func (e Event) monthlyHits(day Ymd, loc *time.Location) bool {
+	target := day.Midnight(loc)
+	cursor := civilDay(e.StartsAt.In(loc), loc)
+	for !cursor.After(target) {
+		if cursor.Equal(target) {
+			return true
+		}
+		next := cursor.AddDate(0, 1, 0)
+		if !next.After(cursor) {
+			return false
+		}
+		cursor = next
+	}
+	return false
+}
+
+func (e Event) clampRange(from, to time.Time) (time.Time, time.Time) {
+	from, to = clampEventRange(from, to)
+	if e.RepeatUntil == nil {
+		return from, to
+	}
+	untilEnd := e.RepeatUntil.Midnight(Moscow()).Add(24 * time.Hour)
+	if untilEnd.Before(to) {
+		to = untilEnd
+	}
+	return from, to
 }
 
 func clampEventRange(from, to time.Time) (time.Time, time.Time) {
@@ -354,4 +521,38 @@ func ExpandEvents(events []Event, from, to time.Time) []EventOccurrence {
 		out = append(out, event.Expand(from, to)...)
 	}
 	return out
+}
+
+func weekdaySlot(startDay, day Ymd, loc *time.Location) int {
+	monday := mondayOf(startDay.Midnight(loc))
+	days := civilDays(monday, day.Midnight(loc))
+	if days < 0 {
+		days = ((days % weekdayCycleDays) + weekdayCycleDays) % weekdayCycleDays
+	}
+	return days % weekdayCycleDays
+}
+
+func mondayOf(day time.Time) time.Time {
+	offset := (int(day.Weekday()) + 6) % 7
+	return civilDay(day, day.Location()).AddDate(0, 0, -offset)
+}
+
+func civilDay(t time.Time, loc *time.Location) time.Time {
+	y, m, d := t.In(loc).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, loc)
+}
+
+func civilDays(from, to time.Time) int {
+	a := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.UTC)
+	b := time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, time.UTC)
+	return int(b.Sub(a) / (24 * time.Hour))
+}
+
+func containsInt(slots []int, slot int) bool {
+	for _, value := range slots {
+		if value == slot {
+			return true
+		}
+	}
+	return false
 }

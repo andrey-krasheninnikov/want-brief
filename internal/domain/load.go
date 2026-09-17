@@ -22,10 +22,11 @@ type DayLoad struct {
 }
 
 type CheckinAverages struct {
-	Stress   *float64 `json:"stress"`
-	Focus    *float64 `json:"focus"`
-	Energy   *float64 `json:"energy"`
-	Interest *float64 `json:"interest"`
+	Stress    *float64 `json:"stress"`
+	Focus     *float64 `json:"focus"`
+	Energy    *float64 `json:"energy"`
+	Interest  *float64 `json:"interest"`
+	Happiness *float64 `json:"happiness"`
 }
 
 type ProjectLoad struct {
@@ -59,10 +60,11 @@ func CheckinAveragesFrom(logs []StressLog) CheckinAverages {
 		count[kind]++
 	}
 	return CheckinAverages{
-		Stress:   mean(sum[CheckinStress], count[CheckinStress]),
-		Focus:    mean(sum[CheckinFocus], count[CheckinFocus]),
-		Energy:   mean(sum[CheckinEnergy], count[CheckinEnergy]),
-		Interest: mean(sum[CheckinInterest], count[CheckinInterest]),
+		Stress:    mean(sum[CheckinStress], count[CheckinStress]),
+		Focus:     mean(sum[CheckinFocus], count[CheckinFocus]),
+		Energy:    mean(sum[CheckinEnergy], count[CheckinEnergy]),
+		Interest:  mean(sum[CheckinInterest], count[CheckinInterest]),
+		Happiness: mean(sum[CheckinHappiness], count[CheckinHappiness]),
 	}
 }
 

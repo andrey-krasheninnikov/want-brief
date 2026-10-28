@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Want Brief: поэтапный рефакторинг</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      color: #e8e8e8;
+      background: #141414;
+      --surface: #1c1c1c;
+      --raised: #252525;
+      --line: #444;
+      --muted: #bdbdbd;
+      --accent: #8990ff;
+      --strong: #86dbb0;
+      --explore: #ffd38a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    a:hover { color: #c4c7ff; }
+    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 2px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 17ch; margin-bottom: .7rem; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.08; letter-spacing: -.04em; }
+    h2 { margin-bottom: .9rem; font-size: clamp(1.45rem, 3vw, 2rem); line-height: 1.2; letter-spacing: -.02em; }
+    h3 { margin-bottom: .55rem; font-size: 1.1rem; }
+    p { max-width: 75ch; }
+    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+    code { overflow-wrap: anywhere; }
+    .wrap { width: min(1160px, calc(100% - 36px)); margin: auto; }
+    .skip { position: absolute; left: 14px; top: -60px; padding: 8px 12px; background: var(--raised); }
+    .skip:focus { top: 10px; }
+    .hero { padding: clamp(44px, 8vw, 96px) 0 38px; border-bottom: 1px solid var(--line); }
+    .hero p { color: var(--muted); font-size: 1.08rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 24px; color: var(--muted); font-size: .84rem; }
+    .meta span { overflow-wrap: anywhere; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+    nav a { display: inline-block; min-height: 42px; padding: 9px 13px; border: 1px solid var(--line); border-radius: 10px; text-decoration: none; }
+    nav a:hover { background: var(--raised); }
+    main { display: grid; gap: 48px; padding: 46px 0 72px; }
+    .lede { color: var(--muted); }
+    .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0 0; }
+    .fact { padding: 17px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+    .fact b { display: block; margin-bottom: 5px; font-size: .88rem; }
+    .fact span { color: var(--muted); font-size: .9rem; }
+    .stack { display: grid; gap: 28px; }
+    article { padding: clamp(18px, 3vw, 28px); border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+    .article-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px 24px; }
+    .article-top h3 { margin-bottom: 0; font-size: clamp(1.3rem, 2.4vw, 1.65rem); }
+    .badge { display: inline-block; padding: 5px 10px; border-radius: 999px; font-size: .82rem; font-weight: 700; white-space: nowrap; }
+    .badge.strong { color: #092a1d; background: var(--strong); }
+    .badge.explore { color: #382506; background: var(--explore); }
+    .badge.keep { color: #d8d8d8; background: #404040; }
+    .files { margin: 12px 0 20px; color: var(--muted); font-size: .88rem; overflow-wrap: anywhere; }
+    .diagrams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0 0 20px; }
+    figure { min-width: 0; margin: 0; padding: 17px; border: 1px solid var(--line); border-radius: 14px; background: #171717; }
+    figcaption { margin-bottom: 15px; color: var(--muted); font-size: .83rem; font-weight: 700; }
+    .flow { display: grid; gap: 8px; align-content: start; }
+    .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .node { min-width: 0; padding: 10px; border: 1px solid #606060; border-radius: 9px; background: var(--raised); font-size: .82rem; overflow-wrap: anywhere; }
+    .node.deep { border-color: var(--accent); background: #26274a; }
+    .node.duplicate { border-color: #b77878; }
+    .arrow { color: var(--accent); text-align: center; line-height: 1; }
+    .seam { margin: 2px 0; padding: 6px 8px; border: 1px dashed var(--accent); border-radius: 7px; color: #c4c7ff; text-align: center; font-size: .76rem; }
+    .assessment { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
+    .assessment div { padding: 12px; border-left: 2px solid var(--accent); background: #202020; }
+    .assessment b { display: block; margin-bottom: 4px; font-size: .82rem; }
+    .assessment span { color: var(--muted); font-size: .85rem; }
+    .note { margin-bottom: 0; color: var(--muted); font-size: .9rem; }
+    .note strong { color: #eee; }
+    .roadmap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+    table { width: 100%; border-collapse: collapse; min-width: 660px; }
+    th, td { padding: 14px 16px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    tr:last-child td { border-bottom: 0; }
+    th { color: var(--muted); font-size: .83rem; }
+    td { font-size: .9rem; }
+    .checklist { padding-left: 1.3rem; }
+    .checklist li { margin: 5px 0; }
+    footer { padding: 24px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: .84rem; }
+    @media (max-width: 760px) {
+      .facts, .diagrams, .assessment { grid-template-columns: 1fr; }
+      .wrap { width: min(100% - 28px, 1160px); }
+      main { gap: 36px; padding-top: 32px; }
+    }
+    @media print {
+      :root { color-scheme: light; color: #171717; background: #fff; --surface: #fff; --raised: #f4f4f4; --line: #999; --muted: #444; --accent: #333; }
+      nav { display: none; }
+      main { gap: 28px; }
+      article { break-inside: avoid; }
+      figure { background: #fff; }
+      .node.deep, .assessment div { background: #f4f4f4; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">К содержанию</a>
+  <header class="hero">
+    <div class="wrap">
+      <div class="meta">
+        <span>Want Brief</span>
+        <span>29 октября 2026</span>
+        <span class="mono">origin/main 4069c79a98c751cee95d9510af5255d53325cfae</span>
+      </div>
+      <h1>Поэтапный рефакторинг кодовой базы</h1>
+      <p>Три небольших переноса ответственности. Сначала сохранить наблюдаемое поведение проверками, затем менять расположение кода.</p>
+      <nav aria-label="Разделы обзора">
+        <a href="#findings">Кандидаты</a>
+        <a href="#order">Порядок</a>
+        <a href="#constraints">Границы изменений</a>
+      </nav>
+    </div>
+  </header>
+  <main id="content" class="wrap">
+    <section aria-labelledby="basis">
+      <h2 id="basis">Основание</h2>
+      <p class="lede">История изменений указывает на Schedule и синхронизацию как часто затрагиваемые области. После <a href="https://github.com/andrey-krasheninnikov/want-brief/issues/92">миграции #92</a> действующий backend написан на Rust. В <code>docs/adr/</code> пока нет принятых архитектурных решений; названия Source, Item и Schedule взяты из <code>GLOSSARY.md</code>.</p>
+      <div class="facts">
+        <div class="fact"><b>Source и Item</b><span>Два маршрута повторяют чтение Source и открытие ключа. Запросы к Jira и Todoist распределены по двум файлам.</span></div>
+        <div class="fact"><b>Schedule</b><span>Один экран связывает три представления, запросы, состояние недели и вычисления для отображения.</span></div>
+        <div class="fact"><b>Критерий</b><span>Перенос оправдан, если удаление нового module вернёт существенную логику нескольким вызывающим.</span></div>
+      </div>
+    </section>
+
+    <section id="findings" aria-labelledby="findings-title">
+      <h2 id="findings-title">Кандидаты</h2>
+      <div class="stack">
+        <article id="source-access">
+          <div class="article-top"><h3>1. Доступ к подключённому Source</h3><span class="badge strong">Сильная рекомендация</span></div>
+          <p class="files"><code>src/sources.rs:675–706</code> · <code>src/item_sync.rs:283–311</code> · <code>src/crypto.rs</code></p>
+          <p>Оба пути синхронизации читают Source и открывают запечатанный ключ. Разные предварительные проверки остаются в вызывающих: их порядок влияет на ошибки.</p>
+          <div class="diagrams">
+            <figure>
+              <figcaption>Сейчас</figcaption>
+              <div class="flow">
+                <div class="row"><div class="node">Sync Source<br>SQL + ключ</div><div class="node">Sync Item<br>SQL + ключ</div></div>
+                <div class="arrow" aria-hidden="true">↓</div>
+                <div class="seam">переход к внешнему источнику</div>
+                <div class="row"><div class="node">Jira</div><div class="node">Todoist</div></div>
+              </div>
+            </figure>
+            <figure>
+              <figcaption>После #96</figcaption>
+              <div class="flow">
+                <div class="row"><div class="node">Sync Source</div><div class="node">Sync Item</div></div>
+                <div class="arrow" aria-hidden="true">↓</div>
+                <div class="node deep">Module доступа: чтение Source и открытие ключа</div>
+                <div class="seam">interface данных подключения</div>
+                <div class="row"><div class="node">Jira</div><div class="node">Todoist</div></div>
+              </div>
+            </figure>
+          </div>
+          <p><strong>Interface:</strong> загрузить Source по идентификатору и открыть ключ после проверок вызывающего. <strong>Seam:</strong> между выбором Source или Item и обращением к провайдеру.</p>
+          <div class="assessment">
+            <div><b>Depth</b><span>SQL и работа с ключом скрыты за коротким interface.</span></div>
+            <div><b>Leverage</b><span>Оба маршрута получают один способ доступа.</span></div>
+            <div><b>Locality</b><span>Правила хранения ключа меняются в одном месте.</span></div>
+          </div>
+          <p class="note"><strong>Тест удаления:</strong> без module запрос и открытие ключа снова потребуются обоим вызывающим. <a href="https://github.com/andrey-krasheninnikov/want-brief/issues/96">Задача #96</a>.</p>
+        </article>
+
+        <article id="source-adapters">
+          <div class="article-top"><h3>2. Adapter Jira и Todoist</h3><span class="badge strong">Сильная рекомендация</span></div>
+          <p class="files"><code>src/sources.rs:81–138, 458–622</code> · <code>src/item_sync.rs:140–281</code></p>
+          <p>Проверка подключения и список Item находятся в <code>sources.rs</code>, детали Item в <code>item_sync.rs</code>. Авторизация и разбор внешних ответов повторяются.</p>
+          <div class="diagrams">
+            <figure>
+              <figcaption>Сейчас</figcaption>
+              <div class="flow">
+                <div class="row"><div class="node">Source sync<br>probe + pull</div><div class="node">Item sync<br>detail</div></div>
+                <div class="arrow" aria-hidden="true">↓</div>
+                <div class="row"><div class="node duplicate">Jira HTTP и разбор</div><div class="node duplicate">Todoist HTTP и разбор</div></div>
+              </div>
+            </figure>
+            <figure>
+              <figcaption>После #97</figcaption>
+              <div class="flow">
+                <div class="row"><div class="node">Source sync</div><div class="node">Item sync</div></div>
+                <div class="seam">interface: probe, список, детали</div>
+                <div class="row"><div class="node deep">Jira adapter</div><div class="node deep">Todoist adapter</div></div>
+              </div>
+            </figure>
+          </div>
+          <p><strong>Interface:</strong> проверить подключение, получить список Item, получить детали Item. <strong>Seam:</strong> после параметров подключения, до внешнего HTTP. Два существующих adapter делают его реальным.</p>
+          <div class="assessment">
+            <div><b>Depth</b><span>Авторизация, пагинация и разбор ответа скрыты за тремя операциями.</span></div>
+            <div><b>Leverage</b><span>Source sync и Item sync пользуются теми же правилами провайдера.</span></div>
+            <div><b>Locality</b><span>Изменение формата Jira или Todoist остаётся в своём adapter.</span></div>
+          </div>
+          <p class="note"><strong>Тест удаления:</strong> логика каждого провайдера снова разойдётся по двум маршрутам. Сначала выполнить #96. <a href="https://github.com/andrey-krasheninnikov/want-brief/issues/97">Задача #97</a>.</p>
+        </article>
+
+        <article id="schedule-week">
+          <div class="article-top"><h3>3. Проекция недели Schedule</h3><span class="badge explore">Перспективно</span></div>
+          <p class="files"><code>web/src/features/schedule/ScheduleScreen.tsx:507–802</code> · <code>ScheduleTable.tsx</code> · <code>ScheduleGantt.tsx</code> · <code>now.ts</code></p>
+          <p>Экран вычисляет сетку, активные блоки и признаки недели. Представления дополнительно группируют блоки по дням. Длина файла сама по себе не причина для разделения.</p>
+          <div class="diagrams">
+            <figure>
+              <figcaption>Сейчас</figcaption>
+              <div class="flow">
+                <div class="node">ScheduleScreen: запросы + неделя + отображение</div>
+                <div class="arrow" aria-hidden="true">↓</div>
+                <div class="row"><div class="node duplicate">Calendar: дни</div><div class="node duplicate">List: дни</div></div>
+                <div class="node duplicate">Gantt: дни</div>
+              </div>
+            </figure>
+            <figure>
+              <figcaption>После #98</figcaption>
+              <div class="flow">
+                <div class="node">ScheduleScreen: запросы + выбор вида</div>
+                <div class="node deep">Module проекции: дни + признаки + сетка</div>
+                <div class="seam">interface данных недели</div>
+                <div class="row"><div class="node">Calendar</div><div class="node">List</div></div>
+                <div class="node">Gantt</div>
+              </div>
+            </figure>
+          </div>
+          <p><strong>Interface:</strong> Schedule, интервалы, переопределения, дни, часовой пояс и текущий момент на входе; данные недели для трёх видов на выходе. <strong>Seam:</strong> между загрузкой и отображением.</p>
+          <div class="assessment">
+            <div><b>Depth</b><span>Общие вычисления за одним чистым interface; его размер надо удержать.</span></div>
+            <div><b>Leverage</b><span>Три вида используют одинаковые признаки дня и блока.</span></div>
+            <div><b>Locality</b><span>Коррекция часового пояса не расходится по видам.</span></div>
+          </div>
+          <p class="note"><strong>Тест удаления:</strong> группировка и признаки снова появятся в экране и представлениях. Риск: слишком широкий interface снизит depth. <a href="https://github.com/andrey-krasheninnikov/want-brief/issues/98">Задача #98</a>.</p>
+        </article>
+
+        <article id="planner">
+          <div class="article-top"><h3>Планировщик Schedule</h3><span class="badge keep">Оставить как есть</span></div>
+          <p class="files"><code>src/schedule_plan.rs</code> · <code>src/schedule.rs:245, 276, 304</code> · <code>tests/fixtures/schedule/</code></p>
+          <p>Файл большой, но interface <code>plan(&amp;Input) -&gt; Schedule</code> уже скрывает расчёт за одним вызовом. <code>schedule.rs</code> использует его для обычного расписания и сравнения сценариев.</p>
+          <div class="diagrams">
+            <figure>
+              <figcaption>Сейчас</figcaption>
+              <div class="flow"><div class="node">Schedule HTTP</div><div class="seam">plan(&amp;Input)</div><div class="node deep">Расчёт Schedule</div></div>
+            </figure>
+            <figure>
+              <figcaption>Решение</figcaption>
+              <div class="flow"><div class="node">Сохранить текущий interface</div><div class="node deep">Сохранять правила за ним</div><div class="node">Дополнять проверочные сценарии при изменениях</div></div>
+            </figure>
+          </div>
+          <div class="assessment">
+            <div><b>Depth</b><span>Большой расчёт за одной операцией.</span></div>
+            <div><b>Leverage</b><span>Один алгоритм обслуживает расписание и сценарии.</span></div>
+            <div><b>Locality</b><span>Правила размещения сосредоточены внутри module.</span></div>
+          </div>
+          <p class="note"><strong>Тест удаления:</strong> сложный расчёт пришлось бы перенести в вызывающих. Отдельная задача на разделение файла не нужна.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="order" aria-labelledby="order-title">
+      <h2 id="order-title">Порядок изменений</h2>
+      <p class="lede">Каждая задача переносит одну ответственность. Сначала проверка прежнего поведения, затем перенос и повтор той же проверки.</p>
+      <div class="roadmap">
+        <table>
+          <thead><tr><th>Порядок</th><th>Изменение</th><th>Проверка до и после</th></tr></thead>
+          <tbody>
+            <tr><td>1 · <a href="https://github.com/andrey-krasheninnikov/want-brief/issues/96">#96</a></td><td>Доступ к Source и ключу</td><td>Оба маршрута; отсутствующий Source; пустой и повреждённый ключ; прежние HTTP-ошибки.</td></tr>
+            <tr><td>2 · <a href="https://github.com/andrey-krasheninnikov/want-brief/issues/97">#97</a></td><td>Jira и Todoist adapter</td><td>Проверка подключения, список и детали Item; ошибки HTTP, лимит ответа, повторная синхронизация.</td></tr>
+            <tr><td>3 · <a href="https://github.com/andrey-krasheninnikov/want-brief/issues/98">#98</a></td><td>Проекция недели Schedule</td><td>Пустая неделя, активный интервал, выходные, часовой пояс; сравнение трёх видов.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="constraints" aria-labelledby="constraints-title">
+      <h2 id="constraints-title">Границы изменений</h2>
+      <ul class="checklist">
+        <li>Сохранять действующие HTTP-маршруты, JSON, коды и тексты ошибок, порядок проверок и внешних запросов.</li>
+        <li>Сохранять схему PostgreSQL, формат запечатанных ключей и локальный статус Item при чтении из Jira и Todoist.</li>
+        <li>Сохранять порядок блоков Schedule, часовые пояса, состояния загрузки и доступность трёх представлений.</li>
+        <li>Новые функции и редизайн выполнять в отдельных задачах. Работу с удалённым Go-кодом не планировать.</li>
+      </ul>
+    </section>
+  </main>
+  <footer><div class="wrap">Источник: <a href="https://github.com/andrey-krasheninnikov/want-brief/issues/93">issue #93</a>, история Git и код на указанном commit. Отчёт содержит текст и схемы без внешних ресурсов.</div></footer>
+</body>
+</html>

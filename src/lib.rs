@@ -1,4 +1,7 @@
 pub mod auth;
+pub mod companies;
+pub mod company_career;
+pub mod company_notes;
 pub mod crypto;
 pub mod earn;
 pub mod events;

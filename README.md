@@ -56,3 +56,5 @@ Each timer creates a time interval for an item. **Allocated time** sums interval
 Run `make test` for Go tests and TypeScript checks. Run `go vet ./...`, `cd web && bun test`, `bun run lint`, and `bun run build` for the remaining local checks. `make lint` also rewrites Go formatting; use `gofmt -l` when you only need to inspect it.
 
 See [architecture](docs/architecture.md) for the application layout, [glossary](GLOSSARY.md) for domain terms, and [frontend notes](web/README.md) for web commands. Repository workflow conventions live in `docs/agents/`.
+
+The [Want Brief design specification](docs/design/redesign.md) includes a responsive preview for the planned interface.

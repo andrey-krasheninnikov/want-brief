@@ -3,7 +3,7 @@ import { useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
-import { zonedInstant, zonedYmd } from '../../shared/zoned'
+import { shiftYmd, zonedInstant, zonedYmd } from '../../shared/zoned'
 import { openTask } from '../../shared/taskOverlay'
 import type { UnplannedItem } from '../../types'
 
@@ -20,12 +20,6 @@ function dueTitle(field: ReturnType<typeof dueField>, itemKind: string): string 
   if (field === 'testDueAt') return 'Tests due'
   if (field === 'dueAt') return itemKind === 'request' ? 'Due' : 'Task due'
   return 'Dev due'
-}
-
-function shiftYmd(ymd: string, days: number): string {
-  const [year, month, day] = ymd.split('-').map(Number)
-  const next = new Date(Date.UTC(year, month - 1, day + days))
-  return next.toISOString().slice(0, 10)
 }
 
 function nextFriday1800(tz: string, now = new Date()): string {

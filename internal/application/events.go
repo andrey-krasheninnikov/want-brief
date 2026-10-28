@@ -149,6 +149,13 @@ func (s *Service) DeleteEventNote(ctx context.Context, id, noteID uuid.UUID) err
 }
 
 func (s *Service) CreateEvent(ctx context.Context, write EventWrite) (domain.Event, error) {
+	if write.Timezone == "" {
+		settings, err := s.scheduleSettings(ctx)
+		if err != nil {
+			return domain.Event{}, err
+		}
+		write.Timezone = settings.Timezone
+	}
 	draft, err := draftFromWrite(write)
 	if err != nil {
 		return domain.Event{}, err

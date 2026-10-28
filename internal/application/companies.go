@@ -59,7 +59,13 @@ func (s *Service) ReplaceCompany(ctx context.Context, id uuid.UUID, write Compan
 	if err != nil {
 		return domain.Company{}, err
 	}
-	if err := company.Apply(draftFromCompany(write)); err != nil {
+	today, err := s.dayOrToday(ctx, nil)
+	if err != nil {
+		return domain.Company{}, err
+	}
+	draft := draftFromCompany(write)
+	draft.CurrentDay = &today
+	if err := company.Apply(draft); err != nil {
 		return domain.Company{}, err
 	}
 	return s.Companies.Update(ctx, company)

@@ -239,3 +239,21 @@ func TestWeeklyProjectCommentRequired(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestApplyClosesContractOnConfiguredDay(t *testing.T) {
+	person := uuid.New()
+	company, err := NewCompany(CompanyDraft{Name: "Acme", People: []PersonRel{{ID: person}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := company.SetContract(&person, ContractInformal, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)); err != nil {
+		t.Fatal(err)
+	}
+	today := time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)
+	if err := company.Apply(CompanyDraft{Name: "Acme", CurrentDay: &today}); err != nil {
+		t.Fatal(err)
+	}
+	if company.Contracts[0].EndedOn == nil || !company.Contracts[0].EndedOn.Equal(today) {
+		t.Fatalf("ended on = %v, want %s", company.Contracts[0].EndedOn, today)
+	}
+}

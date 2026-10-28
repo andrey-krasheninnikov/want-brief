@@ -102,6 +102,7 @@ type CompanyDraft struct {
 	People      []PersonRel
 	StartedOn   *time.Time
 	EndedOn     *time.Time
+	CurrentDay  *time.Time
 }
 
 func ParseSalaryCurrency(raw string) (SalaryCurrency, error) {
@@ -179,7 +180,11 @@ func (c *Company) apply(draft CompanyDraft, now time.Time) error {
 	c.People = people
 	c.StartedOn = started
 	c.EndedOn = ended
-	c.closeOrphanContracts(MoscowDate(now))
+	today := MoscowDate(now)
+	if draft.CurrentDay != nil {
+		today = dateUTC(*draft.CurrentDay)
+	}
+	c.closeOrphanContracts(today)
 	return c.validate()
 }
 

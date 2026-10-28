@@ -411,6 +411,9 @@ func (e Event) SlotOccurrence(day Ymd, override *EventOverride) (EventOccurrence
 		return EventOccurrence{}, ErrNotFound
 	}
 	occ := e.OccurrenceOn(day)
+	if e.Recurrence == RecurrenceOnce {
+		occ = e.Occurrence(e.StartsAt)
+	}
 	if override == nil {
 		return occ, nil
 	}

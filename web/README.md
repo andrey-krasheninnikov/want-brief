@@ -1,32 +1,24 @@
-# React + TypeScript + Vite
+# Want Brief web app
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The web app uses React 19, TypeScript, Vite, and Bun. It calls the Go API through the Vite development proxy.
 
-Currently, two official plugins are available:
+From the repository root, start PostgreSQL and the API with `make up` and `make api`. Then install dependencies and start the web app:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+cd web
+bun install --frozen-lockfile
+bun run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`make web` from the repository root starts the same app with the API proxy set to <http://127.0.0.1:8080> and the web port set to 5173. For the scratch stack, use `make api-dev` and `make web-dev` in separate terminals; its ports are 8081 and 5174.
+
+## Checks
+
+```sh
+bun test
+bun run typecheck
+bun run lint
+bun run build
+```
+
+Routes and authentication gating are defined in `src/App.tsx`. Shared UI components are in `src/shared/`; feature screens are in `src/features/`. The typed API client is `src/api.ts`.

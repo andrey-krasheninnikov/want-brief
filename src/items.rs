@@ -15,44 +15,354 @@ use uuid::Uuid;
 
 const SELECT: &str = "SELECT i.id,i.source_id,i.external_key,i.title,i.status,i.occupancy,i.external_status,i.kind,i.project_id,i.urgent,i.important,i.pinned,i.pinned_at,i.stress,i.due_at,i.dev_due_at,i.review_due_at,i.test_due_at,i.description,i.planned_seconds,i.links,COALESCE(t.tracked_seconds,0)::bigint AS tracked_seconds,i.archived_at,i.deleted_at,i.created_at,i.updated_at,s.name AS source_name,s.kind AS source_kind,COALESCE(p.name,'') AS project_name,COALESCE(p.color,'') AS project_color,COALESCE((SELECT COUNT(*)::int FROM item_checks c WHERE c.item_id=i.id),0) AS check_total,COALESCE((SELECT COUNT(*)::int FROM item_checks c WHERE c.item_id=i.id AND c.done),0) AS check_done,COALESCE((SELECT array_agg(person_id) FROM person_items WHERE item_id=i.id),ARRAY[]::uuid[]) AS person_ids FROM items i JOIN sources s ON s.id=i.source_id LEFT JOIN projects p ON p.id=i.project_id LEFT JOIN (SELECT item_id,EXTRACT(EPOCH FROM SUM(ended_at-started_at))::bigint AS tracked_seconds FROM time_intervals WHERE ended_at IS NOT NULL GROUP BY item_id) t ON t.item_id=i.id";
 
-#[derive(FromRow, Serialize)]
+#[derive(Clone, FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Item {
-    id: Uuid,
+    pub(crate) id: Uuid,
     source_id: Uuid,
-    external_key: String,
-    title: String,
-    status: String,
-    occupancy: String,
+    pub(crate) external_key: String,
+    pub(crate) title: String,
+    pub(crate) status: String,
+    pub(crate) occupancy: String,
     external_status: String,
-    kind: String,
-    project_id: Option<Uuid>,
-    urgent: bool,
-    important: bool,
-    pinned: bool,
-    pinned_at: Option<DateTime<Utc>>,
-    stress: Option<i16>,
-    due_at: Option<DateTime<Utc>>,
-    dev_due_at: Option<DateTime<Utc>>,
-    review_due_at: Option<DateTime<Utc>>,
-    test_due_at: Option<DateTime<Utc>>,
+    pub(crate) kind: String,
+    pub(crate) project_id: Option<Uuid>,
+    pub(crate) urgent: bool,
+    pub(crate) important: bool,
+    pub(crate) pinned: bool,
+    pub(crate) pinned_at: Option<DateTime<Utc>>,
+    pub(crate) stress: Option<i16>,
+    pub(crate) due_at: Option<DateTime<Utc>>,
+    pub(crate) dev_due_at: Option<DateTime<Utc>>,
+    pub(crate) review_due_at: Option<DateTime<Utc>>,
+    pub(crate) test_due_at: Option<DateTime<Utc>>,
     description: String,
-    planned_seconds: i32,
+    pub(crate) planned_seconds: i32,
     links: DbJson<Vec<ProjectLink>>,
-    tracked_seconds: i64,
-    archived_at: Option<DateTime<Utc>>,
-    deleted_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
+    pub(crate) tracked_seconds: i64,
+    pub(crate) archived_at: Option<DateTime<Utc>>,
+    pub(crate) deleted_at: Option<DateTime<Utc>>,
+    pub(crate) created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     source_name: String,
     source_kind: String,
-    project_name: String,
-    project_color: String,
+    pub(crate) project_name: String,
+    pub(crate) project_color: String,
     check_total: i32,
     check_done: i32,
-    person_ids: Vec<Uuid>,
+    pub(crate) person_ids: Vec<Uuid>,
     #[sqlx(skip)]
-    quadrant: String,
+    pub(crate) quadrant: String,
+}
+
+#[cfg(test)]
+mod schedule_tests {
+    use super::*;
+    use crate::schedule_plan::{plan, Input};
+    use crate::schedule_settings::Settings;
+    use chrono::TimeZone;
+    use serde_json::{json, Map, Value};
+    use std::collections::{HashMap, HashSet};
+
+    fn at(day: u32, hour: u32, minute: u32) -> DateTime<Utc> {
+        chrono_tz::Europe::Moscow
+            .with_ymd_and_hms(2026, 9, day, hour, minute, 0)
+            .unwrap()
+            .with_timezone(&Utc)
+    }
+
+    fn item(key: &str, index: i64) -> Item {
+        Item {
+            id: Uuid::new_v4(),
+            source_id: Uuid::nil(),
+            external_key: key.to_owned(),
+            title: key.to_owned(),
+            status: "to_do".to_owned(),
+            occupancy: "solo".to_owned(),
+            external_status: String::new(),
+            kind: "task".to_owned(),
+            project_id: Some(Uuid::nil()),
+            urgent: key == "OV-4",
+            important: false,
+            pinned: false,
+            pinned_at: None,
+            stress: if key == "OV-3" { Some(5) } else { None },
+            due_at: None,
+            dev_due_at: Some(at(16, 18, 0)),
+            review_due_at: None,
+            test_due_at: None,
+            description: String::new(),
+            planned_seconds: 8 * 3600,
+            links: DbJson(Vec::new()),
+            tracked_seconds: 0,
+            archived_at: None,
+            deleted_at: None,
+            created_at: at(1, 12, 0) + chrono::Duration::hours(index),
+            updated_at: at(1, 12, 0),
+            source_name: String::new(),
+            source_kind: "manual".to_owned(),
+            project_name: "Overload".to_owned(),
+            project_color: "#555".to_owned(),
+            check_total: 0,
+            check_done: 0,
+            person_ids: Vec::new(),
+            quadrant: if key == "OV-4" { "delegate" } else { "drop" }.to_owned(),
+        }
+    }
+
+    fn projection(input: &Input) -> Value {
+        let output = serde_json::to_value(plan(input)).unwrap();
+        let mut blocks: Vec<Value> = output["lanes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|lane| lane["blocks"].as_array().unwrap().iter().cloned())
+            .collect();
+        blocks.sort_by(|a, b| {
+            a["startsAt"]
+                .as_str()
+                .cmp(&b["startsAt"].as_str())
+                .then_with(|| a["lane"].as_u64().cmp(&b["lane"].as_u64()))
+                .then_with(|| a["itemId"].as_str().cmp(&b["itemId"].as_str()))
+        });
+        let stamp = |value: &Value| {
+            DateTime::parse_from_rfc3339(value.as_str().unwrap())
+                .unwrap()
+                .with_timezone(&chrono_tz::Europe::Moscow)
+                .format("%a %d %H:%M")
+                .to_string()
+        };
+        let blocks: Vec<Value> = blocks
+            .iter()
+            .map(|block| {
+                let mut row = Map::new();
+                row.insert("key".to_owned(), block["externalKey"].clone());
+                row.insert("kind".to_owned(), block["kind"].clone());
+                row.insert("start".to_owned(), json!(stamp(&block["startsAt"])));
+                row.insert("end".to_owned(), json!(stamp(&block["endsAt"])));
+                row.insert("lane".to_owned(), block["lane"].clone());
+                if block["late"] == true {
+                    row.insert("late".to_owned(), json!(true));
+                }
+                if !block["reasons"].as_array().unwrap().is_empty() {
+                    row.insert("reasons".to_owned(), block["reasons"].clone());
+                }
+                let continuation = match (block["continued"] == true, block["continues"] == true) {
+                    (true, true) => "both",
+                    (true, false) => "from",
+                    (false, true) => "to",
+                    _ => "",
+                };
+                if !continuation.is_empty() {
+                    row.insert("continue".to_owned(), json!(continuation));
+                }
+                Value::Object(row)
+            })
+            .collect();
+        let unplanned: Vec<Value> = output["unplanned"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["item"]["externalKey"].clone())
+            .collect();
+        let busy: Vec<String> = output["busy"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                format!(
+                    "{} {}-{}",
+                    row["title"].as_str().unwrap(),
+                    stamp(&row["startsAt"]),
+                    stamp(&row["endsAt"])
+                )
+            })
+            .collect();
+        let mut score = output["score"].clone();
+        for field in ["loadVariance", "total"] {
+            if let Some(value) = score[field].as_f64().filter(|value| value.fract() == 0.0) {
+                score[field] = json!(value as i64);
+            }
+        }
+        json!({"blocks":blocks,"unplanned":unplanned,"atRisk":output["atRisk"].as_array().unwrap().iter().map(|risk|risk["key"].clone()).collect::<Vec<_>>(),
+            "busy":busy,"overflow":output["overflow"],"score":score})
+    }
+
+    fn base(items: Vec<Item>) -> Input {
+        Input {
+            kind: "work".to_owned(),
+            items,
+            events: Vec::new(),
+            settings: Settings::default(),
+            overrides: HashMap::new(),
+            absences: Vec::new(),
+            names: HashMap::new(),
+            active: HashSet::new(),
+            factors: HashMap::new(),
+            history: Vec::new(),
+            checkins: None,
+            previous: Vec::new(),
+            now: at(15, 9, 30),
+            from: at(14, 0, 0),
+            to: at(21, 0, 0),
+        }
+    }
+
+    #[test]
+    fn unplanned_items_with_deadlines_come_first() {
+        let mut without_due = item("NO-DUE", 0);
+        without_due.dev_due_at = None;
+        let mut without_plan = item("NO-PLAN", 1);
+        without_plan.planned_seconds = 0;
+        let output = serde_json::to_value(plan(&base(vec![without_due, without_plan]))).unwrap();
+        let keys: Vec<&str> = output["unplanned"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["item"]["externalKey"].as_str().unwrap())
+            .collect();
+        assert_eq!(keys, ["NO-PLAN", "NO-DUE"]);
+    }
+
+    #[test]
+    fn overloaded_week_preserves_priority_and_deadline() {
+        let items = ["OV-1", "OV-2", "OV-3", "OV-4", "OV-5"]
+            .iter()
+            .enumerate()
+            .map(|(index, key)| item(key, index as i64))
+            .collect();
+        let projection = projection(&base(items));
+        let expected: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/schedule/overloaded_week.golden.json"
+        ))
+        .unwrap();
+        assert_eq!(projection, expected);
+    }
+
+    #[test]
+    fn current_week_preserves_meetings_and_tracks() {
+        let cases = [
+            ("HB-101", "Hamkor", 6, 18, "parallel", "in_progress"),
+            ("HB-102", "Hamkor", 4, 18, "parallel", "to_do"),
+            ("HB-103", "Hamkor", 3, 17, "waiting", "to_do"),
+            ("AL-7", "Alpha", 5, 17, "solo", "to_do"),
+            ("AL-9", "Alpha", 2, 25, "solo", "to_do"),
+        ];
+        let mut items: Vec<Item> = cases
+            .iter()
+            .map(|(key, project, hours, due, occupancy, status)| {
+                let mut entry = item(key, 0);
+                entry.project_id = Some(if *project == "Hamkor" {
+                    Uuid::nil()
+                } else {
+                    Uuid::from_u128(1)
+                });
+                entry.project_name = (*project).to_owned();
+                entry.project_color = if *project == "Hamkor" { "#0a7" } else { "#c33" }.to_owned();
+                entry.planned_seconds = hours * 3600;
+                entry.dev_due_at = Some(at(*due, 18, 0));
+                entry.occupancy = (*occupancy).to_owned();
+                entry.status = (*status).to_owned();
+                entry.urgent = false;
+                entry.quadrant = "drop".to_owned();
+                entry
+            })
+            .collect();
+        items[0].tracked_seconds = 3600;
+        items[4].important = true;
+        items[4].quadrant = "schedule".to_owned();
+        let mut input = base(items);
+        input.events = vec![
+            crate::events::schedule_fixture("Sprint review", at(16, 12, 0), 60, false, &[]),
+            crate::events::schedule_fixture("Optional sync", at(17, 15, 0), 60, true, &[]),
+        ];
+        input.factors.insert(Uuid::nil().to_string(), 1.25);
+        let expected: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/schedule/current_week.golden.json"
+        ))
+        .unwrap();
+        assert_eq!(projection(&input), expected);
+    }
+
+    #[test]
+    fn followup_week_preserves_people_constraints() {
+        let ann = Uuid::from_u128(2);
+        let bob = Uuid::from_u128(3);
+        let mut review = item("FU-1", 0);
+        review.status = "review".to_owned();
+        review.review_due_at = Some(at(17, 18, 0));
+        let mut waiting = item("FU-2", 0);
+        waiting.status = "awaiting_decision".to_owned();
+        waiting.project_id = Some(Uuid::from_u128(1));
+        waiting.due_at = Some(at(16, 18, 0));
+        waiting.person_ids = vec![ann];
+        let mut overdue = item("FU-3", 0);
+        overdue.status = "awaiting_decision".to_owned();
+        overdue.project_id = Some(Uuid::from_u128(1));
+        overdue.due_at = Some(at(14, 18, 0));
+        overdue.person_ids = vec![bob];
+        let mut input = base(vec![review, waiting, overdue]);
+        input.kind = "followup".to_owned();
+        input.names = HashMap::from([(ann, "Ann".to_owned()), (bob, "Bob".to_owned())]);
+        input.events = vec![crate::events::schedule_fixture(
+            "Ann 1:1",
+            at(16, 10, 0),
+            30,
+            false,
+            &[ann],
+        )];
+        input.absences = vec![crate::schedule_plan::Absence {
+            person: bob,
+            start: at(15, 12, 0).date_naive(),
+            end: at(16, 12, 0).date_naive(),
+        }];
+        let expected: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/schedule/followup_week.golden.json"
+        ))
+        .unwrap();
+        assert_eq!(projection(&input), expected);
+    }
+
+    #[test]
+    fn overrides_preserve_custom_windows_and_breaks() {
+        let mut first = item("OR-1", 0);
+        first.project_name = "Alpha".to_owned();
+        first.planned_seconds = 4 * 3600;
+        first.dev_due_at = Some(at(18, 18, 0));
+        let mut second = item("OR-2", 0);
+        second.project_id = Some(Uuid::from_u128(1));
+        second.project_name = "Beta".to_owned();
+        second.planned_seconds = 3 * 3600;
+        second.dev_due_at = Some(at(18, 18, 0));
+        second.pinned_at = Some(at(17, 14, 0));
+        let mut input = base(vec![first, second]);
+        input.settings.break_window = Some(crate::schedule_settings::BreakWindow {
+            start_min: 780,
+            end_min: 840,
+        });
+        input.overrides.insert(
+            at(15, 12, 0).date_naive(),
+            crate::schedule_plan::DayOverride {
+                off: true,
+                start: None,
+                end: None,
+            },
+        );
+        input.overrides.insert(
+            at(16, 12, 0).date_naive(),
+            crate::schedule_plan::DayOverride {
+                off: false,
+                start: Some(720),
+                end: Some(960),
+            },
+        );
+        input.checkins = Some((2, 2));
+        let expected: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/schedule/overrides_absences.golden.json"
+        ))
+        .unwrap();
+        assert_eq!(projection(&input), expected);
+    }
 }
 
 impl Item {
@@ -132,6 +442,12 @@ pub(crate) async fn fetch(pool: &PgPool, item_id: Uuid) -> Result<Item, sqlx::Er
         .fetch_one(pool)
         .await
         .map(Item::with_quadrant)
+}
+
+pub(crate) async fn open(pool: &PgPool) -> Result<Vec<Item>, sqlx::Error> {
+    let query = format!("{SELECT} WHERE i.archived_at IS NULL AND i.deleted_at IS NULL");
+    let rows = sqlx::query_as::<_, Item>(&query).fetch_all(pool).await?;
+    Ok(rows.into_iter().map(Item::with_quadrant).collect())
 }
 
 async fn show(State(state): State<AppState>, Path(raw): Path<String>) -> Response {

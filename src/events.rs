@@ -394,34 +394,75 @@ struct EventOverride {
     skipped: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct EventOccurrence {
-    id: Uuid,
-    series_id: Uuid,
-    title: String,
+pub(crate) struct EventOccurrence {
+    pub(crate) id: Uuid,
+    pub(crate) series_id: Uuid,
+    pub(crate) title: String,
     description: String,
     agenda: String,
     kind: String,
     #[serde(rename = "type")]
     event_type: String,
     project_id: Option<Uuid>,
-    starts_at: DateTime<Utc>,
-    ends_at: DateTime<Utc>,
+    pub(crate) starts_at: DateTime<Utc>,
+    pub(crate) ends_at: DateTime<Utc>,
     duration_seconds: i32,
     recurrence: String,
-    original_on: NaiveDate,
+    pub(crate) original_on: NaiveDate,
     overridden: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     skipped: bool,
     links: Vec<ProjectLink>,
     meet_url: String,
     involvement: i32,
-    active_start_offset: Option<i32>,
-    active_end_offset: Option<i32>,
-    can_skip: bool,
-    people: Vec<PersonRel>,
+    pub(crate) active_start_offset: Option<i32>,
+    pub(crate) active_end_offset: Option<i32>,
+    pub(crate) can_skip: bool,
+    pub(crate) people: Vec<PersonRel>,
     created_at: DateTime<Utc>,
+}
+
+#[cfg(test)]
+pub(crate) fn schedule_fixture(
+    title: &str,
+    start: DateTime<Utc>,
+    minutes: i64,
+    can_skip: bool,
+    people: &[Uuid],
+) -> EventOccurrence {
+    EventOccurrence {
+        id: Uuid::new_v4(),
+        series_id: Uuid::new_v4(),
+        title: title.to_owned(),
+        description: String::new(),
+        agenda: String::new(),
+        kind: String::new(),
+        event_type: String::new(),
+        project_id: None,
+        starts_at: start,
+        ends_at: start + Duration::minutes(minutes),
+        duration_seconds: (minutes * 60) as i32,
+        recurrence: String::new(),
+        original_on: start.date_naive(),
+        overridden: false,
+        skipped: false,
+        links: Vec::new(),
+        meet_url: String::new(),
+        involvement: 0,
+        active_start_offset: None,
+        active_end_offset: None,
+        can_skip,
+        people: people
+            .iter()
+            .map(|id| PersonRel {
+                id: *id,
+                comment: String::new(),
+            })
+            .collect(),
+        created_at: start,
+    }
 }
 
 #[derive(Default, Deserialize)]
@@ -573,15 +614,20 @@ async fn list_occurrences(
     Query(filter): Query<OccurrenceFilter>,
 ) -> Response {
     let (from, to) = range(filter);
-    let events = match all(&state.pool).await {
-        Ok(events) => events,
-        Err(err) => return database_error(err),
-    };
+    match occurrences(&state.pool, from, to).await {
+        Ok(result) => Json(result).into_response(),
+        Err(err) => database_error(err),
+    }
+}
+
+pub(crate) async fn occurrences(
+    pool: &PgPool,
+    from: DateTime<Utc>,
+    to: DateTime<Utc>,
+) -> Result<Vec<EventOccurrence>, sqlx::Error> {
+    let events = all(pool).await?;
     let ids: Vec<Uuid> = events.iter().map(|event| event.id).collect();
-    let rows = match overrides(&state.pool, &ids).await {
-        Ok(rows) => rows,
-        Err(err) => return database_error(err),
-    };
+    let rows = overrides(pool, &ids).await?;
     let mut by_override: HashMap<(Uuid, NaiveDate), EventOverride> = rows
         .into_iter()
         .map(|row| ((row.series_id, row.original_on), row))
@@ -629,7 +675,7 @@ async fn list_occurrences(
             .cmp(&right.starts_at)
             .then_with(|| left.series_id.cmp(&right.series_id))
     });
-    Json(result).into_response()
+    Ok(result)
 }
 
 async fn get_occurrence(

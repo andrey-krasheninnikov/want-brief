@@ -14,38 +14,38 @@ use sqlx::FromRow;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BreakWindow {
-    start_min: i32,
-    end_min: i32,
+    pub(crate) start_min: i32,
+    pub(crate) end_min: i32,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub(crate) struct Settings {
     pub(crate) timezone: String,
-    work_start_min: i32,
-    work_end_min: i32,
-    workdays: Vec<i32>,
+    pub(crate) work_start_min: i32,
+    pub(crate) work_end_min: i32,
+    pub(crate) workdays: Vec<i32>,
     #[serde(rename = "break")]
-    break_window: Option<BreakWindow>,
-    meeting_buffer_min: i32,
-    daily_focus_min: i32,
-    max_tasks_per_day: i32,
-    min_slice_min: i32,
-    max_slice_min: i32,
-    slice_break_min: i32,
-    grid_min: i32,
-    estimate_buffer: bool,
-    estimate_max_k: f64,
-    oldest_first: bool,
-    stress_shift_hours: i32,
-    target_lead_workdays: i32,
-    soft_busy: bool,
-    waiting_tracks: i32,
-    followup_ping_min: i32,
-    check_windows: Vec<String>,
-    energy_aware: bool,
-    golden_hours: bool,
-    stability_threshold_min: i32,
+    pub(crate) break_window: Option<BreakWindow>,
+    pub(crate) meeting_buffer_min: i32,
+    pub(crate) daily_focus_min: i32,
+    pub(crate) max_tasks_per_day: i32,
+    pub(crate) min_slice_min: i32,
+    pub(crate) max_slice_min: i32,
+    pub(crate) slice_break_min: i32,
+    pub(crate) grid_min: i32,
+    pub(crate) estimate_buffer: bool,
+    pub(crate) estimate_max_k: f64,
+    pub(crate) oldest_first: bool,
+    pub(crate) stress_shift_hours: i32,
+    pub(crate) target_lead_workdays: i32,
+    pub(crate) soft_busy: bool,
+    pub(crate) waiting_tracks: i32,
+    pub(crate) followup_ping_min: i32,
+    pub(crate) check_windows: Vec<String>,
+    pub(crate) energy_aware: bool,
+    pub(crate) golden_hours: bool,
+    pub(crate) stability_threshold_min: i32,
 }
 
 impl Default for Settings {

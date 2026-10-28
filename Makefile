@@ -1,6 +1,4 @@
-.PHONY: up down api api-dev db-dev web web-dev test lint migrate migrate-dev tidy
-
-export GOTOOLCHAIN := local
+.PHONY: up down api api-dev db-dev web web-dev test lint typecheck migrate migrate-dev
 
 DATABASE_URL ?= postgres://wantbrief:wantbrief@127.0.0.1:5432/wantbrief?sslmode=disable
 DEV_DATABASE_URL ?= postgres://wantbrief:wantbrief@127.0.0.1:5432/wantbrief_dev?sslmode=disable
@@ -18,27 +16,24 @@ up:
 down:
 	docker compose down
 
-tidy:
-	go mod tidy
-
 migrate: up
-	DATABASE_URL="$(DATABASE_URL)" go run ./cmd/api -migrate-only
+	DATABASE_URL="$(DATABASE_URL)" cargo run -- -migrate-only
 
 db-dev: up
 	-docker compose exec -T postgres createdb -U wantbrief wantbrief_dev
 
 migrate-dev: db-dev
-	DATABASE_URL="$(DEV_DATABASE_URL)" go run ./cmd/api -migrate-only
+	DATABASE_URL="$(DEV_DATABASE_URL)" cargo run -- -migrate-only
 
 api: up
 	DATABASE_URL="$(DATABASE_URL)" HTTP_ADDR="$(HTTP_ADDR)" CORS_ORIGIN="$(CORS_ORIGIN)" \
 		BOOTSTRAP_PASSWORD="$(BOOTSTRAP_PASSWORD)" TOKEN_KEY="$(TOKEN_KEY)" \
-		go run ./cmd/api
+		cargo run
 
 api-dev: db-dev
 	DATABASE_URL="$(DEV_DATABASE_URL)" HTTP_ADDR="$(DEV_HTTP_ADDR)" CORS_ORIGIN="$(DEV_CORS_ORIGIN)" \
 		BOOTSTRAP_PASSWORD="$(BOOTSTRAP_PASSWORD)" TOKEN_KEY="$(TOKEN_KEY)" \
-		go run ./cmd/api
+		cargo run
 
 web:
 	cd web && WEB_PORT=5173 API_PROXY=http://127.0.0.1:8080 bun run dev
@@ -47,12 +42,12 @@ web-dev:
 	cd web && WEB_PORT=5174 API_PROXY=http://127.0.0.1:8081 bun run dev
 
 test:
-	go test ./...
+	cargo test
 	cd web && bun run typecheck
 
 lint:
-	gofmt -w $$(find . -name '*.go' -not -path './web/*')
-	go vet ./...
+	cargo fmt --all -- --check
+	cargo clippy --all-targets -- -D warnings
 	cd web && bun run typecheck
 
 typecheck:

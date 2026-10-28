@@ -11,7 +11,7 @@ Want Brief keeps Jira, Todoist, and local work in one place. It combines task pr
 
 ## Local setup
 
-You need Go 1.25.1, Bun 1.3.14, and Docker Compose. Install the web dependencies once:
+You need Rust 1.85 or newer, Bun 1.3.14, and Docker Compose. Install the web dependencies once:
 
 ```sh
 cd web && bun install --frozen-lockfile && cd ..
@@ -45,6 +45,12 @@ The example password, token key, database credentials, and HTTP settings are for
 
 For a separate scratch database and web port, run `make api-dev` and `make web-dev` in two additional terminals. The scratch web app opens at <http://127.0.0.1:5174>.
 
+## Existing installations
+
+Rehearse the switch on a PostgreSQL copy. Back up the current database, restore it under a new name, set `DATABASE_URL` to the copy, and run `cargo run -- -migrate-only`. Start the Rust API against that copy with the existing `TOKEN_KEY` and `BOOTSTRAP_PASSWORD`. Check sign-in, saved sources, task sync, and the schedule before changing the live process.
+
+For cutover, stop the Go process, take a fresh database backup, and start the Rust process with the same environment values. The Rust process reads the existing migration journal, session hashes, and sealed source tokens. Keep the backup and the previous `v1.0.3` release until the new process is accepted. To roll back, stop Rust and start `v1.0.3` against a restored backup in a separate database. Changes written after that backup need separate recovery.
+
 ## Sources and time
 
 Add Jira or Todoist connections under Sources, then start a sync there. Jira uses a site URL and either a bearer token or an email and API token; Todoist uses a REST token. The default Jira query selects assigned, unfinished issues.
@@ -53,7 +59,7 @@ Each timer creates a time interval for an item. **Allocated time** sums interval
 
 ## Checks and documentation
 
-Run `make test` for Go tests and TypeScript checks. Run `go vet ./...`, `cd web && bun test`, `bun run lint`, and `bun run build` for the remaining local checks. `make lint` also rewrites Go formatting; use `gofmt -l` when you only need to inspect it.
+Run `make test` for Rust tests and TypeScript checks. Run `make lint`, `cd web && bun test`, `bun run lint`, and `bun run build` for the remaining local checks. To run database integration tests, set `TEST_DATABASE_URL` to an isolated database whose name starts with `wantbrief_issue92_`, then run `cargo test --tests -- --ignored --test-threads=1`.
 
 See [architecture](docs/architecture.md) for the application layout, [glossary](GLOSSARY.md) for domain terms, and [frontend notes](web/README.md) for web commands. Repository workflow conventions live in `docs/agents/`.
 

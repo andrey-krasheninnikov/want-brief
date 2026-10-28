@@ -19,6 +19,8 @@ pub mod person_fields;
 pub mod person_misc;
 pub mod person_professions;
 pub mod projects;
+pub mod schedule;
+pub mod schedule_plan;
 pub mod schedule_settings;
 pub mod sources;
 pub mod track;

@@ -2539,7 +2539,7 @@ dependencies = [
 
 [[package]]
 name = "want-brief"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "aes-gcm",
  "anyhow",

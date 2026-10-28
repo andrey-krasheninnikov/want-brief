@@ -17,7 +17,7 @@ const SELECT: &str = "SELECT i.id,i.source_id,i.external_key,i.title,i.status,i.
 
 #[derive(FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Item {
+pub(crate) struct Item {
     id: Uuid,
     source_id: Uuid,
     external_key: String,
@@ -125,7 +125,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/items/{id}/undelete", axum::routing::post(undelete))
 }
 
-async fn fetch(pool: &PgPool, item_id: Uuid) -> Result<Item, sqlx::Error> {
+pub(crate) async fn fetch(pool: &PgPool, item_id: Uuid) -> Result<Item, sqlx::Error> {
     let query = format!("{SELECT} WHERE i.id=$1");
     sqlx::query_as::<_, Item>(&query)
         .bind(item_id)

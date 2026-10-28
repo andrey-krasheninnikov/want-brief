@@ -50,6 +50,7 @@ pub fn router(state: AppState) -> Router {
         .merge(crate::sources::router())
         .merge(crate::items::router())
         .merge(crate::item_details::router())
+        .merge(crate::item_sync::router())
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
     Router::new()
         .route("/api/health", get(health))

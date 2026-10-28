@@ -3,6 +3,7 @@ pub mod crypto;
 pub mod earn;
 pub mod http;
 pub mod item_details;
+pub mod item_sync;
 pub mod items;
 pub mod journal;
 pub mod migrate;

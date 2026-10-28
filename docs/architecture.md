@@ -24,3 +24,7 @@ Time intervals belong to items and may overlap. Allocated time sums their durati
 ## Local environment
 
 The Makefile has separate live and scratch database and port targets. Its default credentials and the values in `.env.example` are development examples. Supply appropriate secrets and network settings before using the app outside a trusted local environment.
+
+## Refactoring
+
+The [staged architecture review](architecture/refactoring-93.html) evaluates Source and Item sync, Schedule views, and the schedule planner. It links the recommended follow-up issues.

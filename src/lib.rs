@@ -11,5 +11,6 @@ pub mod load;
 pub mod migrate;
 pub mod notes;
 pub mod projects;
+pub mod schedule_settings;
 pub mod sources;
 pub mod track;

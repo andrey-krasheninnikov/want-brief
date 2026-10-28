@@ -147,18 +147,20 @@ async fn get_json<T: for<'de> Deserialize<'de>>(
         .map_err(|err| format!("{label}: {err}"))?;
     if !response.status().is_success() {
         let status = response.status().as_u16();
-        let body = response.bytes().await.unwrap_or_default();
         return Err(if label.starts_with("jira ") {
+            let body = crate::sources::response_body(response, 4 << 20)
+                .await
+                .map(|(body, _)| body)
+                .unwrap_or_default();
             crate::sources::jira_http_error(label, status, &body)
         } else {
             format!("{label}: HTTP {status}")
         });
     }
-    let body = response
-        .bytes()
+    let (body, too_large) = crate::sources::response_body(response, 4 << 20)
         .await
         .map_err(|err| format!("{label}: {err}"))?;
-    if body.len() > 4 << 20 {
+    if too_large {
         return Err(format!("{label}: response too large"));
     }
     if body.iter().find(|byte| !byte.is_ascii_whitespace()) == Some(&b'<') {

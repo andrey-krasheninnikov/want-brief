@@ -120,15 +120,20 @@ async fn probe(source: &Source, token: &str) -> Result<(), String> {
         .map_err(|err| format!("{} probe: {err}", source.kind))?;
     if !response.status().is_success() {
         let status = response.status().as_u16();
-        let body = response.bytes().await.unwrap_or_default();
         return Err(if source.kind == "jira" {
+            let body = response_body(response, 4 << 20)
+                .await
+                .map(|(body, _)| body)
+                .unwrap_or_default();
             jira_http_error("jira probe", status, &body)
         } else {
             format!("todoist probe: HTTP {status}")
         });
     }
     if source.kind == "jira" {
-        let raw = response.bytes().await.map_err(|err| err.to_string())?;
+        let (raw, _) = response_body(response, 4 << 20)
+            .await
+            .map_err(|err| err.to_string())?;
         if raw.iter().find(|byte| !byte.is_ascii_whitespace()) == Some(&b'<') {
             return Err("jira probe: HTML response".to_owned());
         }
@@ -503,11 +508,10 @@ async fn pull(source: &Source, token: &str) -> Result<Vec<RemoteItem>, String> {
                 response.status().as_u16()
             ));
         }
-        let raw = response
-            .bytes()
+        let (raw, too_large) = response_body(response, 4 << 20)
             .await
             .map_err(|err| format!("todoist tasks: {err}"))?;
-        if raw.len() > 4 << 20 {
+        if too_large {
             return Err("todoist tasks: response too large".to_owned());
         }
         let tasks: Vec<TodoTask> =
@@ -561,14 +565,16 @@ async fn pull(source: &Source, token: &str) -> Result<Vec<RemoteItem>, String> {
             .map_err(|err| format!("jira search: {err}"))?;
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let body = response.bytes().await.unwrap_or_default();
+            let body = response_body(response, 4 << 20)
+                .await
+                .map(|(body, _)| body)
+                .unwrap_or_default();
             return Err(jira_http_error("jira search", status, &body));
         }
-        let raw = response
-            .bytes()
+        let (raw, too_large) = response_body(response, 4 << 20)
             .await
             .map_err(|err| format!("jira search: {err}"))?;
-        if raw.len() > 4 << 20 {
+        if too_large {
             return Err("jira search: response too large".to_owned());
         }
         if raw.iter().find(|byte| !byte.is_ascii_whitespace()) == Some(&b'<') {
@@ -649,6 +655,21 @@ pub(crate) fn jira_http_error(operation: &str, status: u16, body: &[u8]) -> Stri
         Some(detail) => format!("{base} ({})", detail.chars().take(200).collect::<String>()),
         None => base,
     }
+}
+
+pub(crate) async fn response_body(
+    mut response: reqwest::Response,
+    limit: usize,
+) -> Result<(Vec<u8>, bool), reqwest::Error> {
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await? {
+        let remaining = limit.saturating_sub(body.len());
+        body.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
+        if chunk.len() > remaining {
+            return Ok((body, true));
+        }
+    }
+    Ok((body, false))
 }
 
 async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Response {
@@ -754,5 +775,24 @@ mod tests {
             integration_error("jira search: HTTP 503".to_owned()).status(),
             StatusCode::BAD_GATEWAY
         );
+    }
+
+    #[tokio::test]
+    async fn remote_response_is_bounded() {
+        let app = Router::new().route("/", get(|| async { "123456789" }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let response = reqwest::get(&url).await.unwrap();
+        assert_eq!(
+            response_body(response, 4).await.unwrap(),
+            (b"1234".to_vec(), true)
+        );
+        let response = reqwest::get(&url).await.unwrap();
+        assert_eq!(
+            response_body(response, 9).await.unwrap(),
+            (b"123456789".to_vec(), false)
+        );
+        server.abort();
     }
 }

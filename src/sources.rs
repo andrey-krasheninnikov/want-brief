@@ -1,3 +1,4 @@
+use crate::crypto::TokenBox;
 use crate::http::{database_error, decode, error, id, not_found, AppState};
 use axum::body::Bytes;
 use axum::extract::{Path, State};
@@ -14,12 +15,12 @@ const COLUMNS: &str = "id,kind,name,email,base_url,token_sealed,query_filter,las
 
 #[derive(FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Source {
+pub(crate) struct Source {
     id: Uuid,
-    kind: String,
+    pub(crate) kind: String,
     name: String,
-    email: String,
-    base_url: String,
+    pub(crate) email: String,
+    pub(crate) base_url: String,
     #[serde(skip_serializing)]
     token_sealed: String,
     #[serde(rename = "query")]
@@ -29,7 +30,7 @@ struct Source {
     connected: bool,
     #[serde(skip_serializing_if = "String::is_empty")]
     last_error: String,
-    insecure_tls: bool,
+    pub(crate) insecure_tls: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     #[sqlx(skip)]
@@ -37,6 +38,25 @@ struct Source {
 }
 
 impl Source {
+    pub(crate) async fn load(state: &AppState, source_id: Uuid) -> Result<Self, Response> {
+        let query = format!("SELECT {COLUMNS} FROM sources WHERE id=$1");
+        sqlx::query_as::<_, Self>(&query)
+            .bind(source_id)
+            .fetch_one(&state.pool)
+            .await
+            .map_err(not_found)
+    }
+
+    #[allow(clippy::result_large_err)]
+    pub(crate) fn token(&self, token_box: &TokenBox) -> Result<String, Response> {
+        if self.token_sealed.is_empty() {
+            return Err(error(StatusCode::FORBIDDEN, "source token is empty"));
+        }
+        token_box
+            .open(&self.token_sealed)
+            .map_err(|_| error(StatusCode::INTERNAL_SERVER_ERROR, "internal error"))
+    }
+
     fn public(mut self) -> Self {
         self.has_token = !self.token_sealed.is_empty();
         self
@@ -677,14 +697,9 @@ async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Respons
         Ok(id) => id,
         Err(response) => return response,
     };
-    let query = format!("SELECT {COLUMNS} FROM sources WHERE id=$1");
-    let source = match sqlx::query_as::<_, Source>(&query)
-        .bind(source_id)
-        .fetch_one(&state.pool)
-        .await
-    {
+    let source = match Source::load(&state, source_id).await {
         Ok(source) => source,
-        Err(err) => return not_found(err),
+        Err(response) => return response,
     };
     if source.kind == "manual" {
         return error(StatusCode::FORBIDDEN, "forbidden: manual source");
@@ -692,12 +707,9 @@ async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Respons
     if source.project_id.is_none() {
         return error(StatusCode::BAD_REQUEST, "invalid: source project");
     }
-    if source.token_sealed.is_empty() {
-        return error(StatusCode::FORBIDDEN, "source token is empty");
-    }
-    let token = match state.token_box.open(&source.token_sealed) {
+    let token = match source.token(&state.token_box) {
         Ok(token) => token,
-        Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
+        Err(response) => return response,
     };
     if let Err(message) = probe(&source, &token).await {
         mark_disconnected(&state, source_id, &message).await;
@@ -751,6 +763,41 @@ async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Respons
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn source_token_preserves_error_status() {
+        let token_box =
+            TokenBox::new("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+                .unwrap();
+        let mut source = Source {
+            id: Uuid::nil(),
+            kind: "jira".to_owned(),
+            name: String::new(),
+            email: String::new(),
+            base_url: String::new(),
+            token_sealed: String::new(),
+            query_filter: String::new(),
+            last_sync_at: None,
+            project_id: None,
+            connected: false,
+            last_error: String::new(),
+            insecure_tls: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            has_token: false,
+        };
+        assert_eq!(
+            source.token(&token_box).unwrap_err().status(),
+            StatusCode::FORBIDDEN
+        );
+        source.token_sealed = "invalid".to_owned();
+        assert_eq!(
+            source.token(&token_box).unwrap_err().status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        source.token_sealed = token_box.seal("secret").unwrap();
+        assert_eq!(source.token(&token_box).unwrap(), "secret");
+    }
 
     #[test]
     fn jira_error_keeps_remote_detail() {

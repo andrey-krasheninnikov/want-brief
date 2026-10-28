@@ -1,4 +1,5 @@
 use crate::auth::Auth;
+use crate::crypto::TokenBox;
 use axum::body::Bytes;
 use axum::extract::{Request, State};
 use axum::http::{header, HeaderValue, Method, StatusCode};
@@ -7,18 +8,23 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use std::sync::Arc;
+use uuid::Uuid;
 
 const SESSION_COOKIE: &str = "wb_session";
 
 #[derive(Clone)]
 pub struct AppState {
+    pub pool: PgPool,
     pub auth: Auth,
     pub cors_origin: String,
+    pub token_box: Arc<TokenBox>,
 }
 
 #[derive(Serialize)]
 struct ErrorBody {
-    error: &'static str,
+    error: String,
 }
 
 #[derive(Serialize)]
@@ -36,6 +42,12 @@ pub fn router(state: AppState) -> Router {
     let protected = Router::new()
         .route("/api/logout", post(logout))
         .route("/api/me", get(me))
+        .merge(crate::projects::router())
+        .merge(crate::notes::router())
+        .merge(crate::track::router())
+        .merge(crate::earn::router())
+        .merge(crate::journal::router())
+        .merge(crate::sources::router())
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
     Router::new()
         .route("/api/health", get(health))
@@ -93,8 +105,42 @@ fn session_token(request: &Request) -> Option<&str> {
         .map(|(_, value)| value)
 }
 
-fn error(status: StatusCode, message: &'static str) -> Response {
-    (status, Json(ErrorBody { error: message })).into_response()
+pub(crate) fn error(status: StatusCode, message: impl Into<String>) -> Response {
+    (
+        status,
+        Json(ErrorBody {
+            error: message.into(),
+        }),
+    )
+        .into_response()
+}
+
+#[allow(clippy::result_large_err)]
+pub(crate) fn decode<T: for<'de> Deserialize<'de>>(body: &Bytes) -> Result<T, Response> {
+    let mut decoder = serde_json::Deserializer::from_slice(body);
+    T::deserialize(&mut decoder).map_err(|_| error(StatusCode::BAD_REQUEST, "invalid"))
+}
+
+#[allow(clippy::result_large_err)]
+pub(crate) fn id(raw: &str) -> Result<Uuid, Response> {
+    Uuid::parse_str(raw).map_err(|_| error(StatusCode::BAD_REQUEST, "invalid"))
+}
+
+pub(crate) fn database_error(err: sqlx::Error) -> Response {
+    if let sqlx::Error::Database(database) = &err {
+        if database.code().as_deref() == Some("23505") {
+            return error(StatusCode::CONFLICT, "conflict");
+        }
+    }
+    error(StatusCode::INTERNAL_SERVER_ERROR, "internal error")
+}
+
+pub(crate) fn not_found(err: sqlx::Error) -> Response {
+    if matches!(err, sqlx::Error::RowNotFound) {
+        error(StatusCode::NOT_FOUND, "not found")
+    } else {
+        database_error(err)
+    }
 }
 
 async fn health() -> impl IntoResponse {

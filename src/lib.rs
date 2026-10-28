@@ -7,6 +7,7 @@ pub mod item_details;
 pub mod item_sync;
 pub mod items;
 pub mod journal;
+pub mod load;
 pub mod migrate;
 pub mod notes;
 pub mod projects;

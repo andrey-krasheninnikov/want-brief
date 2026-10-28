@@ -146,7 +146,13 @@ async fn get_json<T: for<'de> Deserialize<'de>>(
         .await
         .map_err(|err| format!("{label}: {err}"))?;
     if !response.status().is_success() {
-        return Err(format!("{label}: HTTP {}", response.status().as_u16()));
+        let status = response.status().as_u16();
+        let body = response.bytes().await.unwrap_or_default();
+        return Err(if label.starts_with("jira ") {
+            crate::sources::jira_http_error(label, status, &body)
+        } else {
+            format!("{label}: HTTP {status}")
+        });
     }
     let body = response
         .bytes()
@@ -297,7 +303,7 @@ async fn sync_one(state: &AppState, item_id: Uuid) -> Result<Value, Response> {
         .map_err(|_| error(StatusCode::INTERNAL_SERVER_ERROR, "internal error"))?;
     let remote = fetch_remote(&source, &token, &item.external_key)
         .await
-        .map_err(|message| error(StatusCode::BAD_GATEWAY, message))?;
+        .map_err(crate::sources::integration_error)?;
     let mut tx = state.pool.begin().await.map_err(database_error)?;
     sqlx::query("UPDATE items SET external_status=$2,title=CASE WHEN btrim($3::text)='' THEN title ELSE btrim($3) END,description=CASE WHEN btrim($4::text)='' THEN description ELSE btrim($4) END,updated_at=$5 WHERE id=$1")
         .bind(item.id).bind(remote.status.trim()).bind(&remote.title).bind(&remote.description).bind(Utc::now())

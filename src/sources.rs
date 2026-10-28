@@ -119,11 +119,13 @@ async fn probe(source: &Source, token: &str) -> Result<(), String> {
         .await
         .map_err(|err| format!("{} probe: {err}", source.kind))?;
     if !response.status().is_success() {
-        return Err(format!(
-            "{} probe: HTTP {}",
-            source.kind,
-            response.status().as_u16()
-        ));
+        let status = response.status().as_u16();
+        let body = response.bytes().await.unwrap_or_default();
+        return Err(if source.kind == "jira" {
+            jira_http_error("jira probe", status, &body)
+        } else {
+            format!("todoist probe: HTTP {status}")
+        });
     }
     if source.kind == "jira" {
         let raw = response.bytes().await.map_err(|err| err.to_string())?;
@@ -558,7 +560,9 @@ async fn pull(source: &Source, token: &str) -> Result<Vec<RemoteItem>, String> {
             .await
             .map_err(|err| format!("jira search: {err}"))?;
         if !response.status().is_success() {
-            return Err(format!("jira search: HTTP {}", response.status().as_u16()));
+            let status = response.status().as_u16();
+            let body = response.bytes().await.unwrap_or_default();
+            return Err(jira_http_error("jira search", status, &body));
         }
         let raw = response
             .bytes()
@@ -617,7 +621,7 @@ async fn mark_disconnected(state: &AppState, source_id: Uuid, message: &str) {
             .await;
 }
 
-fn integration_error(message: String) -> Response {
+pub(crate) fn integration_error(message: String) -> Response {
     let status = if message.contains("HTTP") {
         StatusCode::BAD_GATEWAY
     } else {
@@ -627,6 +631,23 @@ fn integration_error(message: String) -> Response {
         error(status, message)
     } else {
         error(status, "internal error")
+    }
+}
+
+pub(crate) fn jira_http_error(operation: &str, status: u16, body: &[u8]) -> String {
+    let base = format!("{operation}: HTTP {status}");
+    let detail = serde_json::from_slice::<serde_json::Value>(body)
+        .ok()
+        .and_then(|body| {
+            body["errorMessages"][0]
+                .as_str()
+                .map(str::trim)
+                .map(str::to_owned)
+        })
+        .filter(|detail| !detail.is_empty());
+    match detail {
+        Some(detail) => format!("{base} ({})", detail.chars().take(200).collect::<String>()),
+        None => base,
     }
 }
 
@@ -704,4 +725,34 @@ async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Respons
         return database_error(err);
     }
     Json(serde_json::json!({"upserted":upserted})).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn jira_error_keeps_remote_detail() {
+        let body = br#"{"errorMessages":["  permission denied  "]}"#;
+        assert_eq!(
+            jira_http_error("jira search", 403, body),
+            "jira search: HTTP 403 (permission denied)"
+        );
+        assert_eq!(
+            jira_http_error("jira search", 503, b"bad"),
+            "jira search: HTTP 503"
+        );
+    }
+
+    #[test]
+    fn remote_failures_keep_go_error_status() {
+        assert_eq!(
+            integration_error("jira search: connection refused".to_owned()).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(
+            integration_error("jira search: HTTP 503".to_owned()).status(),
+            StatusCode::BAD_GATEWAY
+        );
+    }
 }

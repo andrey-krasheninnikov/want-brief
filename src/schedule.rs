@@ -233,20 +233,18 @@ async fn get_schedule(State(state): State<AppState>, Query(range): Query<Range>)
         Err(response) => return response,
     };
     let previous: Option<DbJson<serde_json::Value>> =
-        match sqlx::query_scalar("SELECT blocks FROM schedule_snapshots WHERE kind=$1")
+        sqlx::query_scalar("SELECT blocks FROM schedule_snapshots WHERE kind=$1")
             .bind(&kind)
             .fetch_optional(&state.pool)
             .await
-        {
-            Ok(value) => value,
-            Err(err) => return database_error(err),
-        };
+            .ok()
+            .flatten();
     input.previous = previous
         .and_then(|DbJson(blocks)| serde_json::from_value::<Vec<Block>>(blocks).ok())
         .unwrap_or_default();
     let report = schedule_plan::plan(&input);
-    if let Err(err) = sqlx::query("INSERT INTO schedule_snapshots(kind,taken_at,blocks) VALUES($1,$2,$3) ON CONFLICT(kind) DO UPDATE SET taken_at=EXCLUDED.taken_at,blocks=EXCLUDED.blocks")
-        .bind(&kind).bind(input.now).bind(DbJson(&report.horizon)).execute(&state.pool).await { return database_error(err); }
+    let _ = sqlx::query("INSERT INTO schedule_snapshots(kind,taken_at,blocks) VALUES($1,$2,$3) ON CONFLICT(kind) DO UPDATE SET taken_at=EXCLUDED.taken_at,blocks=EXCLUDED.blocks")
+        .bind(&kind).bind(input.now).bind(DbJson(&report.horizon)).execute(&state.pool).await;
     Json(report).into_response()
 }
 

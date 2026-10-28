@@ -225,6 +225,176 @@ mod schedule_tests {
     }
 
     #[test]
+    fn berlin_settings_keep_local_work_hours() {
+        let berlin = chrono_tz::Europe::Berlin;
+        let local = |day, hour| {
+            berlin
+                .with_ymd_and_hms(2026, 9, day, hour, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc)
+        };
+        let mut task = item("Berlin", 0);
+        task.dev_due_at = Some(local(20, 18));
+        task.planned_seconds = 3600;
+        let mut input = base(vec![task.clone()]);
+        input.settings.timezone = "Europe/Berlin".to_owned();
+        input.now = local(15, 8);
+        input.from = input.now;
+        input.to = local(16, 8);
+        let report = plan(&input);
+        assert_eq!(
+            report
+                .horizon
+                .iter()
+                .find(|block| block.item_id == task.id)
+                .unwrap()
+                .starts_at,
+            local(15, 10)
+        );
+        let grid = serde_json::to_value(report).unwrap()["grid"].clone();
+        assert_eq!(grid["timezone"], "Europe/Berlin");
+        assert_eq!(grid["startHour"], 8);
+        assert_eq!(grid["endHour"], 19);
+    }
+
+    #[test]
+    fn active_interval_stays_now_before_work_hours() {
+        let mut first = item("First", 0);
+        let mut tracked = item("Tracked", 1);
+        for task in [&mut first, &mut tracked] {
+            task.dev_due_at = Some(at(20, 18, 0));
+        }
+        first.planned_seconds = 3600;
+        tracked.planned_seconds = 3 * 3600;
+        let mut input = base(vec![first.clone(), tracked.clone()]);
+        input.now = at(15, 4, 30);
+        input.from = at(15, 0, 0);
+        input.to = at(16, 0, 0);
+        input.active.insert(tracked.id);
+        let report = plan(&input);
+        let blocks: Vec<_> = report
+            .horizon
+            .iter()
+            .filter(|block| block.item_id == tracked.id)
+            .collect();
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].starts_at, input.now);
+        assert_eq!(blocks[0].ends_at, at(15, 6, 30));
+        assert!(blocks[0].reasons.iter().any(|reason| reason == "active"));
+        assert_eq!(blocks[1].starts_at, at(15, 10, 0));
+        assert_eq!(
+            report
+                .horizon
+                .iter()
+                .find(|block| block.item_id == first.id)
+                .unwrap()
+                .starts_at,
+            at(15, 11, 0)
+        );
+    }
+
+    #[test]
+    fn third_waiting_task_queues_on_waiting_lane() {
+        let mut tasks = Vec::new();
+        for index in 0..3 {
+            let mut task = item(&format!("Wait{index}"), index);
+            task.occupancy = "waiting".to_owned();
+            task.dev_due_at = Some(at(20, 18, 0));
+            task.planned_seconds = 3600;
+            tasks.push(task);
+        }
+        let mut input = base(tasks);
+        input.now = at(15, 8, 0);
+        input.from = input.now;
+        input.to = at(16, 8, 0);
+        let report = plan(&input);
+        let blocks: Vec<_> = report
+            .horizon
+            .iter()
+            .filter(|block| block.external_key.starts_with("Wait"))
+            .collect();
+        assert_eq!(blocks.len(), 3);
+        assert!(blocks.iter().all(|block| block.lane > 0));
+        assert_eq!(
+            blocks
+                .iter()
+                .filter(|block| block.starts_at == at(15, 11, 0))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn previous_block_is_sticky_only_when_close() {
+        let mut first = item("A", 0);
+        let mut second = item("B", 1);
+        for task in [&mut first, &mut second] {
+            task.dev_due_at = Some(at(20, 18, 0));
+            task.planned_seconds = 3600;
+        }
+        let mut input = base(vec![first, second.clone()]);
+        input.now = at(15, 8, 0);
+        input.from = input.now;
+        input.to = at(16, 8, 0);
+        let mut prior = plan(&input)
+            .horizon
+            .into_iter()
+            .find(|block| block.item_id == second.id)
+            .unwrap();
+        prior.starts_at = at(15, 11, 20);
+        prior.ends_at = at(15, 12, 20);
+        input.previous = vec![prior.clone()];
+        let near = plan(&input);
+        let block = near
+            .horizon
+            .iter()
+            .find(|block| block.item_id == second.id)
+            .unwrap();
+        assert_eq!(block.starts_at, prior.starts_at);
+        assert!(block.reasons.iter().any(|reason| reason == "sticky"));
+        prior.starts_at = at(16, 10, 0);
+        prior.ends_at = at(16, 11, 0);
+        input.previous = vec![prior];
+        let far = plan(&input);
+        assert_eq!(
+            far.horizon
+                .iter()
+                .find(|block| block.item_id == second.id)
+                .unwrap()
+                .starts_at,
+            at(15, 11, 0)
+        );
+    }
+
+    #[test]
+    fn dropping_late_task_and_skipping_meeting_remove_lateness() {
+        let mut late = item("Late", 0);
+        late.dev_due_at = Some(at(15, 9, 0));
+        late.planned_seconds = 2 * 3600;
+        let mut input = base(vec![late]);
+        input.now = at(15, 8, 0);
+        input.from = input.now;
+        input.to = at(16, 8, 0);
+        assert!(plan(&input).score.late_seconds > 0);
+        input.items.clear();
+        assert_eq!(plan(&input).score.late_seconds, 0);
+        let mut today = item("Today", 0);
+        today.dev_due_at = Some(at(15, 18, 0));
+        today.planned_seconds = 3600;
+        input.items = vec![today];
+        input.events = vec![crate::events::schedule_fixture(
+            "Blocker",
+            at(15, 10, 0),
+            9 * 60,
+            false,
+            &[],
+        )];
+        assert!(plan(&input).score.late_seconds > 0);
+        input.events.clear();
+        assert_eq!(plan(&input).score.late_seconds, 0);
+    }
+
+    #[test]
     fn overloaded_week_preserves_priority_and_deadline() {
         let items = ["OV-1", "OV-2", "OV-3", "OV-4", "OV-5"]
             .iter()

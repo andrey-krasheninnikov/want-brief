@@ -15,7 +15,7 @@ use uuid::Uuid;
 const COLUMNS: &str = "id, name, color, description, monthly_income_usd::float8 AS monthly_income_usd, monthly_income_rub::float8 AS monthly_income_rub, target_hours_day::float8 AS target_hours_day, target_hours_week::float8 AS target_hours_week, links, archived_at, created_at, updated_at";
 
 #[derive(Clone, Serialize, Deserialize)]
-struct ProjectLink {
+pub(crate) struct ProjectLink {
     label: String,
     url: String,
 }
@@ -120,7 +120,7 @@ pub fn router() -> Router<AppState> {
 }
 
 #[allow(clippy::result_large_err)]
-fn normalize_links(links: &mut [ProjectLink]) -> Result<(), Response> {
+pub(crate) fn normalize_links(links: &mut [ProjectLink]) -> Result<(), Response> {
     for link in links {
         let trimmed = link.url.trim();
         let parsed = reqwest::Url::parse(trimmed)

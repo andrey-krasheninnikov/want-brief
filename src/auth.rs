@@ -32,6 +32,25 @@ impl Auth {
                 .execute(&self.pool)
                 .await?;
         }
+        let manual: Option<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM sources WHERE kind='manual' ORDER BY created_at LIMIT 1",
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        if manual.is_none() {
+            sqlx::query("INSERT INTO sources (id,kind,name,created_at,updated_at) VALUES ($1,'manual','Manual',$2,$2)")
+                .bind(Uuid::new_v4()).bind(Utc::now()).execute(&self.pool).await?;
+        }
+        let projects: i64 = sqlx::query_scalar("SELECT count(*) FROM projects")
+            .fetch_one(&self.pool)
+            .await?;
+        if projects == 0 {
+            for (name, color, hours) in [("Work", "#4C4CFF", 30.0), ("Life", "#7C8CFF", 10.0)] {
+                sqlx::query("INSERT INTO projects (id,name,color,target_hours_day,target_hours_week,created_at,updated_at) VALUES ($1,$2,$3,$4::float8::numeric,$5::float8::numeric,$6,$6)")
+                    .bind(Uuid::new_v4()).bind(name).bind(color).bind(hours / 7.0).bind(hours).bind(Utc::now())
+                    .execute(&self.pool).await?;
+            }
+        }
         sqlx::query("DELETE FROM sessions WHERE expires_at <= $1")
             .bind(Utc::now())
             .execute(&self.pool)

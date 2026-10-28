@@ -70,7 +70,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/checkins/latest", get(latest_checkins))
 }
 
-async fn item_exists(pool: &PgPool, item_id: Uuid) -> Result<(), Response> {
+pub(crate) async fn item_exists(pool: &PgPool, item_id: Uuid) -> Result<(), Response> {
     sqlx::query_scalar::<_, Uuid>("SELECT id FROM items WHERE id=$1 AND deleted_at IS NULL")
         .bind(item_id)
         .fetch_one(pool)

@@ -2,6 +2,8 @@ pub mod auth;
 pub mod crypto;
 pub mod earn;
 pub mod http;
+pub mod item_details;
+pub mod items;
 pub mod journal;
 pub mod migrate;
 pub mod notes;

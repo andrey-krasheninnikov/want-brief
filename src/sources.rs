@@ -63,6 +63,7 @@ pub fn router() -> Router<AppState> {
             "/api/sources/{id}",
             axum::routing::patch(patch).delete(delete),
         )
+        .route("/api/sources/{id}/sync", axum::routing::post(sync))
 }
 
 async fn project_exists(state: &AppState, project_id: Option<Uuid>) -> Result<(), Response> {
@@ -372,4 +373,335 @@ async fn delete(State(state): State<AppState>, Path(raw): Path<String>) -> Respo
         Ok(_) => error(StatusCode::NOT_FOUND, "not found"),
         Err(err) => database_error(err),
     }
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct JiraIssue {
+    key: String,
+    fields: JiraFields,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct JiraFields {
+    summary: String,
+    duedate: String,
+    created: String,
+    priority: Option<JiraName>,
+}
+
+#[derive(Default, Deserialize)]
+struct JiraName {
+    name: String,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct JiraSearch {
+    issues: Vec<JiraIssue>,
+    next_page_token: String,
+    is_last: bool,
+    total: usize,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct TodoTask {
+    id: String,
+    content: String,
+    due: Option<TodoDue>,
+    priority: i32,
+}
+
+#[derive(Deserialize)]
+struct TodoDue {
+    date: String,
+}
+
+struct RemoteItem {
+    key: String,
+    title: String,
+    due_at: Option<DateTime<Utc>>,
+    created_at: Option<DateTime<Utc>>,
+    urgent: bool,
+    important: bool,
+    url: String,
+}
+
+fn parse_due(raw: &str) -> Option<DateTime<Utc>> {
+    chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+        .ok()
+        .and_then(|date| date.and_hms_opt(0, 0, 0))
+        .map(|date| date.and_utc())
+        .or_else(|| {
+            DateTime::parse_from_rfc3339(raw)
+                .ok()
+                .map(|date| date.with_timezone(&Utc))
+        })
+}
+
+fn jira_time(raw: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(raw)
+        .or_else(|_| DateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M:%S%.f%z"))
+        .ok()
+        .map(|date| date.with_timezone(&Utc))
+}
+
+fn source_client(source: &Source) -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(25))
+        .redirect(if source.kind == "jira" {
+            reqwest::redirect::Policy::none()
+        } else {
+            reqwest::redirect::Policy::default()
+        })
+        .danger_accept_invalid_certs(source.kind == "jira" && source.insecure_tls)
+        .build()
+        .map_err(|err| err.to_string())
+}
+
+fn jira_auth(
+    request: reqwest::RequestBuilder,
+    source: &Source,
+    token: &str,
+) -> reqwest::RequestBuilder {
+    if source.base_url.to_lowercase().contains(".atlassian.net") {
+        request.basic_auth(&source.email, Some(token))
+    } else if let Some((user, password)) = token
+        .split_once(':')
+        .filter(|(user, password)| !user.is_empty() && !password.is_empty())
+    {
+        request.basic_auth(user, Some(password))
+    } else {
+        request.bearer_auth(token)
+    }
+}
+
+async fn pull(source: &Source, token: &str) -> Result<Vec<RemoteItem>, String> {
+    let client = source_client(source)?;
+    if source.kind == "todoist" {
+        let endpoint = format!("{}/rest/v2/tasks", source.base_url);
+        let request = client
+            .get(endpoint)
+            .bearer_auth(token)
+            .header("Accept", "application/json");
+        let request = if source.query_filter.trim().is_empty() {
+            request
+        } else {
+            request.query(&[("filter", source.query_filter.trim())])
+        };
+        let response = request
+            .send()
+            .await
+            .map_err(|err| format!("todoist tasks: {err}"))?;
+        if !response.status().is_success() {
+            return Err(format!(
+                "todoist tasks: HTTP {}",
+                response.status().as_u16()
+            ));
+        }
+        let raw = response
+            .bytes()
+            .await
+            .map_err(|err| format!("todoist tasks: {err}"))?;
+        if raw.len() > 4 << 20 {
+            return Err("todoist tasks: response too large".to_owned());
+        }
+        let tasks: Vec<TodoTask> =
+            serde_json::from_slice(&raw).map_err(|err| format!("todoist decode: {err}"))?;
+        return Ok(tasks
+            .into_iter()
+            .map(|task| {
+                let due_at = task.due.as_ref().and_then(|due| parse_due(&due.date));
+                let urgent = task.priority == 4 || due_at.is_some_and(|due| due <= Utc::now());
+                RemoteItem {
+                    key: task.id,
+                    title: task.content,
+                    due_at,
+                    created_at: None,
+                    urgent,
+                    important: task.priority >= 3,
+                    url: String::new(),
+                }
+            })
+            .collect());
+    }
+    let cloud = source.base_url.to_lowercase().contains(".atlassian.net");
+    let endpoint = if cloud {
+        format!("{}/rest/api/3/search/jql", source.base_url)
+    } else {
+        format!("{}/rest/api/2/search", source.base_url)
+    };
+    let mut page_token = String::new();
+    let mut start_at = 0_usize;
+    let mut items = Vec::new();
+    for _ in 0..50 {
+        let mut body = serde_json::json!({"jql":"assignee = currentUser() AND statusCategory != Done","fields":["summary","status","priority","duedate","created"],"maxResults":100});
+        if cloud {
+            if !page_token.is_empty() {
+                body["nextPageToken"] = page_token.clone().into();
+            }
+        } else {
+            body["startAt"] = start_at.into();
+        }
+        let request = jira_auth(
+            client
+                .post(&endpoint)
+                .header("Accept", "application/json")
+                .json(&body),
+            source,
+            token,
+        );
+        let response = request
+            .send()
+            .await
+            .map_err(|err| format!("jira search: {err}"))?;
+        if !response.status().is_success() {
+            return Err(format!("jira search: HTTP {}", response.status().as_u16()));
+        }
+        let raw = response
+            .bytes()
+            .await
+            .map_err(|err| format!("jira search: {err}"))?;
+        if raw.len() > 4 << 20 {
+            return Err("jira search: response too large".to_owned());
+        }
+        if raw.iter().find(|byte| !byte.is_ascii_whitespace()) == Some(&b'<') {
+            return Err("jira decode: HTML from search".to_owned());
+        }
+        let page: JiraSearch =
+            serde_json::from_slice(&raw).map_err(|err| format!("jira decode: {err}"))?;
+        let count = page.issues.len();
+        for issue in page.issues {
+            let due_at = parse_due(&issue.fields.duedate);
+            let priority = issue
+                .fields
+                .priority
+                .map(|value| value.name.to_lowercase())
+                .unwrap_or_default();
+            items.push(RemoteItem {
+                key: issue.key.clone(),
+                title: issue.fields.summary,
+                due_at,
+                created_at: jira_time(&issue.fields.created),
+                urgent: priority == "highest"
+                    || priority == "blocker"
+                    || due_at.is_some_and(|due| due <= Utc::now()),
+                important: priority == "highest" || priority == "high",
+                url: format!("{}/browse/{}", source.base_url, issue.key),
+            });
+        }
+        if cloud {
+            if page.is_last || page.next_page_token.is_empty() {
+                break;
+            }
+            page_token = page.next_page_token;
+        } else {
+            start_at += count;
+            if count == 0 || start_at >= page.total {
+                break;
+            }
+        }
+    }
+    Ok(items)
+}
+
+async fn mark_disconnected(state: &AppState, source_id: Uuid, message: &str) {
+    let _ =
+        sqlx::query("UPDATE sources SET connected=false,last_error=$2,updated_at=$3 WHERE id=$1")
+            .bind(source_id)
+            .bind(message)
+            .bind(Utc::now())
+            .execute(&state.pool)
+            .await;
+}
+
+fn integration_error(message: String) -> Response {
+    let status = if message.contains("HTTP") {
+        StatusCode::BAD_GATEWAY
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
+    };
+    if status == StatusCode::BAD_GATEWAY {
+        error(status, message)
+    } else {
+        error(status, "internal error")
+    }
+}
+
+async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Response {
+    let source_id = match id(&raw) {
+        Ok(id) => id,
+        Err(response) => return response,
+    };
+    let query = format!("SELECT {COLUMNS} FROM sources WHERE id=$1");
+    let source = match sqlx::query_as::<_, Source>(&query)
+        .bind(source_id)
+        .fetch_one(&state.pool)
+        .await
+    {
+        Ok(source) => source,
+        Err(err) => return not_found(err),
+    };
+    if source.kind == "manual" {
+        return error(StatusCode::FORBIDDEN, "forbidden: manual source");
+    }
+    if source.project_id.is_none() {
+        return error(StatusCode::BAD_REQUEST, "invalid: source project");
+    }
+    if source.token_sealed.is_empty() {
+        return error(StatusCode::FORBIDDEN, "source token is empty");
+    }
+    let token = match state.token_box.open(&source.token_sealed) {
+        Ok(token) => token,
+        Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
+    };
+    if let Err(message) = probe(&source, &token).await {
+        mark_disconnected(&state, source_id, &message).await;
+        return integration_error(message);
+    }
+    let remote = match pull(&source, &token).await {
+        Ok(remote) => remote,
+        Err(message) => {
+            mark_disconnected(&state, source_id, &message).await;
+            return integration_error(message);
+        }
+    };
+    let mut upserted = 0;
+    for item in remote {
+        let now = Utc::now();
+        let created_at = item.created_at.unwrap_or(now);
+        let links = if item.url.is_empty() {
+            serde_json::json!([])
+        } else {
+            let label = if source.kind == "jira" {
+                "Jira"
+            } else {
+                "Todoist"
+            };
+            serde_json::json!([{"label":label,"url":item.url}])
+        };
+        let result = sqlx::query_scalar::<_, Uuid>("INSERT INTO items (id,source_id,external_key,title,status,kind,project_id,urgent,important,due_at,links,created_at,updated_at) VALUES ($1,$2,$3,$4,'backlog','task',$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (source_id,external_key) WHERE external_key <> '' DO UPDATE SET title=CASE WHEN btrim(EXCLUDED.title)='' THEN items.title ELSE EXCLUDED.title END,due_at=EXCLUDED.due_at,project_id=EXCLUDED.project_id,links=EXCLUDED.links,created_at=LEAST(items.created_at,EXCLUDED.created_at),updated_at=EXCLUDED.updated_at WHERE items.deleted_at IS NULL RETURNING id")
+            .bind(Uuid::new_v4()).bind(source_id).bind(&item.key).bind(&item.title).bind(source.project_id)
+            .bind(item.urgent).bind(item.important).bind(item.due_at).bind(sqlx::types::Json(links))
+            .bind(created_at).bind(now)
+            .fetch_one(&state.pool).await;
+        if let Err(err) = result {
+            return not_found(err);
+        }
+        upserted += 1;
+    }
+    let now = Utc::now();
+    if let Err(err) = sqlx::query(
+        "UPDATE sources SET last_sync_at=$2,connected=true,last_error='',updated_at=$2 WHERE id=$1",
+    )
+    .bind(source_id)
+    .bind(now)
+    .execute(&state.pool)
+    .await
+    {
+        return database_error(err);
+    }
+    Json(serde_json::json!({"upserted":upserted})).into_response()
 }

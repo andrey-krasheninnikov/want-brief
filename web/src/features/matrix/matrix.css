@@ -1,8 +1,8 @@
-.priorities-window .window-body {
+.priorities-window .ui-window-body {
   min-height: 0;
   overflow: auto;
 }
-.priorities-window .titlebar h1 {
+.priorities-window .ui-window-header h1 {
   font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
   font-size: clamp(1.9rem, 3.4vw, 2.6rem);
   letter-spacing: -0.08em;

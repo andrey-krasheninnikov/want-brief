@@ -1,10 +1,10 @@
-.today-window .titlebar h1 {
+.today-window .ui-window-header h1 {
   font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
   font-size: clamp(1.8rem, 3vw, 2.35rem);
   letter-spacing: -0.07em;
   line-height: 1.05;
 }
-.today-window .window-body {
+.today-window .ui-window-body {
   gap: 0;
   padding-top: 1.1rem;
 }

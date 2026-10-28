@@ -1,13 +1,13 @@
 # Architecture
 
-Want Brief is a React web app backed by a Go HTTP API and PostgreSQL. The Vite development server proxies API requests to the Go process. The Go process runs SQL migrations at startup, opens the database, and serves the API.
+Want Brief is a React web app backed by a Rust HTTP API and PostgreSQL. The Vite development server proxies API requests to the Rust process. The process runs SQL migrations at startup, opens the database, and serves the API.
 
 ## Backend
 
-- `internal/domain` defines items, events, people, companies, time intervals, scheduling rules, and repository contracts.
-- `internal/application` coordinates use cases such as source sync, item updates, time tracking, and schedule calculation.
-- `internal/infrastructure` contains PostgreSQL repositories, Jira and Todoist pullers, and token encryption.
-- `internal/delivery/http` exposes the API. `internal/bootstrap` wires dependencies and starts the server.
+- `src/main.rs` reads configuration, runs migrations, and starts the server.
+- `src/http.rs` defines routes, session checks, and shared HTTP responses. Domain routes live in adjacent modules for items, events, people, companies, tracking, and sources.
+- `src/schedule_plan.rs` calculates work and follow-up schedules. `src/schedule.rs` loads its inputs and serves schedule requests.
+- `src/migrate.rs` applies the existing PostgreSQL migrations. `src/crypto.rs` seals source credentials; `src/auth.rs` manages sessions.
 
 Jira and Todoist are import sources. Sync reads remote work into local items; local edits and scheduling do not write back to those services. A manual source holds locally created items. Source credentials are sealed before storage and are not returned by the public source representation.
 

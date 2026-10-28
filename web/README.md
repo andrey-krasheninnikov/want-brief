@@ -1,6 +1,6 @@
 # Want Brief web app
 
-The web app uses React 19, TypeScript, Vite, and Bun. It calls the Go API through the Vite development proxy.
+The web app uses React 19, TypeScript, Vite, and Bun. It calls the Rust API through the Vite development proxy.
 
 From the repository root, start PostgreSQL and the API with `make up` and `make api`. Then install dependencies and start the web app:
 

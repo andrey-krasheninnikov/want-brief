@@ -1,4 +1,4 @@
-.sset-window .window-body {
+.sset-window .ui-window-body {
   overflow: auto;
 }
 .sset-actions {
@@ -173,10 +173,10 @@
 }
 
 @media (max-width: 767px) {
-  .sset-window .titlebar {
+  .sset-window .ui-window-header {
     flex-wrap: wrap;
   }
-  .sset-window .title-actions {
+  .sset-window .ui-window-actions {
     flex: 1 0 100%;
   }
   .sset-days li {

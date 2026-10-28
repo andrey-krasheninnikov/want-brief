@@ -1,10 +1,10 @@
-.sched-window .titlebar h1 {
+.sched-window .ui-window-header h1 {
   font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
   font-size: clamp(1.9rem, 3.4vw, 2.6rem);
   letter-spacing: -0.08em;
   line-height: 1.02;
 }
-.sched-window .window-body {
+.sched-window .ui-window-body {
   gap: 0;
   padding-top: 0.85rem;
   min-height: 0;
@@ -1449,12 +1449,12 @@ tbody:first-of-type .sched-table-day th {
 }
 
 @media (max-width: 767px) {
-  .sched-window .window-body { overflow: auto; }
-  .sched-window .titlebar {
+  .sched-window .ui-window-body { overflow: auto; }
+  .sched-window .ui-window-header {
     flex-wrap: wrap;
     align-items: flex-start;
   }
-  .sched-window .title-actions {
+  .sched-window .ui-window-actions {
     flex: 1 0 100%;
   }
   .sched-deck-card {

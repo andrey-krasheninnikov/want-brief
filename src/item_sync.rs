@@ -1,4 +1,5 @@
 use crate::http::{database_error, error, id, not_found, AppState};
+use crate::sources::Source;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -17,15 +18,6 @@ struct ItemRef {
     source_id: Uuid,
     external_key: String,
     kind: String,
-}
-
-#[derive(FromRow)]
-struct SourceRef {
-    kind: String,
-    email: String,
-    base_url: String,
-    token_sealed: String,
-    insecure_tls: bool,
 }
 
 #[derive(Default, Deserialize)]
@@ -169,7 +161,7 @@ async fn get_json<T: for<'de> Deserialize<'de>>(
     serde_json::from_slice(&body).map_err(|err| format!("{label} decode: {err}"))
 }
 
-async fn fetch_remote(source: &SourceRef, token: &str, key: &str) -> Result<RemoteDetail, String> {
+async fn fetch_remote(source: &Source, token: &str, key: &str) -> Result<RemoteDetail, String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(25))
         .redirect(if source.kind == "jira" {
@@ -289,20 +281,8 @@ async fn sync_one(state: &AppState, item_id: Uuid) -> Result<Value, Response> {
     if item.external_key.trim().is_empty() {
         return Err(error(StatusCode::BAD_REQUEST, "invalid: external key"));
     }
-    let source: SourceRef = sqlx::query_as(
-        "SELECT kind,email,base_url,token_sealed,insecure_tls FROM sources WHERE id=$1",
-    )
-    .bind(item.source_id)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(not_found)?;
-    if source.token_sealed.is_empty() {
-        return Err(error(StatusCode::FORBIDDEN, "source token is empty"));
-    }
-    let token = state
-        .token_box
-        .open(&source.token_sealed)
-        .map_err(|_| error(StatusCode::INTERNAL_SERVER_ERROR, "internal error"))?;
+    let source = Source::load(state, item.source_id).await?;
+    let token = source.token(&state.token_box)?;
     let remote = fetch_remote(&source, &token, &item.external_key)
         .await
         .map_err(crate::sources::integration_error)?;

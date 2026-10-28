@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod crypto;
 pub mod earn;
+pub mod events;
 pub mod http;
 pub mod item_details;
 pub mod item_sync;

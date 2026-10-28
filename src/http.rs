@@ -46,6 +46,7 @@ pub fn router(state: AppState) -> Router {
         .merge(crate::notes::router())
         .merge(crate::track::router())
         .merge(crate::earn::router())
+        .merge(crate::events::router())
         .merge(crate::journal::router())
         .merge(crate::sources::router())
         .merge(crate::items::router())

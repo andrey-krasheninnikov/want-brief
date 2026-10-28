@@ -21,9 +21,9 @@ pub(crate) struct ProjectLink {
 }
 
 #[derive(Clone, Serialize, Deserialize, FromRow)]
-struct PersonRel {
-    id: Uuid,
-    comment: String,
+pub(crate) struct PersonRel {
+    pub(crate) id: Uuid,
+    pub(crate) comment: String,
 }
 
 #[derive(FromRow)]
@@ -135,7 +135,7 @@ pub(crate) fn normalize_links(links: &mut [ProjectLink]) -> Result<(), Response>
 }
 
 #[allow(clippy::result_large_err)]
-fn normalize_rels(rels: Vec<PersonRel>) -> Result<Vec<PersonRel>, Response> {
+pub(crate) fn normalize_rels(rels: Vec<PersonRel>) -> Result<Vec<PersonRel>, Response> {
     let mut seen = HashSet::new();
     let mut output = Vec::with_capacity(rels.len());
     for mut rel in rels {

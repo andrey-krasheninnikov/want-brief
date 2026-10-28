@@ -1,8 +1,9 @@
+import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
-import { moscowYmd } from '../../shared/moscow'
+import { zonedYmd } from '../../shared/zoned'
 import type { BondKind, Person, PersonBond } from '../../types'
 import { PersonBondGraph } from './PersonBondGraph'
 import { BOND_KINDS, bondKindLabel } from './peopleModel'
@@ -21,6 +22,7 @@ type Props = {
 }
 
 export function PersonBonds({ person }: Props) {
+  const tz = useTimezone()
   const personId = person.id
   const bonds = person.bonds ?? []
   const queryClient = useQueryClient()
@@ -33,10 +35,10 @@ export function PersonBonds({ person }: Props) {
     otherId: '',
     kind: 'acquaintance' as BondKind,
     comment: '',
-    startedOn: moscowYmd(),
-    changedOn: moscowYmd(),
+    startedOn: zonedYmd(new Date(), tz),
+    changedOn: zonedYmd(new Date(), tz),
     actionComment: '',
-    endedOn: moscowYmd(),
+    endedOn: zonedYmd(new Date(), tz),
   })
 
   function refresh() {
@@ -109,7 +111,7 @@ export function PersonBonds({ person }: Props) {
               kind: bond.kind,
               comment: bond.comment,
               startedOn: dateOnly(bond.startedOn),
-              changedOn: moscowYmd(),
+              changedOn: zonedYmd(new Date(), tz),
               actionComment: '',
               otherId: bond.otherId ?? '',
             })
@@ -118,7 +120,7 @@ export function PersonBonds({ person }: Props) {
             setEditingId(null)
             setAdding(false)
             setEndingId(bond.id)
-            setDraft({ ...draft, endedOn: moscowYmd(), actionComment: '' })
+            setDraft({ ...draft, endedOn: zonedYmd(new Date(), tz), actionComment: '' })
           }}
           onCancel={() => {
             setEditingId(null)
@@ -188,10 +190,10 @@ export function PersonBonds({ person }: Props) {
               otherId: '',
               kind: 'acquaintance',
               comment: '',
-              startedOn: moscowYmd(),
-              changedOn: moscowYmd(),
+              startedOn: zonedYmd(new Date(), tz),
+              changedOn: zonedYmd(new Date(), tz),
               actionComment: '',
-              endedOn: moscowYmd(),
+              endedOn: zonedYmd(new Date(), tz),
             })
             setAdding(true)
           }}

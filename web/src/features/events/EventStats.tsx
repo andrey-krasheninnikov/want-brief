@@ -1,5 +1,5 @@
 import { hours } from '../../shared/format'
-import { moscowYmd } from '../../shared/moscow'
+import { zonedYmd } from '../../shared/zoned'
 import { eventTypeLabel, type EventOccurrence } from '../../types'
 import { eventTone, type EventLookups } from './eventMeta'
 
@@ -9,6 +9,7 @@ const SHORT_MAX = 30 * 60
 type Props = {
   rows: EventOccurrence[]
   lookups: EventLookups
+  timeZone: string
 }
 
 type Bucket = {
@@ -18,8 +19,8 @@ type Bucket = {
   seconds: number
 }
 
-function weekdayMon0(iso: string): number {
-  const ymd = moscowYmd(new Date(iso))
+function weekdayMon0(iso: string, timeZone: string): number {
+  const ymd = zonedYmd(iso, timeZone)
   const [year, month, day] = ymd.split('-').map(Number)
   return (new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay() + 6) % 7
 }
@@ -74,7 +75,7 @@ function Bars({ rows }: { rows: Bucket[] }) {
   )
 }
 
-export function EventStats({ rows, lookups }: Props) {
+export function EventStats({ rows, lookups, timeZone }: Props) {
   const totalSeconds = rows.reduce((sum, row) => sum + row.durationSeconds, 0)
   const shorts = rows.filter((row) => row.durationSeconds <= SHORT_MAX)
   const shortSeconds = shorts.reduce((sum, row) => sum + row.durationSeconds, 0)
@@ -107,7 +108,7 @@ export function EventStats({ rows, lookups }: Props) {
     const inv = involvementBucket(row.involvement)
     add(involvement, inv, involvement.get(inv)!.name, row.durationSeconds)
     add(peak, hasPeak(row) ? 'on' : 'off', hasPeak(row) ? 'Peak on' : 'Full slot', row.durationSeconds)
-    days[weekdayMon0(row.startsAt)].seconds += row.durationSeconds
+    days[weekdayMon0(row.startsAt, timeZone)].seconds += row.durationSeconds
   }
 
   const projects = sorted(byProject)

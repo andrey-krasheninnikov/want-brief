@@ -1,3 +1,5 @@
+import { zonedYmd } from '../../shared/zoned'
+import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { PencilSimple } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -43,11 +45,12 @@ function stateOf(row: PersonAbsence, today: string): 'past' | 'now' | 'ahead' {
 
 // PersonAbsences lists when a person is away so follow-up pings avoid those days.
 export function PersonAbsences({ personId, absences }: Props) {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const [sheet, setSheet] = useState<'new' | string | null>(null)
   const [draft, setDraft] = useState<Draft>(empty)
   const editing = absences.find((row) => row.id === sheet)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = zonedYmd(new Date(), tz)
   const rows = [...absences].sort((a, b) => b.startsOn.localeCompare(a.startsOn))
 
   function refresh() {

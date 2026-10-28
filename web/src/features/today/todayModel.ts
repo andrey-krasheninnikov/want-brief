@@ -184,7 +184,7 @@ export function daysInYmdMonth(ymd: string): number {
 }
 
 export function isMoscowWeekday(ymd: string): boolean {
-  const weekday = new Date(`${ymd}T12:00:00+03:00`).getUTCDay()
+  const weekday = new Date(`${ymd}T12:00:00Z`).getUTCDay()
   return weekday !== 0 && weekday !== 6
 }
 

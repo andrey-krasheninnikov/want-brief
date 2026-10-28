@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChartBar } from '@phosphor-icons/react'
 import { api } from '../../api'
-import { moscowMonth, moscowWeek, moscowYmd, shiftMonths, shiftWeeks } from '../../shared/moscow'
+import { zonedMonth, zonedWeek, zonedYmd, shiftMonths, shiftWeeks } from '../../shared/zoned'
+import { useTimezone } from '../../shared/timezone'
 import { openEvent } from '../../shared/taskOverlay'
 import { Window } from '../../shared/Window'
 import { TaskSheet } from '../tasks/TaskSheet'
@@ -15,6 +16,7 @@ import { WeekGrid } from './WeekGrid'
 import './events.css'
 
 export function EventsScreen() {
+  const tz = useTimezone()
   const [params, setParams] = useSearchParams()
   const creating = params.get('new') === '1'
   const selectedId = params.get('event') ?? undefined
@@ -23,12 +25,12 @@ export function EventsScreen() {
   const [anchor, setAnchor] = useState(() => new Date())
   const [view, setView] = useState<'week' | 'month'>('week')
   const [stats, setStats] = useState(false)
-  const week = useMemo(() => moscowWeek(anchor), [anchor])
-  const month = useMemo(() => moscowMonth(anchor), [anchor])
-  const today = moscowYmd()
+  const week = useMemo(() => zonedWeek(anchor, tz), [anchor, tz])
+  const month = useMemo(() => zonedMonth(anchor, tz), [anchor, tz])
+  const today = zonedYmd(new Date(), tz)
   const range = view === 'week' ? week : month
   const events = useQuery({
-    queryKey: ['events', range.from, range.to],
+    queryKey: ['events', range.from, range.to, tz],
     queryFn: () => api.events(range.from, range.to),
   })
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
@@ -81,7 +83,7 @@ export function EventsScreen() {
             type="button"
             className="ghost"
             aria-label="Previous"
-            onClick={() => setAnchor((current) => (view === 'week' ? shiftWeeks(current, -1) : shiftMonths(current, -1)))}
+            onClick={() => setAnchor((current) => (view === 'week' ? shiftWeeks(current, -1, tz) : shiftMonths(current, -1, tz)))}
           >
             ‹
           </button>
@@ -89,7 +91,7 @@ export function EventsScreen() {
             type="button"
             className="ghost"
             aria-label="Next"
-            onClick={() => setAnchor((current) => (view === 'week' ? shiftWeeks(current, 1) : shiftMonths(current, 1)))}
+            onClick={() => setAnchor((current) => (view === 'week' ? shiftWeeks(current, 1, tz) : shiftMonths(current, 1, tz)))}
           >
             ›
           </button>
@@ -122,6 +124,7 @@ export function EventsScreen() {
           {events.isError ? <p className="error">{events.error.message}</p> : null}
           {!events.isLoading && !events.isError && view === 'week' ? (
             <WeekGrid
+              timeZone={tz}
               days={week.days}
               rows={rows}
               lookups={lookups}
@@ -133,6 +136,7 @@ export function EventsScreen() {
           ) : null}
           {!events.isLoading && !events.isError && view === 'month' ? (
             <MonthGrid
+              timeZone={tz}
               weeks={month.weeks}
               month={month.month}
               rows={rows}
@@ -157,7 +161,7 @@ export function EventsScreen() {
             onDeleted={closeSheet}
           />
         ) : (
-          <EventStats rows={rows} lookups={lookups} />
+          <EventStats rows={rows} lookups={lookups} timeZone={tz} />
         )}
       </TaskSheet>
     </Window>

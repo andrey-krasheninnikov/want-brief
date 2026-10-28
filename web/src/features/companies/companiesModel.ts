@@ -1,5 +1,4 @@
 import type { Company, CompanySalary, ContractKind, Tenure } from '../../types'
-import { moscowYmd } from '../../shared/moscow'
 
 export type CareerLogKind = 'title' | 'salary' | 'manager' | 'report' | 'papers'
 
@@ -53,7 +52,7 @@ export function spanYearsMonths(start: string, end: string): Tenure {
   return { years, months }
 }
 
-export function liveTenure(startedOn: string, endedOn: string, today = moscowYmd()): Tenure | null {
+export function liveTenure(startedOn: string, endedOn: string, today: string): Tenure | null {
   if (!startedOn) return null
   return spanYearsMonths(startedOn, endedOn || today)
 }
@@ -70,15 +69,15 @@ export function careerKindLabel(kind: CareerLogKind): string {
 export function dayLabel(iso: string): string {
   const day = dateOnly(iso)
   if (!day) return ''
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(
-    new Date(`${day}T00:00:00`),
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(
+    new Date(`${day}T12:00:00Z`),
   )
 }
 
 export function dayShort(iso: string): string {
   const day = dateOnly(iso)
   if (!day) return ''
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date(`${day}T00:00:00`))
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`))
 }
 
 export function salaryDelta(salaries: CompanySalary[] | undefined): { text: string; up: boolean } | null {

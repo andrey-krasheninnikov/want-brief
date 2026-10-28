@@ -2,16 +2,15 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api'
 import { hours } from '../../shared/format'
-import { moscowClocks, moscowRange } from '../../shared/moscow'
+import { moscowClocks } from '../../shared/moscow'
+import { zonedDayRange } from '../../shared/zoned'
 
-export function ClockRow() {
+export function ClockRow({ tz }: { tz: string }) {
   const [now, setNow] = useState(() => new Date())
+  const bounds = zonedDayRange(now, tz)
   const load = useQuery({
-    queryKey: ['load', 'day'],
-    queryFn: () => {
-      const bounds = moscowRange('day')
-      return api.load(bounds.from, bounds.to)
-    },
+    queryKey: ['load', 'day', bounds.from, bounds.to, tz],
+    queryFn: () => api.load(bounds.from, bounds.to),
     refetchInterval: 5000,
   })
   const clocks = moscowClocks(now)

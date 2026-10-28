@@ -1,3 +1,4 @@
+import { useTimezone } from '../../shared/timezone'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import type { Item, Quadrant } from '../../types'
@@ -11,12 +12,13 @@ const labels: Record<Quadrant, string> = {
   drop: 'Drop',
 }
 
-function dueLabel(iso: string | null): string {
+function dueLabel(iso: string | null, tz: string): string {
   if (!iso) return '-'
-  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short' }).format(new Date(iso))
+  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', timeZone: tz }).format(new Date(iso))
 }
 
 export function PriorityList({ items }: { items: Item[] }) {
+  const tz = useTimezone()
   const rows = rankItems(items)
   return (
     <div className="prio-shell" style={{ '--d': 4 } as CSSProperties}>
@@ -55,7 +57,7 @@ export function PriorityList({ items }: { items: Item[] }) {
                         {item.projectName || 'unassigned'}
                       </span>
                     </td>
-                    <td className="mono">{dueLabel(item.dueAt)}</td>
+                    <td className="mono">{dueLabel(item.dueAt, tz)}</td>
                     <td>{item.sourceName}</td>
                   </tr>
                 ))}

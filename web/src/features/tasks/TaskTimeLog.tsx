@@ -1,22 +1,14 @@
+import { useTimezone } from '../../shared/timezone'
+import { zonedInstant, zonedYmd } from '../../shared/zoned'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
 import { TaskOverlay } from './TaskConfirm'
 
-function todayDate(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function logRange(date: string, seconds: number): { startedAt: string; endedAt: string } {
-  if (date === todayDate()) {
-    const ended = new Date()
-    return { startedAt: new Date(ended.getTime() - seconds * 1000).toISOString(), endedAt: ended.toISOString() }
-  }
-  const noon = new Date(`${date}T12:00:00`)
-  return { startedAt: new Date(noon.getTime() - seconds * 1000).toISOString(), endedAt: noon.toISOString() }
+function logRange(date: string, seconds: number, tz: string): { startedAt: string; endedAt: string } {
+  const ended = date === zonedYmd(new Date(), tz) ? new Date() : new Date(zonedInstant(`${date}T12:00`, tz)!)
+  return { startedAt: new Date(ended.getTime() - seconds * 1000).toISOString(), endedAt: ended.toISOString() }
 }
 
 type Props = {
@@ -26,8 +18,9 @@ type Props = {
 }
 
 export function TaskTimeLog({ itemId, open, onClose }: Props) {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
-  const [date, setDate] = useState(todayDate)
+  const [date, setDate] = useState(() => zonedYmd(new Date(), tz))
   const [hours, setHours] = useState('0')
   const [minutes, setMinutes] = useState('0')
   const [error, setError] = useState('')
@@ -60,7 +53,7 @@ export function TaskTimeLog({ itemId, open, onClose }: Props) {
       return
     }
     setError('')
-    save.mutate(logRange(date, seconds))
+    save.mutate(logRange(date, seconds, tz))
   }
 
   return (

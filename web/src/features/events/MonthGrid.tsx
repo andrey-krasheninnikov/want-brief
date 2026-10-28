@@ -1,7 +1,9 @@
+import { zonedYmd } from '../../shared/zoned'
 import type { EventOccurrence } from '../../types'
 import { eventMeta, eventTone, type EventLookups } from './eventMeta'
 
 type Props = {
+  timeZone: string
   weeks: string[][]
   month: number
   rows: EventOccurrence[]
@@ -12,27 +14,18 @@ type Props = {
   onPick: (seriesId: string, originalOn: string) => void
 }
 
-function ymdOf(iso: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Moscow',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(iso))
-}
-
 function dayNum(ymd: string): string {
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'Europe/Moscow' }).format(
-    new Date(`${ymd}T12:00:00+03:00`),
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'UTC' }).format(
+    new Date(`${ymd}T12:00:00Z`),
   )
 }
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-export function MonthGrid({ weeks, month, rows, lookups, today, selectedId, selectedOn, onPick }: Props) {
+export function MonthGrid({ timeZone, weeks, month, rows, lookups, today, selectedId, selectedOn, onPick }: Props) {
   const byDay = new Map<string, EventOccurrence[]>()
   for (const row of rows) {
-    const key = ymdOf(row.startsAt)
+    const key = zonedYmd(row.startsAt, timeZone)
     const list = byDay.get(key) ?? []
     list.push(row)
     byDay.set(key, list)

@@ -1,3 +1,4 @@
+import { useTimezone } from '../../shared/timezone'
 import { useState, type CSSProperties } from 'react'
 import { DateField } from '../../shared/DateField'
 import { createdLabel, dueHeat, dueRemain, dueStageOpen } from '../../shared/format'
@@ -36,6 +37,7 @@ function toneClass(overdue: boolean, met: boolean): string {
 }
 
 export function TaskDueRail({ item, values, onChange, onCommit, compact }: Props) {
+  const tz = useTimezone()
   const [open, setOpen] = useState<DueKey | null>(null)
   const rows = item.kind === 'task' ? slots : slots.filter((slot) => slot.key === 'dueAt')
   const visible = compact ? rows.filter((slot) => isoOf(item, slot.key)) : rows
@@ -51,7 +53,7 @@ export function TaskDueRail({ item, values, onChange, onCommit, compact }: Props
           const remain = stageOpen ? dueRemain(iso) : ''
           const overdue = heat >= 1
           const met = Boolean(iso) && !stageOpen
-          const when = createdLabel(iso)
+          const when = createdLabel(iso, tz)
           const text = [slotLabel(item, slot), when, remain].filter(Boolean).join(' · ')
           return (
             <p
@@ -72,7 +74,7 @@ export function TaskDueRail({ item, values, onChange, onCommit, compact }: Props
         const iso = isoOf(item, slot.key)
         const stageOpen = dueStageOpen(item.status, slot.key)
         const heat = dueHeat(iso, item.status, slot.key)
-        const remain = stageOpen ? dueRemain(iso) : iso ? createdLabel(iso) : ''
+        const remain = stageOpen ? dueRemain(iso) : iso ? createdLabel(iso, tz) : ''
         const overdue = heat >= 1
         const met = Boolean(iso) && !stageOpen
         const editing = open === slot.key

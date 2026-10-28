@@ -1,3 +1,4 @@
+import { useTimezone } from '../../shared/timezone'
 import { useMemo, useState } from 'react'
 import type { Person } from '../../types'
 import { personInitials } from './PersonCard'
@@ -21,9 +22,9 @@ const COLS: { id: Col; label: string }[] = [
   { id: 'note', label: 'Last note' },
 ]
 
-function noteLabel(iso: string | null | undefined): string {
+function noteLabel(iso: string | null | undefined, tz: string): string {
   if (!iso) return ''
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(new Date(iso))
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: tz }).format(new Date(iso))
 }
 
 function sortValue(person: Person, col: Col, companyNames: Map<string, string>): string | number {
@@ -37,6 +38,7 @@ function sortValue(person: Person, col: Col, companyNames: Map<string, string>):
 }
 
 export function PeopleTable({ people, companyNames, onPick }: Props) {
+  const tz = useTimezone()
   const [sort, setSort] = useState<{ col: Col; dir: 'asc' | 'desc' }>({ col: 'name', dir: 'asc' })
   const rows = useMemo(() => {
     const copy = [...people]
@@ -84,7 +86,7 @@ export function PeopleTable({ people, companyNames, onPick }: Props) {
               <td className="mono">{person.age ?? ''}</td>
               <td>{primaryContact(person)?.value ?? ''}</td>
               <td>{person.meBond ? bondKindLabel(person.meBond.kind) : ''}</td>
-              <td className="mono">{noteLabel(person.lastNoteAt)}</td>
+              <td className="mono">{noteLabel(person.lastNoteAt, tz)}</td>
             </tr>
           ))}
         </tbody>

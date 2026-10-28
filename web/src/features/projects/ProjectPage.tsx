@@ -1,10 +1,11 @@
+import { useTimezone } from '../../shared/timezone'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { api } from '../../api'
 import { OpenUrl } from '../../shared/UrlField'
 import { hourlyRate, hours, money } from '../../shared/format'
-import { moscowRange } from '../../shared/moscow'
+import { zonedRange } from '../../shared/zoned'
 import type { Project, ProjectLink } from '../../types'
 import { PeoplePicker } from '../people/PeoplePicker'
 import { RelationField } from '../people/RelationField'
@@ -19,8 +20,8 @@ function linkCaption(link: ProjectLink): string {
   }
 }
 
-function noteStamp(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+function noteStamp(iso: string, tz: string): string {
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: tz }).format(new Date(iso))
 }
 
 const DEFAULT_COLOR = '#6152ed'
@@ -60,6 +61,7 @@ function Field({
 }
 
 export function ProjectPage() {
+  const tz = useTimezone()
   const { id = '' } = useParams()
   const queryClient = useQueryClient()
   const project = useQuery({ queryKey: ['projects', id], queryFn: () => api.project(id), enabled: Boolean(id) })
@@ -70,9 +72,9 @@ export function ProjectPage() {
     enabled: Boolean(id),
   })
   const monthLoad = useQuery({
-    queryKey: ['load', 'month'],
+    queryKey: ['load', 'month', tz],
     queryFn: () => {
-      const bounds = moscowRange('month')
+      const bounds = zonedRange('month', new Date(), tz)
       return api.load(bounds.from, bounds.to)
     },
   })
@@ -352,7 +354,7 @@ export function ProjectPage() {
               {preview.map((note) => (
                 <article key={note.id} className="plaza-tile plaza-slide">
                   <div className="plaza-core">
-                    <p className="plaza-kicker">{noteStamp(note.createdAt)}</p>
+                    <p className="plaza-kicker">{noteStamp(note.createdAt, tz)}</p>
                     <p>{note.body}</p>
                   </div>
                 </article>

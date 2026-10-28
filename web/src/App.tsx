@@ -16,6 +16,7 @@ import { PulseScreen } from './features/pulse/PulseScreen'
 import { ScheduleScreen } from './features/schedule/ScheduleScreen'
 import { ScheduleSettingsScreen } from './features/schedule/settings/ScheduleSettingsScreen'
 import { Shell } from './shared/Shell'
+import { TimezoneContext } from './shared/timezone'
 
 const client = new QueryClient()
 
@@ -39,13 +40,23 @@ function Gate() {
     queryFn: api.me,
     retry: false,
   })
+  const settings = useQuery({
+    queryKey: ['schedule-settings'],
+    queryFn: api.scheduleSettings,
+    enabled: me.isSuccess,
+  })
   if (me.isLoading) {
     return <div className="login-stage">booting…</div>
   }
   if (me.isError) {
     return <Navigate to="/login" replace />
   }
-  return <Shell />
+  if (!settings.data) {
+    return settings.isError
+      ? <div className="login-stage"><p>Could not load schedule settings.</p><button onClick={() => void settings.refetch()}>Retry</button></div>
+      : <div className="login-stage">Loading schedule settings…</div>
+  }
+  return <TimezoneContext.Provider value={settings.data.timezone}><Shell /></TimezoneContext.Provider>
 }
 
 export default function App() {

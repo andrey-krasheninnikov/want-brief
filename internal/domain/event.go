@@ -57,6 +57,7 @@ type Event struct {
 	Type              EventType       `json:"type"`
 	ProjectID         *uuid.UUID      `json:"projectId"`
 	StartsAt          time.Time       `json:"startsAt"`
+	Timezone          string          `json:"timezone"`
 	DurationSeconds   int             `json:"durationSeconds"`
 	Recurrence        EventRecurrence `json:"recurrence"`
 	RepeatUntil       *Ymd            `json:"repeatUntil"`
@@ -106,6 +107,7 @@ type EventDraft struct {
 	Type              EventType
 	ProjectID         *uuid.UUID
 	StartsAt          time.Time
+	Timezone          string
 	DurationSeconds   int
 	Recurrence        EventRecurrence
 	RepeatUntil       *Ymd
@@ -229,6 +231,13 @@ func (e *Event) apply(draft EventDraft) error {
 	if draft.StartsAt.IsZero() {
 		return fmt.Errorf("%w: startsAt", ErrInvalid)
 	}
+	tz := strings.TrimSpace(draft.Timezone)
+	if tz == "" {
+		tz = "Europe/Moscow"
+	}
+	if _, err := time.LoadLocation(tz); err != nil {
+		return fmt.Errorf("%w: timezone", ErrInvalid)
+	}
 	duration := draft.DurationSeconds
 	if duration < 1 {
 		return fmt.Errorf("%w: duration", ErrInvalid)
@@ -254,7 +263,8 @@ func (e *Event) apply(draft EventDraft) error {
 		if err != nil {
 			return err
 		}
-		startDay := YmdOf(draft.StartsAt, Moscow())
+		loc, _ := time.LoadLocation(tz)
+		startDay := YmdOf(draft.StartsAt, loc)
 		if parsed < startDay {
 			return fmt.Errorf("%w: repeatUntil", ErrInvalid)
 		}
@@ -281,6 +291,7 @@ func (e *Event) apply(draft EventDraft) error {
 	e.Type = typ
 	e.ProjectID = draft.ProjectID
 	e.StartsAt = draft.StartsAt.UTC()
+	e.Timezone = tz
 	e.DurationSeconds = duration
 	e.Recurrence = rec
 	e.RepeatUntil = until
@@ -352,7 +363,7 @@ func (e Event) Occurrence(at time.Time) EventOccurrence {
 		EndsAt:            start.Add(time.Duration(e.DurationSeconds) * time.Second),
 		DurationSeconds:   e.DurationSeconds,
 		Recurrence:        e.Recurrence,
-		OriginalOn:        YmdOf(start, Moscow()),
+		OriginalOn:        YmdOf(start, e.location()),
 		Links:             e.Links,
 		MeetURL:           e.MeetURL,
 		Involvement:       e.Involvement,
@@ -365,10 +376,9 @@ func (e Event) Occurrence(at time.Time) EventOccurrence {
 }
 
 func (e Event) OccurrenceOn(day Ymd) EventOccurrence {
-	loc := Moscow()
+	loc := e.location()
 	h, m, s := e.StartsAt.In(loc).Clock()
-	midnight := day.Midnight(loc)
-	start := time.Date(midnight.Year(), midnight.Month(), midnight.Day(), h, m, s, 0, loc)
+	start := eventLocalTime(day, h, m, s, loc)
 	occ := e.Occurrence(start)
 	occ.OriginalOn = day
 	return occ
@@ -378,7 +388,7 @@ func (e Event) HasSlot(day Ymd) bool {
 	if _, err := ParseYmd(string(day)); err != nil {
 		return false
 	}
-	loc := Moscow()
+	loc := e.location()
 	startDay := YmdOf(e.StartsAt, loc)
 	if day < startDay {
 		return false
@@ -421,14 +431,14 @@ func (e Event) Expand(from, to time.Time) []EventOccurrence {
 		return e.expandMonthly(from, to)
 	default:
 		if !e.StartsAt.Before(from) && e.StartsAt.Before(to) {
-			return []EventOccurrence{e.OccurrenceOn(YmdOf(e.StartsAt, Moscow()))}
+			return []EventOccurrence{e.Occurrence(e.StartsAt)}
 		}
 		return nil
 	}
 }
 
 func (e Event) expandWeekly(from, to time.Time) []EventOccurrence {
-	loc := Moscow()
+	loc := e.location()
 	startDay := YmdOf(e.StartsAt, loc)
 	cursor := civilDay(from.In(loc), loc)
 	startMidnight := startDay.Midnight(loc)
@@ -450,25 +460,22 @@ func (e Event) expandWeekly(from, to time.Time) []EventOccurrence {
 }
 
 func (e Event) expandMonthly(from, to time.Time) []EventOccurrence {
-	start := e.StartsAt
-	for start.Before(from) {
-		next := start.AddDate(0, 1, 0)
-		if !next.After(start) {
-			return nil
-		}
-		start = next
-	}
+	loc := e.location()
+	cursor := civilDay(e.StartsAt.In(loc), loc)
 	var out []EventOccurrence
-	for start.Before(to) {
-		day := YmdOf(start, Moscow())
+	for cursor.Before(to) {
+		day := YmdOf(cursor, loc)
 		if e.HasSlot(day) {
-			out = append(out, e.OccurrenceOn(day))
+			occ := e.OccurrenceOn(day)
+			if !occ.StartsAt.Before(from) && occ.StartsAt.Before(to) {
+				out = append(out, occ)
+			}
 		}
-		next := start.AddDate(0, 1, 0)
-		if !next.After(start) {
+		next := cursor.AddDate(0, 1, 0)
+		if !next.After(cursor) {
 			break
 		}
-		start = next
+		cursor = next
 	}
 	return out
 }
@@ -494,7 +501,7 @@ func (e Event) clampRange(from, to time.Time) (time.Time, time.Time) {
 	if e.RepeatUntil == nil {
 		return from, to
 	}
-	untilEnd := e.RepeatUntil.Midnight(Moscow()).Add(24 * time.Hour)
+	untilEnd := e.RepeatUntil.Midnight(e.location()).AddDate(0, 0, 1)
 	if untilEnd.Before(to) {
 		to = untilEnd
 	}
@@ -555,4 +562,44 @@ func containsInt(slots []int, slot int) bool {
 		}
 	}
 	return false
+}
+
+func (e Event) location() *time.Location {
+	loc, err := time.LoadLocation(e.Timezone)
+	if err != nil {
+		return Moscow()
+	}
+	return loc
+}
+
+func eventLocalTime(day Ymd, hour, minute, second int, loc *time.Location) time.Time {
+	civil, _ := time.Parse("2006-01-02", string(day))
+	naive := time.Date(civil.Year(), civil.Month(), civil.Day(), hour, minute, second, 0, time.UTC)
+	target := fmt.Sprintf("%sT%02d:%02d:%02d", day, hour, minute, second)
+	offsets := map[int]bool{}
+	candidates := []time.Time{}
+	for _, days := range []int{-2, -1, 0, 1, 2} {
+		_, offset := naive.Add(time.Duration(days) * 24 * time.Hour).In(loc).Zone()
+		if offsets[offset] {
+			continue
+		}
+		offsets[offset] = true
+		candidates = append(candidates, naive.Add(-time.Duration(offset)*time.Second))
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Before(candidates[j]) })
+	for _, candidate := range candidates {
+		if candidate.In(loc).Format("2006-01-02T15:04:05") == target {
+			return candidate
+		}
+	}
+	low, high := candidates[0].UnixNano(), candidates[len(candidates)-1].UnixNano()
+	for high-low > 1 {
+		middle := low + (high-low)/2
+		if time.Unix(0, middle).In(loc).Format("2006-01-02T15:04:05") >= target {
+			high = middle
+		} else {
+			low = middle
+		}
+	}
+	return time.Unix(0, high).UTC()
 }

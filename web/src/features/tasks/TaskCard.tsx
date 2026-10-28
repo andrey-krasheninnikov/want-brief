@@ -1,3 +1,4 @@
+import { useTimezone } from '../../shared/timezone'
 import { DotsSixVertical, UsersThree } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react'
@@ -70,6 +71,7 @@ export function TaskCard({
   onDragBegin,
   onMove,
 }: Props) {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
@@ -211,7 +213,7 @@ export function TaskCard({
               </span>
             ) : null}
             {foreign ? <span className="tasks-ext muted">{foreign}</span> : null}
-            {showCreated && item.createdAt ? <span className="muted">{createdLabel(item.createdAt)}</span> : null}
+            {showCreated && item.createdAt ? <span className="muted">{createdLabel(item.createdAt, tz)}</span> : null}
           </p>
         ) : null}
         <TaskDueRail item={item} compact />

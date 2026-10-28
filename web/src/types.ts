@@ -380,6 +380,7 @@ export type EventSeries = {
   type: EventType
   projectId: string | null
   startsAt: string
+  timezone: string
   durationSeconds: number
   recurrence: EventRecurrence
   repeatUntil: string | null
@@ -424,8 +425,8 @@ export function eventTypeLabel(type: EventType): string {
 
 const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-export function weekdaysFromStart(iso: string): number[] {
-  const short = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Europe/Moscow' }).format(new Date(iso))
+export function weekdaysFromStart(iso: string, timeZone: string): number[] {
+  const short = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(new Date(iso))
   const index = WEEKDAY_NAMES.indexOf(short)
   if (index < 0) return [0, 7]
   return [index, index + 7]

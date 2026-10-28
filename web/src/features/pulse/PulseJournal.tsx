@@ -1,3 +1,4 @@
+import { useTimezone } from '../../shared/timezone'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
@@ -21,11 +22,12 @@ function ownerHref(source: JournalSource, ownerId: string | null, search: string
   return null
 }
 
-function stamp(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+function stamp(iso: string, tz: string): string {
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: tz }).format(new Date(iso))
 }
 
 export function PulseJournal() {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const location = useLocation()
   const journal = useQuery({ queryKey: ['journal'], queryFn: api.journal })
@@ -100,7 +102,7 @@ export function PulseJournal() {
                       <span className="pulse-badge">{row.source}</span>
                     </td>
                     <td>{href ? <Link to={href}>{row.ownerName}</Link> : <strong>{row.ownerName}</strong>}</td>
-                    <td className="mono">{stamp(row.createdAt)}</td>
+                    <td className="mono">{stamp(row.createdAt, tz)}</td>
                     <td className="pulse-note-body">{row.body}</td>
                     <td>
                       {row.source === 'loose' ? (

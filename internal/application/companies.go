@@ -20,11 +20,30 @@ type CompanyWrite struct {
 }
 
 func (s *Service) ListCompanies(ctx context.Context) ([]domain.Company, error) {
-	return s.Companies.List(ctx)
+	rows, err := s.Companies.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	settings, err := s.scheduleSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		rows[i] = rows[i].WithTenureIn(s.now(), settings.Location())
+	}
+	return rows, nil
 }
 
 func (s *Service) GetCompany(ctx context.Context, id uuid.UUID) (domain.Company, error) {
-	return s.Companies.Get(ctx, id)
+	row, err := s.Companies.Get(ctx, id)
+	if err != nil {
+		return domain.Company{}, err
+	}
+	settings, err := s.scheduleSettings(ctx)
+	if err != nil {
+		return domain.Company{}, err
+	}
+	return row.WithTenureIn(s.now(), settings.Location()), nil
 }
 
 func (s *Service) CreateCompany(ctx context.Context, write CompanyWrite) (domain.Company, error) {
@@ -55,7 +74,11 @@ func (s *Service) AddCompanyTitle(ctx context.Context, id uuid.UUID, title strin
 	if err != nil {
 		return domain.Company{}, err
 	}
-	if err := company.SetTitle(title, s.dayOrToday(startedOn)); err != nil {
+	day, err := s.dayOrToday(ctx, startedOn)
+	if err != nil {
+		return domain.Company{}, err
+	}
+	if err := company.SetTitle(title, day); err != nil {
 		return domain.Company{}, err
 	}
 	return s.Companies.Update(ctx, company)
@@ -70,7 +93,11 @@ func (s *Service) AddCompanySalary(ctx context.Context, id uuid.UUID, currency s
 	if err != nil {
 		return domain.Company{}, err
 	}
-	if err := company.SetSalary(kind, amount, s.dayOrToday(startedOn), comment); err != nil {
+	day, err := s.dayOrToday(ctx, startedOn)
+	if err != nil {
+		return domain.Company{}, err
+	}
+	if err := company.SetSalary(kind, amount, day, comment); err != nil {
 		return domain.Company{}, err
 	}
 	return s.Companies.Update(ctx, company)
@@ -86,7 +113,11 @@ func (s *Service) SetCompanyManager(ctx context.Context, id uuid.UUID, personID 
 			return domain.Company{}, err
 		}
 	}
-	if err := company.SetManager(personID, s.dayOrToday(startedOn)); err != nil {
+	day, err := s.dayOrToday(ctx, startedOn)
+	if err != nil {
+		return domain.Company{}, err
+	}
+	if err := company.SetManager(personID, day); err != nil {
 		return domain.Company{}, err
 	}
 	return s.Companies.Update(ctx, company)
@@ -100,7 +131,11 @@ func (s *Service) AddCompanyReport(ctx context.Context, id, personID uuid.UUID, 
 	if _, err := s.People.Get(ctx, personID); err != nil {
 		return domain.Company{}, err
 	}
-	if err := company.AddReport(personID, s.dayOrToday(startedOn)); err != nil {
+	day, err := s.dayOrToday(ctx, startedOn)
+	if err != nil {
+		return domain.Company{}, err
+	}
+	if err := company.AddReport(personID, day); err != nil {
 		return domain.Company{}, err
 	}
 	return s.Companies.Update(ctx, company)
@@ -111,7 +146,11 @@ func (s *Service) EndCompanyReport(ctx context.Context, id, reportID uuid.UUID, 
 	if err != nil {
 		return domain.Company{}, err
 	}
-	if err := company.EndReport(reportID, s.dayOrToday(endedOn)); err != nil {
+	day, err := s.dayOrToday(ctx, endedOn)
+	if err != nil {
+		return domain.Company{}, err
+	}
+	if err := company.EndReport(reportID, day); err != nil {
 		return domain.Company{}, err
 	}
 	return s.Companies.Update(ctx, company)
@@ -131,7 +170,11 @@ func (s *Service) SetCompanyContract(ctx context.Context, id uuid.UUID, personID
 			return domain.Company{}, err
 		}
 	}
-	if err := company.SetContract(personID, parsed, s.dayOrToday(startedOn)); err != nil {
+	day, err := s.dayOrToday(ctx, startedOn)
+	if err != nil {
+		return domain.Company{}, err
+	}
+	if err := company.SetContract(personID, parsed, day); err != nil {
 		return domain.Company{}, err
 	}
 	return s.Companies.Update(ctx, company)
@@ -180,11 +223,15 @@ func (s *Service) DeleteCompanyNote(ctx context.Context, companyID, noteID uuid.
 	return s.CompanyNotes.Delete(ctx, noteID)
 }
 
-func (s *Service) dayOrToday(day *time.Time) time.Time {
+func (s *Service) dayOrToday(ctx context.Context, day *time.Time) (time.Time, error) {
 	if day != nil {
-		return *day
+		return *day, nil
 	}
-	return domain.MoscowDate(s.now())
+	settings, err := s.scheduleSettings(ctx)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return domain.DateAt(s.now(), settings.Location()), nil
 }
 
 func draftFromCompany(write CompanyWrite) domain.CompanyDraft {

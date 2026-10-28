@@ -1,3 +1,5 @@
+import { useTimezone } from '../../shared/timezone'
+import { zonedInstant, zonedLocalInput } from '../../shared/zoned'
 import { ArrowCounterClockwise, ArrowsClockwise, ChatTeardrop, Clock, Copy, Snowflake, Trash } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -31,16 +33,8 @@ type Props = {
   onGone: () => void
 }
 
-function toLocalInput(iso: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function isoFromInput(raw: string): string {
-  return new Date(raw).toISOString()
+function toLocalInput(iso: string | null, tz: string): string {
+  return iso ? zonedLocalInput(iso, tz) : ''
 }
 
 function sourceHref(links: ProjectLink[]): string {
@@ -56,6 +50,7 @@ function statusTone(item: Item): string {
 }
 
 export function TaskBrief({ item, task, onGone }: Props) {
+  const tz = useTimezone()
   const { patch, mark, hint } = task
   const promptLog = useTaskLogPrompt()
   const offerUndo = useTaskUndo()
@@ -63,10 +58,10 @@ export function TaskBrief({ item, task, onGone }: Props) {
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
   const intervals = useQuery({ queryKey: ['intervals'], queryFn: api.intervals, refetchInterval: 1000 })
   const [description, setDescription] = useState(item.description)
-  const [dueAt, setDueAt] = useState(toLocalInput(item.dueAt))
-  const [devDueAt, setDevDueAt] = useState(toLocalInput(item.devDueAt))
-  const [reviewDueAt, setReviewDueAt] = useState(toLocalInput(item.reviewDueAt))
-  const [testDueAt, setTestDueAt] = useState(toLocalInput(item.testDueAt))
+  const [dueAt, setDueAt] = useState(toLocalInput(item.dueAt, tz))
+  const [devDueAt, setDevDueAt] = useState(toLocalInput(item.devDueAt, tz))
+  const [reviewDueAt, setReviewDueAt] = useState(toLocalInput(item.reviewDueAt, tz))
+  const [testDueAt, setTestDueAt] = useState(toLocalInput(item.testDueAt, tz))
   const [externalKey, setExternalKey] = useState(item.externalKey)
   const [copied, setCopied] = useState(false)
   const [kindConfirm, setKindConfirm] = useState<ItemKind | null>(null)
@@ -74,10 +69,10 @@ export function TaskBrief({ item, task, onGone }: Props) {
 
   useEffect(() => {
     setDescription(item.description)
-    setDueAt(toLocalInput(item.dueAt))
-    setDevDueAt(toLocalInput(item.devDueAt))
-    setReviewDueAt(toLocalInput(item.reviewDueAt))
-    setTestDueAt(toLocalInput(item.testDueAt))
+    setDueAt(toLocalInput(item.dueAt, tz))
+    setDevDueAt(toLocalInput(item.devDueAt, tz))
+    setReviewDueAt(toLocalInput(item.reviewDueAt, tz))
+    setTestDueAt(toLocalInput(item.testDueAt, tz))
     setExternalKey(item.externalKey)
   }, [
     item.id,
@@ -88,6 +83,7 @@ export function TaskBrief({ item, task, onGone }: Props) {
     item.reviewDueAt,
     item.testDueAt,
     item.externalKey,
+    tz,
   ])
 
   const syncRemote = useMutation({
@@ -130,8 +126,8 @@ export function TaskBrief({ item, task, onGone }: Props) {
       if (current) patch.mutate({ body: { [key]: '' }, field: key })
       return
     }
-    const iso = isoFromInput(raw)
-    if (iso === current) return
+    const iso = zonedInstant(raw, tz)
+    if (!iso || iso === current) return
     patch.mutate({ body: { [key]: iso }, field: key })
   }
 
@@ -194,7 +190,7 @@ export function TaskBrief({ item, task, onGone }: Props) {
   const remote = item.sourceKind === 'jira' || item.sourceKind === 'todoist'
   const running = (intervals.data ?? []).find((entry) => entry.itemId === item.id)
   const source = (sources.data ?? []).find((entry) => entry.id === item.sourceId)
-  const lastSync = source?.lastSyncAt ? createdLabel(source.lastSyncAt) : 'never'
+  const lastSync = source?.lastSyncAt ? createdLabel(source.lastSyncAt, tz) : 'never'
   const pullLabel = item.sourceKind === 'todoist' ? 'Pull Todoist' : 'Pull Jira'
   const link = sourceHref(item.links ?? [])
   const identity = Boolean(item.archivedAt || item.externalStatus || (!manual && item.externalKey) || link)

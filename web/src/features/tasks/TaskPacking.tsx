@@ -3,18 +3,15 @@ import { useState } from 'react'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
 import { span } from '../../shared/format'
-import { moscowWeek } from '../../shared/moscow'
+import { useTimezone } from '../../shared/timezone'
+import { zonedInstant, zonedLocalInput, zonedWeek } from '../../shared/zoned'
 import { OCCUPANCIES, occupancyLabel, type Item, type Occupancy } from '../../types'
 import type { TaskPatch } from './useTaskPatch'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
-function toLocalInput(iso: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+function toLocalInput(iso: string | null, tz: string): string {
+  return iso ? zonedLocalInput(iso, tz) : ''
 }
 
 const OCCUPANCY_NOTE: Record<Occupancy, string> = {
@@ -44,10 +41,11 @@ function deltaLabel(seconds: number): string {
 
 // WhatIfLine answers one question: what happens to the week if this task slips by seven days.
 function WhatIfLine({ item }: { item: Item }) {
-  const week = moscowWeek(new Date())
+  const tz = useTimezone()
+  const week = zonedWeek(new Date(), tz)
   const due = packingDue(item)
   const query = useQuery({
-    queryKey: ['task-whatif', item.id, due, week.from],
+    queryKey: ['task-whatif', item.id, due, week.from, tz],
     enabled: Boolean(due) && packable(item),
     queryFn: () =>
       api.scheduleWhatIf({
@@ -73,10 +71,11 @@ function WhatIfLine({ item }: { item: Item }) {
 
 // TaskPacking groups the knobs the packer reads from a task: occupancy, pin instant, slip preview.
 export function TaskPacking({ item, task }: { item: Item; task: TaskPatch }) {
+  const tz = useTimezone()
   const { patch, hint } = task
   // The draft is valid only against the server value it was typed over; a fresh
   // server value wins without an effect.
-  const stored = toLocalInput(item.pinnedAt)
+  const stored = toLocalInput(item.pinnedAt, tz)
   const [draft, setDraft] = useState({ base: stored, value: stored })
   const pinnedAt = draft.base === stored ? draft.value : stored
   const setPinnedAt = (value: string) => setDraft({ base: stored, value })
@@ -86,7 +85,8 @@ export function TaskPacking({ item, task }: { item: Item; task: TaskPatch }) {
       if (item.pinnedAt) patch.mutate({ body: { pinnedAt: '' }, field: 'pinnedAt' })
       return
     }
-    const iso = new Date(raw).toISOString()
+    const iso = zonedInstant(raw, tz)
+    if (!iso) return
     if (iso === item.pinnedAt) return
     patch.mutate({ body: { pinnedAt: iso }, field: 'pinnedAt' })
   }

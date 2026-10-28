@@ -1,3 +1,4 @@
+import { useTimezone } from '../../shared/timezone'
 import type { PersonBond } from '../../types'
 import { bondKindLabel } from './peopleModel'
 
@@ -5,11 +6,12 @@ type Props = {
   bonds: PersonBond[]
 }
 
-function stamp(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+function stamp(iso: string, tz: string): string {
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: tz }).format(new Date(iso))
 }
 
 export function PersonLog({ bonds }: Props) {
+  const tz = useTimezone()
   const entries = bonds
     .flatMap((bond) =>
       bond.events.map((event) => ({
@@ -29,7 +31,7 @@ export function PersonLog({ bonds }: Props) {
       {entries.map((entry) => (
         <article key={entry.key} className="people-note">
           <p className="people-kicker">
-            {entry.action} · {entry.label} · {stamp(entry.at)}
+            {entry.action} · {entry.label} · {stamp(entry.at, tz)}
           </p>
           {entry.comment ? <p>{entry.comment}</p> : null}
         </article>

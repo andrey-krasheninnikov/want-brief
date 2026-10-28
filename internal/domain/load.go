@@ -76,16 +76,15 @@ func mean(sum, n int) *float64 {
 	return &value
 }
 
-func LoadByDay(intervals []TimeInterval, from, to, now time.Time) []DayLoad {
+func LoadByDay(intervals []TimeInterval, from, to, now time.Time, loc *time.Location) []DayLoad {
 	if !to.After(from) {
 		return []DayLoad{}
 	}
-	loc := Moscow()
 	start := from.In(loc)
 	cursor := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
 	out := []DayLoad{}
 	for cursor.Before(to) {
-		dayTo := cursor.Add(24 * time.Hour)
+		dayTo := cursor.AddDate(0, 0, 1)
 		clipFrom := cursor
 		if clipFrom.Before(from) {
 			clipFrom = from

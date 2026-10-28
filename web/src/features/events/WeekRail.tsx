@@ -8,10 +8,10 @@ type Props = {
 }
 
 function dayParts(ymd: string) {
-  const date = new Date(`${ymd}T12:00:00+03:00`)
+  const date = new Date(`${ymd}T12:00:00Z`)
   return {
-    week: new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'Europe/Moscow' }).format(date),
-    num: new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'Europe/Moscow' }).format(date),
+    week: new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(date),
+    num: new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'UTC' }).format(date),
   }
 }
 

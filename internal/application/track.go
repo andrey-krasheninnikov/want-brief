@@ -138,6 +138,10 @@ func (s *Service) Load(ctx context.Context, from, to time.Time) (domain.LoadRepo
 		return domain.LoadReport{}, err
 	}
 
+	settings, err := s.scheduleSettings(ctx)
+	if err != nil {
+		return domain.LoadReport{}, err
+	}
 	now := s.now()
 	itemsByID := map[uuid.UUID]domain.Item{}
 	for _, item := range items {
@@ -228,7 +232,7 @@ func (s *Service) Load(ctx context.Context, from, to time.Time) (domain.LoadRepo
 		WallSeconds:      domain.WallSeconds(intervals, from, to, now),
 		ByProject:        byProject,
 		ByItem:           itemLoads,
-		ByDay:            domain.LoadByDay(intervals, from, to, now),
+		ByDay:            domain.LoadByDay(intervals, from, to, now, settings.Location()),
 		Stress:           stress,
 		Averages:         averages,
 		AverageStress:    averages.Stress,

@@ -16,6 +16,7 @@ type EventWrite struct {
 	Type              string
 	ProjectID         *uuid.UUID
 	StartsAt          time.Time
+	Timezone          string
 	DurationSeconds   int
 	Recurrence        string
 	RepeatUntil       *domain.Ymd
@@ -177,6 +178,9 @@ func (s *Service) ReplaceEvent(ctx context.Context, id uuid.UUID, write EventWri
 	if err != nil {
 		return domain.Event{}, err
 	}
+	if write.Timezone == "" {
+		draft.Timezone = event.Timezone
+	}
 	if err := event.Apply(draft); err != nil {
 		return domain.Event{}, err
 	}
@@ -231,6 +235,7 @@ func draftFromWrite(write EventWrite) (domain.EventDraft, error) {
 		Type:              typ,
 		ProjectID:         write.ProjectID,
 		StartsAt:          write.StartsAt,
+		Timezone:          write.Timezone,
 		DurationSeconds:   duration,
 		Recurrence:        rec,
 		RepeatUntil:       write.RepeatUntil,

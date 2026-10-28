@@ -1,5 +1,6 @@
 import type { Company, CompanySalary, CompanyTitle, ContractKind, Person } from '../../types'
-import { moscowYmd } from '../../shared/moscow'
+import { useTimezone } from '../../shared/timezone'
+import { zonedYmd } from '../../shared/zoned'
 import { CareerLogTable } from './CompanyLog'
 import {
   careerLog,
@@ -33,16 +34,16 @@ function dayMs(iso: string): number {
   return new Date(`${dateOnly(iso)}T00:00:00Z`).getTime()
 }
 
-function axisOf(salaries: CompanySalary[], startedOn?: string | null): { from: number; to: number } {
+function axisOf(salaries: CompanySalary[], today: string, startedOn?: string | null): { from: number; to: number } {
   const stamps = [
     ...salaries.map((row) => row.startedOn),
-    ...salaries.map((row) => row.endedOn ?? moscowYmd()),
+    ...salaries.map((row) => row.endedOn ?? today),
     startedOn,
   ].filter(Boolean) as string[]
-  const today = dayMs(moscowYmd())
-  if (stamps.length === 0) return { from: today - PAD, to: today }
+  const todayMs = dayMs(today)
+  if (stamps.length === 0) return { from: todayMs - PAD, to: todayMs }
   const times = stamps.map(dayMs)
-  const to = Math.max(...times, today)
+  const to = Math.max(...times, todayMs)
   return { from: Math.min(to - PAD, ...times), to }
 }
 
@@ -51,14 +52,14 @@ function xAt(at: number, from: number, to: number): number {
   return 56 + ((at - from) / span) * 600
 }
 
-function salarySteps(rows: CompanySalary[], currency: CompanySalary['currency'], from: number, to: number, max: number): Point[] {
+function salarySteps(rows: CompanySalary[], currency: CompanySalary['currency'], from: number, to: number, max: number, today: string): Point[] {
   const series = rows.filter((row) => row.currency === currency).sort((a, b) => a.startedOn.localeCompare(b.startedOn))
   const points: Point[] = []
   let cursor = -Infinity
   for (const row of series) {
     const y = 18 + ((max - row.amount) / Math.max(max, 1)) * 148
     let start = xAt(dayMs(row.startedOn), from, to)
-    let end = xAt(dayMs(row.endedOn ?? moscowYmd()), from, to)
+    let end = xAt(dayMs(row.endedOn ?? today), from, to)
     start = Math.max(start, cursor)
     end = Math.max(end, start + 36)
     cursor = end
@@ -79,7 +80,7 @@ function areaPath(points: Point[]): string {
   return `${linePath(points)} L ${last.x.toFixed(1)} 166 L ${first.x.toFixed(1)} 166 Z`
 }
 
-function SalaryChart({ salaries }: { salaries: CompanySalary[] }) {
+function SalaryChart({ salaries, today }: { salaries: CompanySalary[]; today: string }) {
   if (salaries.length === 0) {
     return (
       <div className="companies-empty">
@@ -88,11 +89,11 @@ function SalaryChart({ salaries }: { salaries: CompanySalary[] }) {
       </div>
     )
   }
-  const { from, to } = axisOf(salaries)
+  const { from, to } = axisOf(salaries, today)
   const usdMax = Math.max(1, ...salaries.filter((row) => row.currency === 'usd').map((row) => row.amount))
   const rubMax = Math.max(1, ...salaries.filter((row) => row.currency === 'rub').map((row) => row.amount))
-  const usd = salarySteps(salaries, 'usd', from, to, usdMax)
-  const rub = salarySteps(salaries, 'rub', from, to, rubMax)
+  const usd = salarySteps(salaries, 'usd', from, to, usdMax, today)
+  const rub = salarySteps(salaries, 'rub', from, to, rubMax, today)
   const ticks = [0, 1, 2, 3, 4]
   const scale = usd.length ? usdMax : rubMax
   return (
@@ -206,6 +207,8 @@ function TitleRails({ titles, from, to }: { titles: CompanyTitle[]; from: string
 }
 
 export function CompanyOverview({ company, people }: Props) {
+  const tz = useTimezone()
+  const today = zonedYmd(new Date(), tz)
   const title = openOf(company.titles)
   const salary = openOf(company.salaries)
   const delta = salaryDelta(company.salaries)
@@ -214,8 +217,8 @@ export function CompanyOverview({ company, people }: Props) {
   const manager = people.find((row) => row.id === managerId)?.name || 'No manager'
   const names = new Map(people.map((row) => [row.id, row.name]))
   const log = careerLog(company, names).slice(0, 5)
-  const railFrom = dateOnly(company.startedOn) || dateOnly(company.titles[0]?.startedOn) || moscowYmd()
-  const railTo = dateOnly(company.endedOn) || moscowYmd()
+  const railFrom = dateOnly(company.startedOn) || dateOnly(company.titles[0]?.startedOn) || today
+  const railTo = dateOnly(company.endedOn) || today
 
   return (
     <section id="company-sec-overview" className="people-section">
@@ -268,7 +271,7 @@ export function CompanyOverview({ company, people }: Props) {
                 </li>
               </ul>
             </div>
-            <SalaryChart salaries={company.salaries ?? []} />
+            <SalaryChart salaries={company.salaries ?? []} today={today} />
           </div>
         </article>
         <article className="companies-tile companies-donut">

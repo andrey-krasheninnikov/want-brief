@@ -1465,6 +1465,7 @@ type eventBody struct {
 	Type              string               `json:"type"`
 	ProjectID         *string              `json:"projectId"`
 	StartsAt          string               `json:"startsAt"`
+	Timezone          string               `json:"timezone"`
 	DurationSeconds   int                  `json:"durationSeconds"`
 	Recurrence        string               `json:"recurrence"`
 	RepeatUntil       *string              `json:"repeatUntil"`
@@ -1511,6 +1512,7 @@ func decodeEventWrite(r *http.Request) (application.EventWrite, error) {
 		Type:              body.Type,
 		ProjectID:         projectID,
 		StartsAt:          startsAt,
+		Timezone:          body.Timezone,
 		DurationSeconds:   body.DurationSeconds,
 		Recurrence:        body.Recurrence,
 		RepeatUntil:       until,

@@ -3,7 +3,7 @@ import { useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
-import { moscowYmd } from '../../shared/moscow'
+import { zonedInstant, zonedYmd } from '../../shared/zoned'
 import { openTask } from '../../shared/taskOverlay'
 import type { UnplannedItem } from '../../types'
 
@@ -22,29 +22,22 @@ function dueTitle(field: ReturnType<typeof dueField>, itemKind: string): string 
   return 'Dev due'
 }
 
-function isoFromInput(raw: string): string {
-  return new Date(raw).toISOString()
-}
-
 function shiftYmd(ymd: string, days: number): string {
   const [year, month, day] = ymd.split('-').map(Number)
   const next = new Date(Date.UTC(year, month - 1, day + days))
   return next.toISOString().slice(0, 10)
 }
 
-function nextFriday1800(now = new Date()): string {
-  const ymd = moscowYmd(now)
+function nextFriday1800(tz: string, now = new Date()): string {
+  const ymd = zonedYmd(now, tz)
   const [year, month, day] = ymd.split('-').map(Number)
   const weekday = new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay()
   const friday = shiftYmd(ymd, (5 - weekday + 7) % 7)
-  const at = new Date(`${friday}T18:00:00+03:00`)
-  if (at.getTime() <= now.getTime()) {
-    return new Date(`${shiftYmd(friday, 7)}T18:00:00+03:00`).toISOString()
-  }
-  return at.toISOString()
+  const at = zonedInstant(`${friday}T18:00`, tz)!
+  return new Date(at).getTime() <= now.getTime() ? zonedInstant(`${shiftYmd(friday, 7)}T18:00`, tz)! : at
 }
 
-function NeedCard({ row, delay, kind }: { row: UnplannedItem; delay: number; kind: 'work' | 'followup' }) {
+function NeedCard({ row, delay, kind, tz }: { row: UnplannedItem; delay: number; kind: 'work' | 'followup'; tz: string }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [due, setDue] = useState('')
@@ -64,7 +57,8 @@ function NeedCard({ row, delay, kind }: { row: UnplannedItem; delay: number; kin
 
   function saveDue(raw: string) {
     if (!raw) return
-    patch.mutate({ [field]: isoFromInput(raw) })
+    const iso = zonedInstant(raw, tz)
+    if (iso) patch.mutate({ [field]: iso })
   }
 
   function savePlan(hoursRaw: string, minutesRaw: string) {
@@ -93,7 +87,7 @@ function NeedCard({ row, delay, kind }: { row: UnplannedItem; delay: number; kin
               {dueTitle(field, row.item.kind)}
               <DateField mode="datetime" value={due} onChange={setDue} onCommit={saveDue} />
             </label>
-            <button type="button" className="ghost sched-need-chip" onClick={() => patch.mutate({ [field]: nextFriday1800() })}>
+            <button type="button" className="ghost sched-need-chip" onClick={() => patch.mutate({ [field]: nextFriday1800(tz) })}>
               Friday 18:00
             </button>
           </>
@@ -152,13 +146,13 @@ function NeedCard({ row, delay, kind }: { row: UnplannedItem; delay: number; kin
 }
 
 // rows arrive in packer order from the server.
-export function NeedsFields({ rows, kind }: { rows: UnplannedItem[]; kind: 'work' | 'followup' }) {
+export function NeedsFields({ rows, kind, tz }: { rows: UnplannedItem[]; kind: 'work' | 'followup'; tz: string }) {
   if (rows.length === 0) return null
   return (
     <aside className="sched-needs">
       <p className="sched-need-kicker">Needs fields</p>
       {rows.map((row, i) => (
-        <NeedCard key={row.item.id} row={row} delay={i} kind={kind} />
+        <NeedCard key={row.item.id} row={row} delay={i} kind={kind} tz={tz} />
       ))}
     </aside>
   )

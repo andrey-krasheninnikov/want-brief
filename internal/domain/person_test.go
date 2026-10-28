@@ -129,3 +129,17 @@ func TestPersonCompaniesEmptyAndOptionalComment(t *testing.T) {
 		t.Fatalf("got %+v", person.Companies)
 	}
 }
+
+func TestPersonAgeAtInConfiguredZone(t *testing.T) {
+	born := time.Date(2000, 10, 29, 0, 0, 0, 0, time.UTC)
+	person := Person{BornOn: &born}
+	now := time.Date(2026, 10, 28, 23, 30, 0, 0, time.UTC)
+	london, _ := time.LoadLocation("Europe/London")
+	tokyo, _ := time.LoadLocation("Asia/Tokyo")
+	if got := *person.AgeAtIn(now, london); got != 25 {
+		t.Fatalf("London age = %d, want 25", got)
+	}
+	if got := *person.AgeAtIn(now, tokyo); got != 26 {
+		t.Fatalf("Tokyo age = %d, want 26", got)
+	}
+}

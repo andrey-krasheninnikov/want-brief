@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Want Brief design preview</title>
+  <style>
+    :root {
+      font-family: 'Manrope Variable', Manrope, system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+      color-scheme: dark;
+      --background: #141414;
+      --foreground: #e8e8e8;
+      --card: #1c1c1c;
+      --popover: #252525;
+      --secondary: #252525;
+      --muted: #adadad;
+      --border: #383838;
+      --primary: #5962f0;
+      --primary-hover: #5059de;
+      --primary-text: #fff;
+      --danger: #ff738d;
+      --ring: #5962f0;
+      --quiet: #101010;
+    }
+    body[data-theme='light'] {
+      color-scheme: light;
+      --background: #f6f5f3;
+      --foreground: #242321;
+      --card: #fff;
+      --popover: #fff;
+      --secondary: #ecebe8;
+      --muted: #5f5b58;
+      --border: #d4d1cd;
+      --primary: #5962f0;
+      --primary-hover: #5059de;
+      --primary-text: #fff;
+      --danger: #b22b42;
+      --ring: #5962f0;
+      --quiet: #f0eeeb;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; color: var(--foreground); background: var(--background); }
+    button, input, select, textarea { font: inherit; }
+    button, input, select, textarea { color: var(--foreground); background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+    button, select { min-height: 44px; }
+    button { padding: 9px 14px; cursor: pointer; }
+    button:hover { background: var(--secondary); }
+    button:disabled { cursor: default; opacity: .55; }
+    input, select, textarea { min-width: 0; padding: 10px 12px; }
+    textarea { min-height: 88px; resize: vertical; }
+    :focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+    a { color: inherit; }
+    p { margin: 0; }
+    h1, h2, h3 { margin: 0; line-height: 1.15; }
+    h1 { font-size: clamp(28px, 3.2vw, 40px); letter-spacing: -.04em; }
+    h2 { font-size: clamp(22px, 2.4vw, 30px); letter-spacing: -.03em; }
+    h3 { font-size: 18px; }
+    small, .muted { color: var(--muted); font-size: 14px; }
+    .display { font-family: 'Days One', 'Manrope Variable', Manrope, system-ui, sans-serif; letter-spacing: -.045em; }
+    .skip-link { position: fixed; top: -60px; left: 12px; z-index: 40; padding: 10px 14px; background: var(--card); }
+    .skip-link:focus { top: 8px; }
+    .preview-bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 16px; min-height: 68px; padding: 10px max(20px, calc((100vw - 1500px) / 2)); background: var(--popover); border-bottom: 1px solid var(--border); }
+    .preview-name { font-weight: 700; white-space: nowrap; }
+    .preview-bar label { display: flex; align-items: center; gap: 8px; min-width: 0; margin-left: auto; font-size: 14px; }
+    .preview-bar select { width: min(250px, 36vw); }
+    .preview-note { font-size: 14px; color: var(--muted); }
+    .app { display: grid; grid-template-columns: 214px minmax(0, 1fr); gap: 20px; max-width: 1500px; min-height: calc(100dvh - 68px); margin: auto; padding: 20px; }
+    .side { display: flex; flex-direction: column; align-self: start; position: sticky; top: 88px; min-height: calc(100dvh - 108px); padding: 16px 10px; background: var(--card); border-radius: 24px; }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 20px; font-weight: 700; }
+    .brand img { width: 32px; height: 32px; border-radius: 8px; }
+    .side nav, .side-foot { display: grid; gap: 4px; }
+    .side-foot { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+    .nav-item { width: 100%; text-align: left; border-color: transparent; background: transparent; }
+    .nav-item[aria-current='page'] { background: var(--secondary); box-shadow: inset 3px 0 0 var(--primary); font-weight: 700; }
+    main { min-width: 0; }
+    .screen { display: grid; gap: 20px; padding: 24px; min-height: calc(100dvh - 108px); background: var(--card); border-radius: 24px; align-content: start; }
+    .screen-login { display: grid; place-items: center; }
+    .screen-login > .surface { width: min(440px, 100%); }
+    body[data-page='login'] .app { display: block; }
+    body[data-page='login'] .side, body[data-page='login'] .mobile-nav { display: none; }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+    .page-header p { margin-top: 8px; color: var(--muted); }
+    .actions, .row, .summary-row, .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .actions { justify-content: flex-end; }
+    .button-primary { color: var(--primary-text); background: var(--primary); border-color: var(--primary); font-weight: 700; }
+    .button-primary:hover { color: var(--primary-text); background: var(--primary-hover); }
+    .button-quiet { background: transparent; }
+    .surface { padding: 20px; background: var(--secondary); border-radius: 24px; }
+    .surface h2, .surface h3 { margin-bottom: 12px; }
+    .stack { display: grid; gap: 16px; }
+    .stack-tight { display: grid; gap: 8px; }
+    .two-col { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(250px, 1fr); gap: 16px; }
+    .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .metric { padding: 16px; background: var(--quiet); border-radius: 12px; }
+    .metric strong { display: block; margin: 4px 0; font-size: 27px; }
+    .hero-work { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 16px; padding: 24px; background: var(--primary); color: var(--primary-text); border-radius: 32px; }
+    .hero-work small { color: var(--primary-text); }
+    .hero-work h2 { margin: 8px 0; font-size: clamp(26px, 3.5vw, 50px); }
+    .hero-work .button-primary { background: #fff; color: #242321; border-color: #fff; }
+    .list { display: grid; gap: 0; list-style: none; padding: 0; margin: 0; }
+    .list li { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+    .list li:first-child { border-top: 0; }
+    .list strong { display: block; overflow-wrap: anywhere; }
+    .list small { display: block; margin-top: 3px; }
+    .pill { display: inline-flex; align-items: center; min-height: 28px; padding: 3px 9px; border-radius: 999px; background: var(--quiet); font-size: 14px; white-space: nowrap; }
+    .pill-risk { color: var(--danger); }
+    .empty { display: grid; justify-items: start; gap: 8px; padding: 24px; background: var(--quiet); border-radius: 12px; }
+    .empty p { color: var(--muted); }
+    .field { display: grid; gap: 6px; min-width: 0; font-size: 14px; font-weight: 600; }
+    .field input, .field select, .field textarea { width: 100%; font-size: 16px; font-weight: 400; }
+    fieldset { margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+    fieldset label { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+    fieldset input[type='checkbox'] { width: 20px; height: 20px; padding: 0; accent-color: var(--primary); }
+    .form-error { color: var(--danger); font-size: 14px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .board-column { display: grid; align-content: start; gap: 10px; padding: 14px; background: var(--quiet); border-radius: 12px; }
+    .board-column h2 { font-size: 18px; }
+    .task-card { display: grid; gap: 8px; padding: 14px; background: var(--card); border-radius: 12px; }
+    .task-card strong { overflow-wrap: anywhere; }
+    .calendar { display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr)); gap: 8px; min-width: 1050px; }
+    .calendar-day { min-height: 185px; padding: 12px; background: var(--quiet); border-radius: 12px; }
+    .calendar-day strong { display: block; margin-bottom: 12px; }
+    .event { padding: 10px; margin-top: 8px; background: var(--card); border-left: 3px solid var(--primary); border-radius: 8px; font-size: 14px; }
+    .scroll-x { overflow-x: auto; padding-bottom: 4px; }
+    .schedule-grid { display: grid; grid-template-columns: 80px repeat(5, minmax(120px, 1fr)); gap: 6px; min-width: 760px; }
+    .schedule-grid > div { min-height: 64px; padding: 9px; background: var(--quiet); border-radius: 8px; font-size: 14px; }
+    .schedule-grid .slot { background: var(--primary); color: var(--primary-text); }
+    .quadrants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .quadrant { min-height: 180px; padding: 16px; background: var(--quiet); border-radius: 12px; }
+    .quadrant h2 { margin-bottom: 12px; font-size: 18px; }
+    .quadrant .task-card { margin-top: 8px; }
+    .directory { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(0, 1.2fr); gap: 16px; }
+    .directory .surface { min-width: 0; }
+    .chart { display: flex; align-items: end; gap: 8px; height: 160px; padding: 12px 12px 0; background: var(--quiet); border-radius: 12px; }
+    .chart span { flex: 1; min-width: 12px; background: var(--primary); border-radius: 5px 5px 0 0; }
+    .chart span:nth-child(even) { background: var(--muted); }
+    .source-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .notice { position: fixed; right: 16px; bottom: 16px; z-index: 50; max-width: 320px; padding: 12px 16px; color: var(--foreground); background: var(--popover); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px #0004; }
+    .mobile-nav { display: none; }
+    dialog { max-width: min(420px, calc(100vw - 24px)); width: 100%; padding: 20px; color: var(--foreground); background: var(--popover); border: 1px solid var(--border); border-radius: 24px; }
+    dialog::backdrop { background: #0009; }
+    dialog header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    dialog nav { display: grid; gap: 4px; }
+    @media (max-width: 1100px) {
+      .two-col, .three-col { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 900px) {
+      .preview-note { display: none; }
+      .app { display: block; padding: 12px 12px 84px; }
+      .side { display: none; }
+      .screen { min-height: calc(100dvh - 164px); padding: 18px; }
+      .mobile-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: 6px 8px max(6px, env(safe-area-inset-bottom)); background: var(--popover); border-top: 1px solid var(--border); }
+      .mobile-nav button { min-width: 0; min-height: 52px; padding: 4px 1px; font-size: 14px; border-color: transparent; background: transparent; }
+      .mobile-nav button[aria-current='page'] { background: var(--secondary); box-shadow: inset 0 3px 0 var(--primary); font-weight: 700; }
+      .notice { bottom: 80px; }
+    }
+    @media (max-width: 620px) {
+      .preview-bar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+      .preview-name { width: 100%; }
+      .preview-bar label { margin-left: 0; flex: 1; }
+      .preview-bar select { width: auto; flex: 1; }
+      .screen { padding: 16px; gap: 16px; }
+      .page-header { align-items: stretch; flex-direction: column; }
+      .actions { justify-content: flex-start; }
+      .hero-work, .metrics, .board, .quadrants, .directory, .form-grid { grid-template-columns: 1fr; }
+      .form-grid .full { grid-column: auto; }
+      .hero-work { align-items: start; }
+      .source-status { align-items: flex-start; flex-direction: column; }
+      .list li { flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    }
+    @media (prefers-reduced-transparency: reduce) {
+      dialog, .preview-bar, .mobile-nav { backdrop-filter: none; }
+    }
+    @media (forced-colors: active) {
+      :focus-visible { outline-color: Highlight; }
+      .nav-item[aria-current='page'], .mobile-nav button[aria-current='page'] { border: 2px solid Highlight; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#screen-title">Skip to content</a>
+  <header class="preview-bar">
+    <span class="preview-name">Want Brief · design preview</span>
+    <span class="preview-note">Sample data. Changes are not saved.</span>
+    <label for="screen-picker">Screen
+      <select id="screen-picker">
+        <option value="today">Today</option>
+        <option value="tasks">Tasks</option>
+        <option value="events">Events</option>
+        <option value="schedule">Schedule</option>
+        <option value="schedule-settings">Schedule settings</option>
+        <option value="matrix">Priorities</option>
+        <option value="projects">Projects</option>
+        <option value="people">People</option>
+        <option value="companies">Companies</option>
+        <option value="pulse">Pulse</option>
+        <option value="sources">Sources</option>
+        <option value="login">Login</option>
+      </select>
+    </label>
+    <button id="theme-toggle" type="button">Light theme</button>
+  </header>
+  <div class="app">
+    <aside class="side" aria-label="Main navigation">
+      <div class="brand"><img src="../../assets/logo_512px.png" alt="" width="32" height="32">Want Brief</div>
+      <nav id="desktop-nav" aria-label="Sections"></nav>
+      <div class="side-foot">
+        <button type="button" class="nav-item" data-demo="Check-in preview">Check-in</button>
+        <button type="button" class="nav-item" data-screen="login">Log out</button>
+      </div>
+    </aside>
+    <main id="main-content"><div id="screen-content"></div></main>
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Primary sections"></nav>
+  </div>
+  <dialog id="more-dialog" aria-labelledby="more-title">
+    <header><h2 id="more-title">More sections</h2><button id="close-more" type="button">Close</button></header>
+    <nav id="more-nav" aria-label="More sections"></nav>
+  </dialog>
+  <p class="notice" id="notice" role="status" hidden></p>
+
+  <template id="screen-today">
+    <div class="screen">
+      <header class="page-header"><div><h1 id="screen-title" tabindex="-1">Today</h1><p>Wednesday, 28 October. Start with the next useful action.</p></div><button type="button" data-demo="Check-in preview">Check-in</button></header>
+      <section class="hero-work" aria-labelledby="current-work"><div><small>Current work · 35 minutes tracked</small><h2 id="current-work" class="display">Review project proposal</h2><p>Finish the final notes before the 14:00 meeting.</p></div><button class="button-primary" type="button" data-demo="Timer preview">Open timer</button></section>
+      <div class="metrics"><div class="metric"><small>Available today</small><strong class="display">3 h 20 m</strong><small>After planned events</small></div><div class="metric"><small>At risk</small><strong class="display">2 tasks</strong><small>Need a decision today</small></div><div class="metric"><small>Earned this month</small><strong class="display">₽84,000</strong><small>Based on recorded time</small></div></div>
+      <div class="two-col"><section class="surface"><h2>Next up</h2><ul class="list"><li><div><strong>14:00 · Project meeting</strong><small>Discuss scope and owners</small></div><span class="pill">Event</span></li><li><div><strong>Prepare task outline</strong><small>Due today · 45 minutes</small></div><span class="pill">Task</span></li><li><div><strong>Review open questions</strong><small>Due tomorrow</small></div><span class="pill">Task</span></li></ul></section><section class="surface"><h2>Needs attention</h2><ul class="list"><li><div><strong>Confirm delivery date</strong><small>Deadline is close</small></div><span class="pill pill-risk">At risk</span></li><li><div><strong>Update source access</strong><small>Sync needs a new token</small></div><span class="pill pill-risk">Action needed</span></li></ul></section></div>
+    </div>
+  </template>
+
+  <template id="screen-tasks">
+    <div class="screen">
+      <header class="page-header"><div><h1 id="screen-title" tabindex="-1">Tasks</h1><p>Track work from all sources in one board.</p></div><button class="button-primary" type="button" data-demo="Task form preview">New task</button></header>
+      <div class="toolbar"><label class="field" for="task-search">Search tasks<input id="task-search" type="search" placeholder="Search by title"></label><label class="field" for="task-source">Source<select id="task-source"><option>All sources</option><option>Local</option><option>Jira</option><option>Todoist</option></select></label></div>
+      <div class="board"><section class="board-column"><h2>To do · 2</h2><article class="task-card"><strong>Prepare task outline</strong><small>Local · Today</small><span class="pill">To do</span></article><article class="task-card"><strong>Confirm delivery date</strong><small>Jira · Today</small><span class="pill pill-risk">At risk</span></article></section><section class="board-column"><h2>In progress · 1</h2><article class="task-card"><strong>Review project proposal</strong><small>35 minutes tracked</small><span class="pill">In progress</span></article></section><section class="board-column"><h2>Done · 0</h2><div class="empty"><strong>No completed tasks today</strong><p>Completed work will appear here.</p></div></section></div>
+      <section class="surface"><h2>Task details and form</h2><form class="form-grid"><label class="field full" for="task-title">Title<input id="task-title" value="Prepare task outline" required></label><label class="field" for="task-status">Status<select id="task-status"><option>To do</option><option>In progress</option><option>Done</option></select></label><label class="field" for="task-date">Due date<input id="task-date" type="date" value="2026-10-28"></label><label class="field full" for="task-notes">Notes<textarea id="task-notes">List the decisions needed before the meeting.</textarea></label><div class="full actions"><button class="button-primary" type="submit">Save task</button></div></form></section>
+    </div>
+  </template>
+
+  <template id="screen-events">
+    <div class="screen">
+      <header class="page-header"><div><h1 id="screen-title" tabindex="-1">Events</h1><p>Meetings and time blocks for the week.</p></div><button class="button-primary" type="button" data-demo="Event form preview">New event</button></header>
+      <section class="surface"><div class="row"><h2>26 October to 1 November</h2><span class="pill">Week view</span></div><div class="scroll-x"><div class="calendar"><div class="calendar-day"><strong>Mon 26</strong><div class="event">10:00<br>Planning</div></div><div class="calendar-day"><strong>Tue 27</strong><div class="event">13:00<br>Focus block</div></div><div class="calendar-day"><strong>Wed 28</strong><div class="event">14:00<br>Project meeting</div></div><div class="calendar-day"><strong>Thu 29</strong><p class="muted">No events. Time is available for planned work.</p></div><div class="calendar-day"><strong>Fri 30</strong><div class="event">11:00<br>Review</div></div><div class="calendar-day"><strong>Sat 31</strong><p class="muted">No events</p></div><div class="calendar-day"><strong>Sun 1</strong><p class="muted">No events</p></div></div></div></section>
+      <section class="surface"><h2>Event form</h2><form class="form-grid"><label class="field full" for="event-title">Title<input id="event-title" value="Project meeting" required></label><label class="field" for="event-start">Starts<input id="event-start" type="datetime-local" value="2026-10-28T14:00"></label><label class="field" for="event-end">Ends<input id="event-end" type="datetime-local" value="2026-10-28T15:00"></label><div class="full actions"><button class="button-primary" type="submit">Save event</button></div></form></section>
+    </div>
+  </template>
+
+  <template id="screen-schedule">
+    <div class="screen">
+      <header class="page-header"><div><h1 id="screen-title" tabindex="-1">Schedule</h1><p>See what fits before committing to more work.</p></div><button type="button" data-screen="schedule-settings">Settings</button></header>
+      <div class="metrics"><div class="metric"><small>Planned work</small><strong class="display">18 h</strong></div><div class="metric"><small>Available time</small><strong class="display">23 h</strong></div><div class="metric"><small>At risk</small><strong class="display">2 tasks</strong></div></div>
+      <section class="surface"><h2>Week of 26 October</h2><div class="scroll-x"><div class="schedule-grid"><div>Time</div><div>Monday</div><div>Tuesday</div><div>Wednesday</div><div>Thursday</div><div>Friday</div><div>Morning</div><div class="slot">Task outline<br>09:00 to 10:30</div><div>Available</div><div class="slot">Proposal review<br>09:00 to 11:00</div><div>Available</div><div class="slot">Weekly review<br>09:00 to 10:00</div><div>Afternoon</div><div class="slot">Source cleanup<br>14:00 to 15:00</div><div class="slot">Project notes<br>13:00 to 15:00</div><div>Meeting at 14:00</div><div>Available</div><div>Available</div></div></div></section>
+      <div class="two-col"><section class="surface"><h2>Work at risk</h2><ul class="list"><li><div><strong>Confirm delivery date</strong><small>Time left this week is limited</small></div><span class="pill pill-risk">At risk</span></li><li><div><strong>Prepare handoff</strong><small>Needs two open hours</small></div><span class="pill pill-risk">At risk</span></li></ul></section><section class="surface"><h2>Open time</h2><div class="empty"><strong>Thursday afternoon is free</strong><p>Move a task here to protect its deadline.</p></div></section></div>
+    </div>
+  </template>
+
+  <template id="screen-schedule-settings">
+    <div class="screen">
+      <header class="page-header"><div><h1 id="screen-title" tabindex="-1">Schedule settings</h1><p>Set working time and capacity for planning.</p></div><button type="button" data-screen="schedule">Back to schedule</button></header>
+      <section class="surface"><h2>Working week</h2><form class="stack"><fieldset><legend>Working days</legend><div class="row"><label><input type="checkbox" checked> Monday</label><label><input type="checkbox" checked> Tuesday</label><label><input type="checkbox" checked> Wednesday</label><label><input type="checkbox" checked> Thursday</label><label><input type="checkbox" checked> Friday</label></div></fieldset><div class="form-grid"><label class="field" for="work-start">Day starts<input id="work-start" type="time" value="09:00"></label><label class="field" for="work-end">Day ends<input id="work-end" type="time" value="18:00"></label><label class="field full" for="work-capacity">Planning capacity, hours per day<input id="work-capacity" type="number" min="1" max="24" value="6"></label></div><div class="actions"><button class="button-primary" type="submit">Save settings</button></div></form></section>
+      <section class="surface"><h2>Day overrides</h2><div class="empty"><strong>No overrides this week</strong><p>Adjust one day when your usual schedule changes.</p><button type="button" data-demo="Day override preview">Add override</button></div></section>
+    </div>
+  </template>
+
+  <template id="screen-matrix">
+    <div class="screen">
+      <header class="page-header"><div><h1 id="screen-title" tabindex="-1">Priorities</h1><p>Choose what deserves attention now.</p></div><button type="button" data-screen="tasks">All tasks</button></header>
+      <div class="quadrants"><section class="quadrant"><h2>Important and urgent</h2><div class="task-card"><strong>Confirm delivery date</strong><small>Due today</small></div></section><section class="quadrant"><h2>Important, not urgent</h2><div class="task-card"><strong>Prepare task outline</strong><small>Due next week</small></div></section><section class="quadrant"><h2>Urgent, less important</h2><div class="task-card"><strong>Update source access</strong><small>Sync is waiting</small></div></section><section class="quadrant"><h2>Later</h2><div class="empty"><strong>No tasks here</strong><p>Lower priority work will appear in this quadrant.</p></div></section></div>
+    </div>
+  </template>
+
+  <template id="screen-projects">
+    <div class="screen"><header class="page-header"><div><h1 id="screen-title" tabindex="-1">Projects</h1><p>Keep work and project context together.</p></div><button class="button-primary" type="button" data-demo="Project form preview">New project</button></header><div class="directory"><section class="surface"><h2>Projects</h2><ul class="list"><li><div><strong>Website refresh</strong><small>3 open tasks</small></div><span class="pill">Active</span></li><li><div><strong>Personal plan</strong><small>1 open task</small></div></li></ul></section><section class="surface"><h2>Website refresh</h2><p class="muted">Current delivery work and linked people.</p><div class="metrics"><div class="metric"><small>Open tasks</small><strong>3</strong></div><div class="metric"><small>Tracked time</small><strong>12 h</strong></div><div class="metric"><small>Due</small><strong>Friday</strong></div></div><h3>Notes</h3><div class="empty"><strong>No notes yet</strong><p>Add a decision or update for this project.</p><button type="button" data-demo="Project note preview">Add note</button></div></section></div></div>
+  </template>
+
+  <template id="screen-people">
+    <div class="screen"><header class="page-header"><div><h1 id="screen-title" tabindex="-1">People</h1><p>Find contacts and work history.</p></div><button class="button-primary" type="button" data-demo="Person form preview">New person</button></header><label class="field" for="people-search">Search people<input id="people-search" type="search" placeholder="Name or profession"></label><div class="directory"><section class="surface"><h2>People</h2><ul class="list"><li><div><strong>Alex Morgan</strong><small>Product lead · Website refresh</small></div></li><li><div><strong>Sam Rivera</strong><small>Designer</small></div></li></ul></section><section class="surface"><h2>Alex Morgan</h2><div class="summary-row"><span class="pill">Product lead</span><span class="pill">Website refresh</span></div><h3>Contacts</h3><ul class="list"><li><div><strong>Work email</strong><small>alex@example.com</small></div></li></ul><h3>Notes</h3><div class="empty"><strong>No notes yet</strong><p>Add a note after your next conversation.</p><button type="button" data-demo="Person note preview">Add note</button></div></section></div></div>
+  </template>
+
+  <template id="screen-companies">
+    <div class="screen"><header class="page-header"><div><h1 id="screen-title" tabindex="-1">Companies</h1><p>Review organizations and related work.</p></div><button class="button-primary" type="button" data-demo="Company form preview">New company</button></header><label class="field" for="company-search">Search companies<input id="company-search" type="search" placeholder="Company name"></label><div class="directory"><section class="surface"><h2>Companies</h2><ul class="list"><li><div><strong>Northstar Studio</strong><small>2 people · 1 project</small></div></li><li><div><strong>Open Field</strong><small>No active projects</small></div></li></ul></section><section class="surface"><h2>Northstar Studio</h2><p class="muted">Design and product work.</p><h3>People</h3><ul class="list"><li><div><strong>Alex Morgan</strong><small>Product lead</small></div></li><li><div><strong>Sam Rivera</strong><small>Designer</small></div></li></ul><div class="empty"><strong>No company notes yet</strong><p>Record context for the next project.</p><button type="button" data-demo="Company note preview">Add note</button></div></section></div></div>
+  </template>
+
+  <template id="screen-pulse">
+    <div class="screen"><header class="page-header"><div><h1 id="screen-title" tabindex="-1">Pulse</h1><p>Time, stress and notes in one view.</p></div><button type="button" data-demo="Check-in preview">Check-in</button></header><div class="metrics"><div class="metric"><small>Tracked this week</small><strong class="display">21 h</strong></div><div class="metric"><small>Wall-clock work</small><strong class="display">18 h</strong></div><div class="metric"><small>Average stress</small><strong class="display">3 / 5</strong></div></div><div class="two-col"><section class="surface"><h2>Time by day</h2><div class="chart" role="img" aria-label="Time tracked this week: Monday 4 hours, Tuesday 5, Wednesday 3, Thursday 6, Friday 3"><span style="height: 66%"></span><span style="height: 83%"></span><span style="height: 50%"></span><span style="height: 100%"></span><span style="height: 50%"></span></div><div class="row"><small>Mon</small><small>Tue</small><small>Wed</small><small>Thu</small><small>Fri</small></div></section><section class="surface"><h2>Journal</h2><div class="empty"><strong>No notes this week</strong><p>Record a short note after a check-in.</p><button type="button" data-demo="Journal note preview">Add note</button></div></section></div></div>
+  </template>
+
+  <template id="screen-sources">
+    <div class="screen"><header class="page-header"><div><h1 id="screen-title" tabindex="-1">Sources</h1><p>Bring assigned work into the same task view.</p></div></header><section class="surface"><h2>Connected sources</h2><ul class="list"><li class="source-status"><div><strong>Jira · Work</strong><small>Last synced today at 09:20</small></div><span class="pill">Connected</span></li><li class="source-status"><div><strong>Todoist · Personal</strong><small>Sync needs a new token</small></div><span class="pill pill-risk">Action needed</span></li></ul></section><section class="surface"><h2>Add a source</h2><form class="form-grid"><label class="field" for="source-kind">Service<select id="source-kind"><option>Jira</option><option>Todoist</option></select></label><label class="field" for="source-name">Name<input id="source-name" placeholder="Work"></label><label class="field full" for="source-url">Site URL<input id="source-url" type="url" placeholder="https://example.atlassian.net"></label><label class="field full" for="source-token">Access token<input id="source-token" type="password" autocomplete="off"></label><div class="full actions"><button class="button-primary" type="submit">Add source</button></div></form></section></div>
+  </template>
+
+  <template id="screen-login">
+    <div class="screen screen-login"><section class="surface"><div class="brand"><img src="../../assets/logo_512px.png" alt="" width="32" height="32">Want Brief</div><h1 id="screen-title" tabindex="-1">Welcome back</h1><p class="muted">Sign in to see your work.</p><form class="stack"><label class="field" for="login-password">Password<input id="login-password" type="password" autocomplete="current-password" aria-invalid="true" aria-describedby="login-error" required></label><p class="form-error" id="login-error" role="alert">Incorrect password. Try again.</p><button class="button-primary" type="submit">Sign in</button></form></section></div>
+  </template>
+
+  <script>
+    const pages = [
+      ['today', 'Today'], ['tasks', 'Tasks'], ['events', 'Events'],
+      ['schedule', 'Schedule'], ['matrix', 'Priorities'], ['projects', 'Projects'],
+      ['people', 'People'], ['companies', 'Companies'], ['pulse', 'Pulse'],
+      ['sources', 'Sources'],
+    ]
+    const mobile = [
+      ['today', 'Today'], ['tasks', 'Tasks'], ['events', 'Events'],
+      ['schedule', 'Plan'], ['matrix', 'Focus'],
+    ]
+    const content = document.getElementById('screen-content')
+    const picker = document.getElementById('screen-picker')
+    const themeToggle = document.getElementById('theme-toggle')
+    const moreDialog = document.getElementById('more-dialog')
+    const moreButton = document.createElement('button')
+    const notice = document.getElementById('notice')
+    let noticeTimer
+    const screenIds = [...picker.options].map(option => option.value)
+    if (screenIds.length !== 12 || !screenIds.every(id => document.getElementById(`screen-${id}`))) {
+      throw new Error('Screen preview is incomplete')
+    }
+
+    function navButton(id, label, className = 'nav-item') {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = className
+      button.dataset.screen = id
+      button.textContent = label
+      if (label !== pages.find(([key]) => key === id)?.[1]) button.setAttribute('aria-label', pages.find(([key]) => key === id)?.[1] ?? label)
+      return button
+    }
+    for (const [id, label] of pages) document.getElementById('desktop-nav').append(navButton(id, label))
+    for (const [id, label] of mobile) document.getElementById('mobile-nav').append(navButton(id, label, 'mobile-item'))
+    moreButton.type = 'button'
+    moreButton.textContent = 'More'
+    moreButton.setAttribute('aria-haspopup', 'dialog')
+    moreButton.setAttribute('aria-controls', 'more-dialog')
+    document.getElementById('mobile-nav').append(moreButton)
+    for (const [id, label] of pages.slice(5)) document.getElementById('more-nav').append(navButton(id, label))
+    document.getElementById('more-nav').append(navButton('schedule-settings', 'Schedule settings'))
+    document.getElementById('more-nav').append(navButton('login', 'Log out'))
+    const checkin = document.createElement('button')
+    checkin.type = 'button'
+    checkin.textContent = 'Check-in'
+    checkin.dataset.demo = 'Check-in preview'
+    document.getElementById('more-nav').append(checkin)
+
+    function showNotice(message) {
+      notice.textContent = message
+      notice.hidden = false
+      clearTimeout(noticeTimer)
+      noticeTimer = setTimeout(() => { notice.hidden = true }, 3600)
+    }
+    function showScreen(id, focus = true) {
+      const template = document.getElementById(`screen-${id}`)
+      if (!template) return
+      if (moreDialog.open) moreDialog.close()
+      content.replaceChildren(template.content.cloneNode(true))
+      document.body.dataset.page = id
+      picker.value = id
+      document.querySelectorAll('button[data-screen]').forEach(button => {
+        if (button.dataset.screen === id) button.setAttribute('aria-current', 'page')
+        else button.removeAttribute('aria-current')
+      })
+      if (pages.slice(5).some(([key]) => key === id) || id === 'schedule-settings' || id === 'login') moreButton.setAttribute('aria-current', 'page')
+      else moreButton.removeAttribute('aria-current')
+      if (focus) content.querySelector('h1')?.focus()
+    }
+    document.addEventListener('click', event => {
+      const screen = event.target.closest('button[data-screen]')
+      if (screen) showScreen(screen.dataset.screen)
+      const demo = event.target.closest('[data-demo]')
+      if (demo) showNotice(`${demo.dataset.demo}. Changes are not saved.`)
+    })
+    document.addEventListener('submit', event => {
+      event.preventDefault()
+      showNotice('Design preview. Changes are not saved.')
+    })
+    picker.addEventListener('change', () => showScreen(picker.value))
+    moreButton.addEventListener('click', () => {
+      moreDialog.showModal()
+      moreDialog.querySelector('nav button')?.focus()
+    })
+    document.getElementById('close-more').addEventListener('click', () => {
+      moreDialog.close()
+      moreButton.focus()
+    })
+    moreDialog.addEventListener('cancel', event => {
+      event.preventDefault()
+      moreDialog.close()
+      moreButton.focus()
+    })
+    function setTheme(theme) {
+      document.body.dataset.theme = theme
+      themeToggle.textContent = theme === 'light' ? 'Dark theme' : 'Light theme'
+      themeToggle.setAttribute('aria-label', `Switch to ${theme === 'light' ? 'dark' : 'light'} theme`)
+    }
+    themeToggle.addEventListener('click', () => setTheme(document.body.dataset.theme === 'light' ? 'dark' : 'light'))
+    setTheme(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+    showScreen('today', false)
+  </script>
+</body>
+</html>

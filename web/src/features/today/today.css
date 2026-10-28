@@ -1,0 +1,338 @@
+.today-window .titlebar h1 {
+  font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
+  font-size: clamp(1.8rem, 3vw, 2.35rem);
+  letter-spacing: -0.07em;
+  line-height: 1.05;
+}
+.today-window .window-body {
+  gap: 0;
+  padding-top: 1.1rem;
+}
+
+.today-bento {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(16rem, 1fr);
+  gap: 1rem;
+  align-items: start;
+  min-width: 0;
+}
+.today-now { grid-column: 1 / -1; }
+.today-clocks { grid-column: 1 / -1; min-width: 0; }
+.today-earn { grid-column: 1 / -1; min-width: 0; }
+.today-agenda { grid-column: 1; }
+.today-risk { grid-column: 2; }
+
+.today-tile {
+  padding: 5px;
+  border-radius: 1.45rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  animation: today-up 700ms var(--motion) both;
+  animation-delay: calc(var(--d, 0) * 90ms);
+}
+.today-core {
+  min-width: 0;
+  padding: 1.1rem 1.15rem 1.2rem;
+  border-radius: calc(1.45rem - 5px);
+  background: #12141b;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.14);
+}
+.today-core > .agenda,
+.today-core > .clocks,
+.today-core > .today-earn-board {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  margin: 0;
+}
+.today-earn-board .clocks {
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.today-core > .agenda h3 {
+  margin: 0 0 0.85rem;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.today-window .agenda-next,
+.today-window .agenda-row {
+  display: block;
+  padding: 5px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1.1rem;
+  cursor: pointer;
+}
+.today-window .agenda-row.static {
+  cursor: default;
+}
+.today-agenda-core {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.85rem 0.95rem;
+  border-radius: calc(1.1rem - 5px);
+  background: color-mix(in srgb, var(--window) 80%, var(--bg));
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+.today-window .agenda-next { padding: 5px; }
+.today-window .agenda-next .today-agenda-core { padding: 1.05rem 1.05rem 1.1rem; }
+.today-window .agenda-next time {
+  font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
+  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+  letter-spacing: -0.06em;
+}
+.today-window .agenda-chip {
+  border-radius: 999px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.today-window .agenda-chip.late {
+  background: color-mix(in srgb, #e07070 38%, transparent);
+}
+.today-window .agenda-skel {
+  background: color-mix(in srgb, var(--bg-3) 55%, transparent);
+}
+.today-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+}
+.today-empty a {
+  color: var(--ink);
+  font-weight: 600;
+}
+.today-offplan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.65rem;
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.today-offplan em {
+  font-style: normal;
+  color: var(--ink);
+}
+
+.today-window .clocks {
+  gap: 0.65rem;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.today-window .clocks article {
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.15rem;
+}
+.today-window .clocks article:last-child {
+  background: rgba(255, 255, 255, 0.055);
+  color: inherit;
+}
+.today-window .clocks article:last-child small {
+  color: var(--muted);
+}
+.today-clock-core {
+  padding: 0.85rem 0.95rem 0.95rem;
+  border-radius: calc(1.15rem - 4px);
+  background: color-mix(in srgb, var(--bg) 35%, var(--window));
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+.today-window .clocks small {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.today-window .clocks strong {
+  font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
+  font-size: clamp(1.45rem, 2.2vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.06em;
+  line-height: 1.05;
+  margin-top: 0.45rem;
+}
+.today-earn-sub {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.today-window .today-fx-board {
+  grid-template-columns: minmax(0, 1fr);
+}
+.today-fx {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.today-fx input {
+  width: 6.75rem;
+  min-height: 2.55rem;
+  padding: 0.2rem 0.55rem;
+  font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
+  font-size: clamp(1.45rem, 2.2vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.06em;
+  line-height: 1.05;
+  color: var(--ink);
+  background: var(--bg-2);
+}
+.today-earn-board {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.today-earn-plot {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+.today-earn-plot-well {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: stretch;
+  min-height: 14rem;
+  padding: 0.9rem 0.55rem 0.7rem 0.65rem;
+  border-radius: 1.35rem;
+  background: color-mix(in srgb, #0b0f16 82%, var(--window));
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.today-earn-plot-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0.1rem 0 2.7rem;
+  list-style: none;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  line-height: 1;
+  background: color-mix(in srgb, #0b0f16 82%, var(--window));
+}
+.today-earn-plot-track {
+  min-width: 0;
+  overflow-x: auto;
+  padding-right: 0.45rem;
+}
+.today-earn-plot-cols {
+  display: flex;
+  align-items: stretch;
+  gap: 0.28rem;
+  width: max-content;
+  min-height: 12.4rem;
+  margin: 0;
+  padding: 0.15rem 0 0;
+  list-style: none;
+}
+.today-earn-plot-cols li {
+  flex: 0 0 4rem;
+  display: grid;
+  grid-template-rows: minmax(9.4rem, 1fr) auto auto;
+  justify-items: center;
+  gap: 0.2rem;
+}
+.today-earn-plot-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  align-self: stretch;
+  width: 100%;
+}
+.today-earn-plot-bar span {
+  display: block;
+  width: 0.28rem;
+  max-width: 100%;
+  border-radius: 2px;
+  background: rgba(236, 240, 248, 0.9);
+}
+.today-earn-plot-cols b {
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.today-earn-plot-cols small {
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.today-earn-plot-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.7rem;
+}
+.today-earn-plot-foot small {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.today-earn-plot-foot strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@keyframes today-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 900px) {
+  .today-window .clocks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .today-bento {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+  .today-now,
+  .today-clocks,
+  .today-earn,
+  .today-agenda,
+  .today-risk {
+    grid-column: auto;
+  }
+  .today-window .agenda-next .today-agenda-core {
+    grid-template-columns: auto 1fr;
+  }
+  .today-window .agenda-next .tasks-timer {
+    grid-column: 2;
+    justify-self: start;
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .today-tile {
+    animation: none;
+    transition: none;
+  }
+}

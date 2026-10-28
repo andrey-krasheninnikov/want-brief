@@ -1,0 +1,81 @@
+{
+  "blocks": [
+    {
+      "key": "OR-1",
+      "kind": "work",
+      "start": "Wed 16 12:00",
+      "end": "Wed 16 13:00",
+      "lane": 0,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "OR-1",
+      "kind": "work",
+      "start": "Wed 16 14:00",
+      "end": "Wed 16 16:00",
+      "lane": 0,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "both"
+    },
+    {
+      "key": "OR-1",
+      "kind": "work",
+      "start": "Thu 17 10:00",
+      "end": "Thu 17 11:00",
+      "lane": 0,
+      "reasons": [
+        "due_soon"
+      ],
+      "continue": "from"
+    },
+    {
+      "key": "OR-2",
+      "kind": "work",
+      "start": "Thu 17 14:00",
+      "end": "Thu 17 16:00",
+      "lane": 0,
+      "reasons": [
+        "due_soon",
+        "pinned_at"
+      ],
+      "continue": "to"
+    },
+    {
+      "key": "OR-2",
+      "kind": "work",
+      "start": "Thu 17 16:10",
+      "end": "Thu 17 17:10",
+      "lane": 0,
+      "reasons": [
+        "due_soon",
+        "pinned_at"
+      ],
+      "continue": "from"
+    }
+  ],
+  "unplanned": [],
+  "atRisk": [],
+  "busy": [
+    "Break Mon 14 13:00-Mon 14 14:00",
+    "Break Wed 16 13:00-Wed 16 14:00",
+    "Break Thu 17 13:00-Thu 17 14:00",
+    "Break Fri 18 13:00-Fri 18 14:00"
+  ],
+  "overflow": {
+    "itemCount": 0,
+    "seconds": 0,
+    "firstDueAt": null
+  },
+  "score": {
+    "lateSeconds": 0,
+    "fragments": 3,
+    "switches": 1,
+    "loadVariance": 0.25,
+    "total": 3.75
+  }
+}

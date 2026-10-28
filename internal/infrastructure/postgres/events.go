@@ -10,7 +10,7 @@ import (
 	"github.com/pchkauu/want-brief/internal/domain"
 )
 
-const eventCols = `id, title, description, agenda, kind, type, project_id, starts_at, duration_seconds,
+const eventCols = `id, title, description, agenda, kind, type, project_id, starts_at, timezone, duration_seconds,
 	recurrence, repeat_until, weekdays, links, meet_url, involvement, active_start_offset, active_end_offset, can_skip, created_at, updated_at`
 
 func scanEvent(scan func(dest ...any) error) (domain.Event, error) {
@@ -20,7 +20,7 @@ func scanEvent(scan func(dest ...any) error) (domain.Event, error) {
 	var days []int16
 	err := scan(
 		&event.ID, &event.Title, &event.Description, &event.Agenda, &event.Kind, &event.Type, &event.ProjectID,
-		&event.StartsAt, &event.DurationSeconds, &event.Recurrence, &until, &days, &links, &event.MeetURL, &event.Involvement,
+		&event.StartsAt, &event.Timezone, &event.DurationSeconds, &event.Recurrence, &until, &days, &links, &event.MeetURL, &event.Involvement,
 		&event.ActiveStartOffset, &event.ActiveEndOffset, &event.CanSkip, &event.CreatedAt, &event.UpdatedAt,
 	)
 	if err != nil {
@@ -121,11 +121,11 @@ func (s *Store) CreateEvent(ctx context.Context, event domain.Event) (domain.Eve
 	ends := event.EndsAt()
 	row := s.pool.QueryRow(ctx, `
 		INSERT INTO events (
-			id, title, description, agenda, kind, type, project_id, starts_at, ends_at, duration_seconds,
+			id, title, description, agenda, kind, type, project_id, starts_at, ends_at, timezone, duration_seconds,
 			recurrence, repeat_until, weekdays, links, meet_url, involvement, active_start_offset, active_end_offset, can_skip, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
 		RETURNING `+eventCols, event.ID, event.Title, event.Description, event.Agenda, string(event.Kind), string(event.Type),
-		event.ProjectID, event.StartsAt, ends, event.DurationSeconds, string(event.Recurrence), repeatUntilArg(event.RepeatUntil),
+		event.ProjectID, event.StartsAt, ends, event.Timezone, event.DurationSeconds, string(event.Recurrence), repeatUntilArg(event.RepeatUntil),
 		intsToInt16s(event.Weekdays), raw, event.MeetURL, event.Involvement, event.ActiveStartOffset, event.ActiveEndOffset,
 		event.CanSkip, event.CreatedAt, event.UpdatedAt)
 	people := event.People
@@ -148,13 +148,13 @@ func (s *Store) UpdateEvent(ctx context.Context, event domain.Event) (domain.Eve
 	tag, err := s.pool.Exec(ctx, `
 		UPDATE events SET
 			title=$2, description=$3, agenda=$4, kind=$5, type=$6, project_id=$7, starts_at=$8, ends_at=$9,
-			duration_seconds=$10, recurrence=$11, repeat_until=$12, weekdays=$13, links=$14, meet_url=$15, involvement=$16,
+			timezone=$21, duration_seconds=$10, recurrence=$11, repeat_until=$12, weekdays=$13, links=$14, meet_url=$15, involvement=$16,
 			active_start_offset=$17, active_end_offset=$18, can_skip=$19, updated_at=$20
 		WHERE id=$1
 	`, event.ID, event.Title, event.Description, event.Agenda, string(event.Kind), string(event.Type), event.ProjectID,
 		event.StartsAt, ends, event.DurationSeconds, string(event.Recurrence), repeatUntilArg(event.RepeatUntil),
 		intsToInt16s(event.Weekdays), raw, event.MeetURL, event.Involvement, event.ActiveStartOffset, event.ActiveEndOffset,
-		event.CanSkip, event.UpdatedAt)
+		event.CanSkip, event.UpdatedAt, event.Timezone)
 	if err != nil {
 		return domain.Event{}, err
 	}

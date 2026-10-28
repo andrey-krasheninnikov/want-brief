@@ -19,19 +19,50 @@ type PersonWrite struct {
 }
 
 func (s *Service) ListPeople(ctx context.Context) ([]domain.Person, error) {
-	return s.People.List(ctx)
+	rows, err := s.People.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	settings, err := s.scheduleSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		rows[i] = rows[i].WithAgeIn(s.now(), settings.Location())
+	}
+	return rows, nil
 }
 
 func (s *Service) GetPerson(ctx context.Context, id uuid.UUID) (domain.Person, error) {
-	return s.People.Get(ctx, id)
+	row, err := s.People.Get(ctx, id)
+	if err != nil {
+		return domain.Person{}, err
+	}
+	settings, err := s.scheduleSettings(ctx)
+	if err != nil {
+		return domain.Person{}, err
+	}
+	return row.WithAgeIn(s.now(), settings.Location()), nil
 }
 
 func (s *Service) CreatePerson(ctx context.Context, write PersonWrite) (domain.Person, error) {
+	settings, err := s.scheduleSettings(ctx)
+	if err != nil {
+		return domain.Person{}, err
+	}
+	if write.AgeYears != nil && write.BornOn == nil {
+		day := domain.PresumeBornOnIn(*write.AgeYears, s.now(), settings.Location())
+		write.BornOn = &day
+	}
 	person, err := domain.NewPerson(draftFromPerson(write))
 	if err != nil {
 		return domain.Person{}, err
 	}
-	return s.People.Create(ctx, person)
+	saved, err := s.People.Create(ctx, person)
+	if err != nil {
+		return domain.Person{}, err
+	}
+	return saved.WithAgeIn(s.now(), settings.Location()), nil
 }
 
 func (s *Service) ReplacePerson(ctx context.Context, id uuid.UUID, write PersonWrite) (domain.Person, error) {
@@ -39,10 +70,22 @@ func (s *Service) ReplacePerson(ctx context.Context, id uuid.UUID, write PersonW
 	if err != nil {
 		return domain.Person{}, err
 	}
+	settings, err := s.scheduleSettings(ctx)
+	if err != nil {
+		return domain.Person{}, err
+	}
+	if write.AgeYears != nil && write.BornOn == nil {
+		day := domain.PresumeBornOnIn(*write.AgeYears, s.now(), settings.Location())
+		write.BornOn = &day
+	}
 	if err := person.Apply(draftFromPerson(write)); err != nil {
 		return domain.Person{}, err
 	}
-	return s.People.Update(ctx, person)
+	saved, err := s.People.Update(ctx, person)
+	if err != nil {
+		return domain.Person{}, err
+	}
+	return saved.WithAgeIn(s.now(), settings.Location()), nil
 }
 
 func (s *Service) DeletePerson(ctx context.Context, id uuid.UUID) error {
@@ -249,10 +292,9 @@ func (s *Service) CreatePersonProfession(ctx context.Context, personID uuid.UUID
 	if _, err := s.People.Get(ctx, personID); err != nil {
 		return domain.PersonProfession{}, err
 	}
-	now := s.now()
-	started := domain.MoscowDate(now)
-	if write.StartedOn != nil {
-		started = *write.StartedOn
+	started, err := s.dayOrToday(ctx, write.StartedOn)
+	if err != nil {
+		return domain.PersonProfession{}, err
 	}
 	prof, err := domain.NewPersonProfession(personID, domain.PersonProfessionDraft{
 		Title:     write.Title,
@@ -289,7 +331,11 @@ func (s *Service) ReplacePersonProfession(ctx context.Context, personID, profess
 	}); err != nil {
 		return domain.PersonProfession{}, err
 	}
-	if err := prof.SetSalary(write.MonthlySalaryUSD, write.MonthlySalaryRUB, domain.MoscowDate(s.now())); err != nil {
+	today, err := s.dayOrToday(ctx, nil)
+	if err != nil {
+		return domain.PersonProfession{}, err
+	}
+	if err := prof.SetSalary(write.MonthlySalaryUSD, write.MonthlySalaryRUB, today); err != nil {
 		return domain.PersonProfession{}, err
 	}
 	return s.PersonProfessions.Update(ctx, prof)
@@ -341,9 +387,9 @@ func (s *Service) OpenBond(ctx context.Context, personID uuid.UUID, write BondOp
 		return domain.PersonBond{}, err
 	}
 	now := s.now()
-	started := domain.MoscowDate(now)
-	if write.StartedOn != nil {
-		started = *write.StartedOn
+	started, err := s.dayOrToday(ctx, write.StartedOn)
+	if err != nil {
+		return domain.PersonBond{}, err
 	}
 	bond, err := domain.NewPersonBond(a, b, kind, write.Comment, started, now)
 	if err != nil {
@@ -363,6 +409,13 @@ func (s *Service) ChangeBond(ctx context.Context, personID, bondID uuid.UUID, wr
 		return domain.PersonBond{}, err
 	}
 	now := s.now()
+	if write.ChangedOn == nil {
+		day, err := s.dayOrToday(ctx, nil)
+		if err != nil {
+			return domain.PersonBond{}, err
+		}
+		write.ChangedOn = &day
+	}
 	if err := bond.Change(write.BondChange, now); err != nil {
 		return domain.PersonBond{}, err
 	}
@@ -380,6 +433,13 @@ func (s *Service) EndBond(ctx context.Context, personID, bondID uuid.UUID, write
 		return domain.PersonBond{}, err
 	}
 	now := s.now()
+	if write.EndedOn == nil {
+		day, err := s.dayOrToday(ctx, nil)
+		if err != nil {
+			return domain.PersonBond{}, err
+		}
+		write.EndedOn = &day
+	}
 	if err := bond.End(write.EndedOn, now); err != nil {
 		return domain.PersonBond{}, err
 	}

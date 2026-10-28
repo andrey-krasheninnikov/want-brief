@@ -1,12 +1,14 @@
+import { useTimezone } from '../../shared/timezone'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { api } from '../../api'
 
-function noteStamp(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+function noteStamp(iso: string, tz: string): string {
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: tz }).format(new Date(iso))
 }
 
 export function ProjectNotesPage() {
+  const tz = useTimezone()
   const { id = '' } = useParams()
   const queryClient = useQueryClient()
   const project = useQuery({ queryKey: ['projects', id], queryFn: () => api.project(id), enabled: Boolean(id) })
@@ -53,7 +55,7 @@ export function ProjectNotesPage() {
             {log.map((note) => (
               <li key={note.id}>
                 <div>
-                  <time className="muted">{noteStamp(note.createdAt)}</time>
+                  <time className="muted">{noteStamp(note.createdAt, tz)}</time>
                   <p>{note.body}</p>
                 </div>
                 <button type="button" className="ghost" onClick={() => removeNote.mutate(note.id)}>

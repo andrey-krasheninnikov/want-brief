@@ -1,6 +1,7 @@
+import { zonedYmd } from '../../shared/zoned'
 import { useEffect, useRef, type CSSProperties } from 'react'
 import type { EventOccurrence } from '../../types'
-import { moscowMinutes, moscowYmd } from '../../shared/moscow'
+import { zonedMinutes } from '../../shared/zoned'
 import { layoutLanes } from './eventLayout'
 import { eventMeta, eventTone, type EventLookups } from './eventMeta'
 
@@ -8,6 +9,7 @@ const HOUR = 96
 const GAP = 3
 
 type Props = {
+  timeZone: string
   days: string[]
   rows: EventOccurrence[]
   lookups: EventLookups
@@ -17,20 +19,11 @@ type Props = {
   onPick: (seriesId: string, originalOn: string) => void
 }
 
-function ymdOf(iso: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Moscow',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(iso))
-}
-
 function dayLabel(ymd: string) {
-  const date = new Date(`${ymd}T12:00:00+03:00`)
+  const date = new Date(`${ymd}T12:00:00Z`)
   return {
-    week: new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'Europe/Moscow' }).format(date),
-    num: new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'Europe/Moscow' }).format(date),
+    week: new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(date),
+    num: new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'UTC' }).format(date),
   }
 }
 
@@ -44,10 +37,10 @@ function blockStyle(start: number, dur: number, col: number, cols: number, color
   }
 }
 
-export function WeekGrid({ days, rows, lookups, today, selectedId, selectedOn, onPick }: Props) {
+export function WeekGrid({ timeZone, days, rows, lookups, today, selectedId, selectedOn, onPick }: Props) {
   const scroller = useRef<HTMLDivElement>(null)
-  const now = moscowYmd()
-  const nowMin = moscowMinutes(new Date().toISOString())
+  const now = zonedYmd(new Date(), timeZone)
+  const nowMin = zonedMinutes(new Date(), timeZone)
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: 8 * HOUR })
@@ -75,10 +68,10 @@ export function WeekGrid({ days, rows, lookups, today, selectedId, selectedOn, o
             ))}
           </div>
           {days.map((ymd) => {
-            const dayRows = rows.filter((row) => ymdOf(row.startsAt) === ymd)
+            const dayRows = rows.filter((row) => zonedYmd(row.startsAt, timeZone) === ymd)
             const lanes = layoutLanes(
               dayRows.map((row) => {
-                const start = moscowMinutes(row.startsAt)
+                const start = zonedMinutes(row.startsAt, timeZone)
                 return { start, end: start + row.durationSeconds / 60 }
               }),
             )
@@ -89,7 +82,7 @@ export function WeekGrid({ days, rows, lookups, today, selectedId, selectedOn, o
                 ))}
                 {ymd === now ? <b className="cal-now" style={{ top: (nowMin / 60) * HOUR }} /> : null}
                 {dayRows.map((row, i) => {
-                  const start = moscowMinutes(row.startsAt)
+                  const start = zonedMinutes(row.startsAt, timeZone)
                   const dur = row.durationSeconds / 60
                   const meta = eventMeta(row, lookups)
                   const lane = lanes[i]

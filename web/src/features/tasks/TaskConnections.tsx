@@ -1,3 +1,4 @@
+import { useTimezone } from '../../shared/timezone'
 import { CloudArrowDown } from '@phosphor-icons/react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -47,6 +48,7 @@ function slotsOf(links: ProjectLink[]): Record<SlotLabel, string> {
 }
 
 export function TaskConnections({ item, task }: Props) {
+  const tz = useTimezone()
   const { patch, mark, hint } = task
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
@@ -182,7 +184,7 @@ export function TaskConnections({ item, task }: Props) {
           </span>
         </div>
         <p className="dossier-note">
-          {source?.lastSyncAt ? `Synced ${createdLabel(source.lastSyncAt)}` : 'Never synced'}
+          {source?.lastSyncAt ? `Synced ${createdLabel(source.lastSyncAt, tz)}` : 'Never synced'}
         </p>
       </section>
 

@@ -260,3 +260,57 @@ func TestNewEventNoteRejectsEmptyBody(t *testing.T) {
 		t.Fatal("expected invalid note body")
 	}
 }
+
+func TestEventRecurrenceKeepsOwnTimezoneAcrossDST(t *testing.T) {
+	loc, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := Event{
+		StartsAt:        time.Date(2026, 3, 23, 9, 0, 0, 0, loc),
+		DurationSeconds: 1800,
+		Recurrence:      RecurrenceWeekly,
+		Weekdays:        []int{0, 7},
+		Timezone:        "Europe/London",
+	}
+	rows := event.Expand(time.Date(2026, 3, 22, 0, 0, 0, 0, time.UTC), time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC))
+	if len(rows) != 2 || !rows[0].StartsAt.Equal(time.Date(2026, 3, 23, 9, 0, 0, 0, time.UTC)) ||
+		!rows[1].StartsAt.Equal(time.Date(2026, 3, 30, 8, 0, 0, 0, time.UTC)) || string(rows[1].OriginalOn) != "2026-03-30" {
+		t.Fatalf("occurrences=%+v", rows)
+	}
+}
+
+func TestEventGapAndRepeatedHour(t *testing.T) {
+	spring := Event{StartsAt: time.Date(2026, 3, 22, 1, 30, 0, 0, time.UTC), Timezone: "Europe/London"}
+	gap := spring.OccurrenceOn(Ymd("2026-03-29"))
+	if !gap.StartsAt.Equal(time.Date(2026, 3, 29, 1, 0, 0, 0, time.UTC)) {
+		t.Fatalf("gap=%s", gap.StartsAt)
+	}
+	autumn := Event{StartsAt: time.Date(2026, 10, 18, 0, 30, 0, 0, time.UTC), Timezone: "Europe/London"}
+	repeated := autumn.OccurrenceOn(Ymd("2026-10-25"))
+	if !repeated.StartsAt.Equal(time.Date(2026, 10, 25, 0, 30, 0, 0, time.UTC)) {
+		t.Fatalf("repeated=%s", repeated.StartsAt)
+	}
+}
+
+func TestOneOffOccurrenceKeepsSecondDSTHour(t *testing.T) {
+	start := time.Date(2026, 10, 25, 1, 30, 0, 0, time.UTC)
+	event, err := NewEventFrom(EventDraft{Title: "Once", Kind: EventKindCall, Type: EventTypeSync, StartsAt: start, Timezone: "Europe/London", DurationSeconds: 1800, Recurrence: RecurrenceOnce})
+	if err != nil {
+		t.Fatal(err)
+	}
+	occ, err := event.SlotOccurrence("2026-10-25", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !occ.StartsAt.Equal(start) {
+		t.Fatalf("start = %s, want %s", occ.StartsAt, start)
+	}
+}
+
+func TestEventRejectsUnknownTimezone(t *testing.T) {
+	_, err := NewEventFrom(EventDraft{Title: "Call", Kind: EventKindCall, StartsAt: time.Now(), Timezone: "Unknown/Place", DurationSeconds: 1800})
+	if err == nil {
+		t.Fatal("expected invalid timezone")
+	}
+}

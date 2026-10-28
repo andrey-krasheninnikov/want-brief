@@ -102,6 +102,7 @@ type CompanyDraft struct {
 	People      []PersonRel
 	StartedOn   *time.Time
 	EndedOn     *time.Time
+	CurrentDay  *time.Time
 }
 
 func ParseSalaryCurrency(raw string) (SalaryCurrency, error) {
@@ -179,7 +180,11 @@ func (c *Company) apply(draft CompanyDraft, now time.Time) error {
 	c.People = people
 	c.StartedOn = started
 	c.EndedOn = ended
-	c.closeOrphanContracts(MoscowDate(now))
+	today := MoscowDate(now)
+	if draft.CurrentDay != nil {
+		today = dateUTC(*draft.CurrentDay)
+	}
+	c.closeOrphanContracts(today)
 	return c.validate()
 }
 
@@ -239,11 +244,13 @@ func (c *Company) closeOrphanContracts(today time.Time) {
 	}
 }
 
-func (c Company) TenureAt(now time.Time) *Tenure {
+func (c Company) TenureAt(now time.Time) *Tenure { return c.TenureAtIn(now, Moscow()) }
+
+func (c Company) TenureAtIn(now time.Time, loc *time.Location) *Tenure {
 	if c.StartedOn == nil {
 		return nil
 	}
-	end := MoscowDate(now)
+	end := DateAt(now, loc)
 	if c.EndedOn != nil {
 		end = dateUTC(*c.EndedOn)
 	}
@@ -267,8 +274,10 @@ func spanYearsMonths(start, end time.Time) (int, int) {
 	return years, months
 }
 
-func (c Company) WithTenure(now time.Time) Company {
-	c.Tenure = c.TenureAt(now)
+func (c Company) WithTenure(now time.Time) Company { return c.WithTenureIn(now, Moscow()) }
+
+func (c Company) WithTenureIn(now time.Time, loc *time.Location) Company {
+	c.Tenure = c.TenureAtIn(now, loc)
 	if c.Links == nil {
 		c.Links = []ProjectLink{}
 	}

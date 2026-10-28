@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
+import { useTimezone } from '../../shared/timezone'
+import { zonedInstant, zonedLocalInput } from '../../shared/zoned'
 import { openEvent } from '../../shared/taskOverlay'
 import { OpenUrl, UrlField } from '../../shared/UrlField'
 import { PeoplePicker } from '../people/PeoplePicker'
@@ -29,32 +31,19 @@ type Props = {
   onDeleted: () => void
 }
 
-function pad(n: number): string {
-  return String(n).padStart(2, '0')
+function emptyStart(tz: string): string {
+  return zonedLocalInput(new Date(Date.now() + 60 * 60 * 1000), tz)
 }
 
-function toLocalInput(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function emptyStart(): string {
-  const d = new Date(Date.now() + 60 * 60 * 1000)
-  return toLocalInput(d.toISOString())
-}
-
-function noteStamp(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+function noteStamp(iso: string, tz: string): string {
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: tz }).format(new Date(iso))
 }
 
 function slotStamp(ymd: string): string {
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'Europe/Moscow' }).format(
-    new Date(`${ymd}T12:00:00+03:00`),
-  )
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${ymd}T12:00:00Z`))
 }
 
-function draftFrom(row?: EventSeries) {
+function draftFrom(tz: string, row?: EventSeries) {
   const seconds = row?.durationSeconds ?? 1800
   return {
     title: row?.title ?? '',
@@ -63,7 +52,8 @@ function draftFrom(row?: EventSeries) {
     kind: (row?.kind ?? 'call') as EventKind,
     type: (row?.type ?? 'sync') as EventType,
     projectId: row?.projectId ?? '',
-    startsAt: row ? toLocalInput(row.startsAt) : emptyStart(),
+    timezone: row?.timezone ?? tz,
+    startsAt: row ? zonedLocalInput(row.startsAt, row.timezone ?? tz) : emptyStart(tz),
     hours: String(Math.floor(seconds / 3600)),
     minutes: String(Math.floor((seconds % 3600) / 60)),
     recurrence: (row?.recurrence ?? 'once') as EventRecurrence,
@@ -103,6 +93,7 @@ export function EventDossierSheet({
 }
 
 export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Props) {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const series = useQuery({
@@ -121,7 +112,7 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
     queryFn: () => api.eventNotes(seriesId!, allNotes ? undefined : originalOn),
     enabled: Boolean(seriesId && originalOn),
   })
-  const [form, setForm] = useState(() => draftFrom())
+  const [form, setForm] = useState(() => draftFrom(tz))
   const [occStart, setOccStart] = useState('')
   const [occHours, setOccHours] = useState('0')
   const [occMinutes, setOccMinutes] = useState('30')
@@ -133,9 +124,9 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (seriesId && series.data) setForm(draftFrom(series.data))
-    if (!seriesId) setForm(draftFrom())
-  }, [seriesId, series.data?.id, series.data?.updatedAt])
+    if (seriesId && series.data) setForm(draftFrom(tz, series.data))
+    if (!seriesId) setForm(draftFrom(tz))
+  }, [seriesId, series.data?.id, series.data?.updatedAt, series.data?.timezone, tz])
 
   useEffect(() => {
     setAllNotes(false)
@@ -146,11 +137,11 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
   useEffect(() => {
     if (!occurrence.data) return
     const seconds = occurrence.data.durationSeconds
-    setOccStart(toLocalInput(occurrence.data.startsAt))
+    setOccStart(zonedLocalInput(occurrence.data.startsAt, series.data?.timezone ?? tz))
     setOccHours(String(Math.floor(seconds / 3600)))
     setOccMinutes(String(Math.floor((seconds % 3600) / 60)))
     setOccSkipped(Boolean(occurrence.data.skipped))
-  }, [occurrence.data?.startsAt, occurrence.data?.durationSeconds, occurrence.data?.skipped, occurrence.data?.originalOn])
+  }, [occurrence.data?.startsAt, occurrence.data?.durationSeconds, occurrence.data?.skipped, occurrence.data?.originalOn, series.data?.timezone, tz])
 
   function body() {
     const duration = Math.round(Number(form.hours) || 0) * 3600 + Math.round(Number(form.minutes) || 0) * 60
@@ -163,7 +154,8 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
       kind: form.kind,
       type: form.type,
       projectId: form.projectId || null,
-      startsAt: new Date(form.startsAt).toISOString(),
+      startsAt: zonedInstant(form.startsAt, form.timezone)!,
+      timezone: form.timezone,
       durationSeconds: duration,
       recurrence: form.recurrence,
       repeatUntil: form.recurrence === 'once' ? null : form.repeatUntil || null,
@@ -198,7 +190,7 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
       const duration = Math.round(Number(occHours) || 0) * 3600 + Math.round(Number(occMinutes) || 0) * 60
       return api.putEventOccurrence(seriesId!, {
         originalOn: originalOn!,
-        startsAt: new Date(occStart).toISOString(),
+        startsAt: zonedInstant(occStart, series.data?.timezone ?? tz)!,
         durationSeconds: duration,
         skipped: occSkipped,
       })
@@ -260,7 +252,7 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
     setForm((current) => ({
       ...current,
       recurrence,
-      weekdays: recurrence === 'weekly' ? (current.weekdays.length ? current.weekdays : weekdaysFromStart(current.startsAt)) : [],
+      weekdays: recurrence === 'weekly' ? (current.weekdays.length ? current.weekdays : weekdaysFromStart(zonedInstant(current.startsAt, current.timezone)!, current.timezone)) : [],
     }))
   }
 
@@ -290,7 +282,7 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
           {occurrence.isError ? <p className="error">{occurrence.error.message}</p> : null}
           <label>
             Starts
-            <DateField mode="datetime" value={occStart} onChange={setOccStart} />
+            <DateField mode="datetime" timeZone={series.data?.timezone ?? tz} value={occStart} onChange={setOccStart} />
           </label>
           <div className="events-pair">
             <label>
@@ -343,7 +335,7 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
           {log.map((note: EventNote) => (
             <article key={note.id} className="tasks-note">
               <p className="tasks-kicker">
-                {noteStamp(note.createdAt)}
+                {noteStamp(note.createdAt, tz)}
                 {allNotes ? ` · ${slotStamp(note.originalOn)}` : ''}
               </p>
               <p>{note.body}</p>
@@ -394,9 +386,10 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
           ))}
         </select>
       </label>
+      <p className="muted">Time zone: {form.timezone}</p>
       <label>
         Starts
-        <DateField mode="datetime" value={form.startsAt} onChange={(startsAt) => setForm({ ...form, startsAt })} />
+        <DateField mode="datetime" timeZone={form.timezone} value={form.startsAt} onChange={(startsAt) => setForm({ ...form, startsAt })} />
       </label>
       {form.recurrence !== 'once' ? (
         <label>

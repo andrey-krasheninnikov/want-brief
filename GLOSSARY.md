@@ -13,6 +13,7 @@ Use these terms in documentation and issue titles. Their meanings follow the cur
 | Company | An organization record with related people and career information. |
 | Event | A scheduled event or call, once or recurring. |
 | Event occurrence | One dated instance of an event series. An occurrence may be overridden or skipped. |
+| Event time zone | The time zone saved on an event series that anchors its recurring local time. |
 | Quadrant | An Eisenhower priority group: do, schedule, delegate, or drop. |
 | Occupancy | How an item uses schedule capacity: solo, parallel, or waiting. |
 | Schedule | A calculated placement of work around events and capacity, including risk and overflow. |

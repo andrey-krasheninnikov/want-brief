@@ -1,9 +1,10 @@
+import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { PencilSimple } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
-import { moscowYmd } from '../../shared/moscow'
+import { zonedYmd } from '../../shared/zoned'
 import { TaskSheet } from '../tasks/TaskSheet'
 import type { PersonProfession, SalaryPeriod } from '../../types'
 import { PersonRail, PersonRailAdd } from './PersonRail'
@@ -21,18 +22,18 @@ type Draft = {
 const empty: Draft = {
   title: '',
   comment: '',
-  startedOn: moscowYmd(),
+  startedOn: '',
   endedOn: '',
   monthlySalaryUsd: '0',
   monthlySalaryRub: '0',
 }
 
-function fromProfession(row: PersonProfession): Draft {
+function fromProfession(row: PersonProfession, today: string): Draft {
   const current = currentSalary(row)
   return {
     title: row.title,
     comment: row.comment,
-    startedOn: dateOnly(row.startedOn) || moscowYmd(),
+    startedOn: dateOnly(row.startedOn) || today,
     endedOn: dateOnly(row.endedOn),
     monthlySalaryUsd: String(current?.monthlySalaryUsd ?? 0),
     monthlySalaryRub: String(current?.monthlySalaryRub ?? 0),
@@ -60,6 +61,8 @@ type Props = {
 }
 
 export function PersonProfessions({ personId, professions }: Props) {
+  const tz = useTimezone()
+  const today = zonedYmd(new Date(), tz)
   const queryClient = useQueryClient()
   const [sheet, setSheet] = useState<'new' | string | null>(null)
   const [draft, setDraft] = useState<Draft>(empty)
@@ -88,12 +91,12 @@ export function PersonProfessions({ personId, professions }: Props) {
   })
 
   function openNew() {
-    setDraft({ ...empty, startedOn: moscowYmd() })
+    setDraft({ ...empty, startedOn: today })
     setSheet('new')
   }
 
   function openEdit(row: PersonProfession) {
-    setDraft(fromProfession(row))
+    setDraft(fromProfession(row, zonedYmd(new Date(), tz)))
     setSheet(row.id)
   }
 

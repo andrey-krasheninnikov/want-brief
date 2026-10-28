@@ -1,10 +1,11 @@
+import { useTimezone } from '../../shared/timezone'
 import { ArrowsClockwise } from '@phosphor-icons/react'
 import { useCallback, useMemo, useState, type DragEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../api'
 import { dueStageOpen, dueWithinWeek, itemCost, type DueSlot } from '../../shared/format'
-import { moscowRange } from '../../shared/moscow'
+import { zonedRange } from '../../shared/zoned'
 import {
   KINDS,
   kindLabel,
@@ -81,6 +82,7 @@ export function TasksScreen() {
 }
 
 function TasksWorkspace() {
+  const tz = useTimezone()
   const promptLog = useTaskLogPrompt()
   const offerUndo = useTaskUndo()
   const { id } = useParams()
@@ -110,9 +112,9 @@ function TasksWorkspace() {
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const monthLoad = useQuery({
-    queryKey: ['load', 'month'],
+    queryKey: ['load', 'month', tz],
     queryFn: () => {
-      const bounds = moscowRange('month')
+      const bounds = zonedRange('month', new Date(), tz)
       return api.load(bounds.from, bounds.to)
     },
   })

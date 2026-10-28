@@ -103,11 +103,17 @@ func (p *Person) apply(draft PersonDraft, now time.Time) error {
 }
 
 func PresumeBornOn(age int, now time.Time) time.Time {
-	return MoscowDate(now).AddDate(-age, 0, 0)
+	return PresumeBornOnIn(age, now, Moscow())
 }
 
-func MoscowDate(now time.Time) time.Time {
-	y, m, d := now.In(Moscow()).Date()
+func PresumeBornOnIn(age int, now time.Time, loc *time.Location) time.Time {
+	return DateAt(now, loc).AddDate(-age, 0, 0)
+}
+
+func MoscowDate(now time.Time) time.Time { return DateAt(now, Moscow()) }
+
+func DateAt(now time.Time, loc *time.Location) time.Time {
+	y, m, d := now.In(loc).Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
@@ -115,16 +121,20 @@ func dateUTC(day time.Time) time.Time {
 	return time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
 }
 
-func (p Person) AgeAt(now time.Time) *int {
+func (p Person) AgeAt(now time.Time) *int { return p.AgeAtIn(now, Moscow()) }
+
+func (p Person) AgeAtIn(now time.Time, loc *time.Location) *int {
 	if p.BornOn == nil {
 		return nil
 	}
-	years := yearsSince(*p.BornOn, now)
+	years := yearsSince(*p.BornOn, DateAt(now, loc))
 	return &years
 }
 
-func (p Person) WithAge(now time.Time) Person {
-	p.Age = p.AgeAt(now)
+func (p Person) WithAge(now time.Time) Person { return p.WithAgeIn(now, Moscow()) }
+
+func (p Person) WithAgeIn(now time.Time, loc *time.Location) Person {
+	p.Age = p.AgeAtIn(now, loc)
 	if p.Projects == nil {
 		p.Projects = []PersonRel{}
 	}
@@ -159,7 +169,7 @@ func (p Person) WithAge(now time.Time) Person {
 }
 
 func yearsSince(born, now time.Time) int {
-	today := MoscowDate(now)
+	today := now
 	bornDay := dateUTC(born)
 	years := today.Year() - bornDay.Year()
 	anniversary := time.Date(today.Year(), bornDay.Month(), bornDay.Day(), 0, 0, 0, 0, time.UTC)

@@ -1,8 +1,9 @@
+import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
-import { moscowYmd } from '../../shared/moscow'
+import { zonedYmd } from '../../shared/zoned'
 import type { Company } from '../../types'
 import { companySalaryText, dateOnly, dayShort, liveTenure, openOf, periodShare, tenureText } from './companiesModel'
 
@@ -14,20 +15,21 @@ type Props = {
 }
 
 export function CompanyCareer({ company, startedOn, endedOn, onTenure }: Props) {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const [title, setTitle] = useState('')
-  const [titleOn, setTitleOn] = useState(moscowYmd())
+  const [titleOn, setTitleOn] = useState(zonedYmd(new Date(), tz))
   const [currency, setCurrency] = useState<'usd' | 'rub'>('usd')
   const [amount, setAmount] = useState('')
   const [comment, setComment] = useState('')
-  const [salaryOn, setSalaryOn] = useState(moscowYmd())
+  const [salaryOn, setSalaryOn] = useState(zonedYmd(new Date(), tz))
   const openSalary = openOf(company.salaries)
   const nextAmount = Number(amount)
   const samePay = Boolean(openSalary && openSalary.currency === currency && openSalary.amount === nextAmount)
   const blocked = Boolean(openSalary) && amount.trim() !== '' && !samePay && !comment.trim()
-  const tenure = liveTenure(startedOn, endedOn)
-  const railFrom = startedOn || dateOnly(company.titles[0]?.startedOn) || dateOnly(company.salaries[0]?.startedOn) || moscowYmd()
-  const railTo = endedOn || moscowYmd()
+  const tenure = liveTenure(startedOn, endedOn, zonedYmd(new Date(), tz))
+  const railFrom = startedOn || dateOnly(company.titles[0]?.startedOn) || dateOnly(company.salaries[0]?.startedOn) || zonedYmd(new Date(), tz)
+  const railTo = endedOn || zonedYmd(new Date(), tz)
   const titles = (company.titles ?? []).slice().sort((a, b) => a.startedOn.localeCompare(b.startedOn))
   const salaries = (company.salaries ?? []).slice().sort((a, b) => a.startedOn.localeCompare(b.startedOn))
 

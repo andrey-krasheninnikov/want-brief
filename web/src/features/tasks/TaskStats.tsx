@@ -3,7 +3,8 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api'
 import { createdLabel, itemCost, liveTracked, span } from '../../shared/format'
-import { moscowRange } from '../../shared/moscow'
+import { useTimezone } from '../../shared/timezone'
+import { zonedRange } from '../../shared/zoned'
 import type { Item } from '../../types'
 import { TaskTimer } from './TaskTimer'
 import type { TaskPatch } from './useTaskPatch'
@@ -37,13 +38,14 @@ function projectSeconds(rows: { projectId: string | null; allocatedSeconds: numb
 }
 
 export function TaskStats({ item, task }: Props) {
+  const tz = useTimezone()
   const { patch, hint } = task
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const intervals = useQuery({ queryKey: ['intervals'], queryFn: api.intervals, refetchInterval: 1000 })
   const monthLoad = useQuery({
-    queryKey: ['load', 'month'],
+    queryKey: ['load', 'month', tz],
     queryFn: () => {
-      const bounds = moscowRange('month')
+      const bounds = zonedRange('month', new Date(), tz)
       return api.load(bounds.from, bounds.to)
     },
   })
@@ -166,7 +168,7 @@ export function TaskStats({ item, task }: Props) {
           ) : null}
         </div>
         {project ? null : <p className="dossier-empty">Link a project in Connections to see the money split.</p>}
-        <p className="dossier-note">Created · {createdLabel(item.createdAt)}</p>
+        <p className="dossier-note">Created · {createdLabel(item.createdAt, tz)}</p>
       </section>
     </>
   )

@@ -1,8 +1,9 @@
+import { useTimezone } from '../../shared/timezone'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
-import { moscowRange } from '../../shared/moscow'
+import { zonedRange } from '../../shared/zoned'
 import type { EventSeries, Item } from '../../types'
 import { PlazaSheet } from './PlazaSheet'
 import { ProjectCard } from './ProjectCard'
@@ -27,13 +28,14 @@ function upcomingEvents(series: EventSeries[] | undefined, projectId: string, no
 }
 
 export function ProjectsScreen() {
+  const tz = useTimezone()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const monthLoad = useQuery({
-    queryKey: ['load', 'month'],
+    queryKey: ['load', 'month', tz],
     queryFn: () => {
-      const bounds = moscowRange('month')
+      const bounds = zonedRange('month', new Date(), tz)
       return api.load(bounds.from, bounds.to)
     },
   })

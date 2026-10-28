@@ -1,4 +1,7 @@
 import type { Quadrant, ScheduleBlock, ScheduleLane } from '../../types'
+import { zonedYmd } from '../../shared/zoned'
+
+export { zonedMinutes, zonedYmd } from '../../shared/zoned'
 
 export const DEFAULT_TZ = 'Europe/Moscow'
 
@@ -10,29 +13,6 @@ export type NowPick = {
   phase: NowPhase
 }
 
-// zonedYmd returns the calendar day of an instant in the schedule timezone.
-export function zonedYmd(iso: string | Date, tz = DEFAULT_TZ): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(typeof iso === 'string' ? new Date(iso) : iso)
-}
-
-// zonedMinutes returns minutes since local midnight in the schedule timezone.
-export function zonedMinutes(iso: string | Date, tz = DEFAULT_TZ): number {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(typeof iso === 'string' ? new Date(iso) : iso)
-  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? '0') % 24
-  const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? '0')
-  return hour * 60 + minute
-}
-
 export function clock(iso: string, tz = DEFAULT_TZ): string {
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: tz,
@@ -42,15 +22,14 @@ export function clock(iso: string, tz = DEFAULT_TZ): string {
   }).format(new Date(iso))
 }
 
-export function dayHead(ymd: string, today: string, tz = DEFAULT_TZ) {
-  // Noon UTC keeps the weekday stable in any zone within ±11h.
+export function dayHead(ymd: string, today: string) {
   const date = new Date(`${ymd}T12:00:00Z`)
   const weekday = date.getUTCDay()
   return {
     today: ymd === today,
     weekend: weekday === 0 || weekday === 6,
-    week: new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: tz }).format(date),
-    num: new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: tz }).format(date),
+    week: new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(date),
+    num: new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'UTC' }).format(date),
   }
 }
 

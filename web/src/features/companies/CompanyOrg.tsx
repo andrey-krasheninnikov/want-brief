@@ -1,7 +1,8 @@
+import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
-import { moscowYmd } from '../../shared/moscow'
+import { zonedYmd } from '../../shared/zoned'
 import type { Company, ContractKind, Person } from '../../types'
 import { CONTRACT_KINDS, contractKindLabel, openOf } from './companiesModel'
 
@@ -11,6 +12,7 @@ type Props = {
 }
 
 export function CompanyOrg({ company, people }: Props) {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const [reportId, setReportId] = useState('')
   const names = new Map(people.map((row) => [row.id, row.name]))
@@ -27,11 +29,11 @@ export function CompanyOrg({ company, people }: Props) {
   }
 
   const setManager = useMutation({
-    mutationFn: (personId: string | null) => api.setCompanyManager(company.id, { personId, startedOn: moscowYmd() }),
+    mutationFn: (personId: string | null) => api.setCompanyManager(company.id, { personId, startedOn: zonedYmd(new Date(), tz) }),
     onSuccess: refresh,
   })
   const addReport = useMutation({
-    mutationFn: (personId: string) => api.addCompanyReport(company.id, { personId, startedOn: moscowYmd() }),
+    mutationFn: (personId: string) => api.addCompanyReport(company.id, { personId, startedOn: zonedYmd(new Date(), tz) }),
     onSuccess: () => {
       setReportId('')
       refresh()
@@ -43,7 +45,7 @@ export function CompanyOrg({ company, people }: Props) {
   })
   const setContract = useMutation({
     mutationFn: (body: { personId?: string | null; kind: ContractKind }) =>
-      api.setCompanyContract(company.id, { ...body, startedOn: moscowYmd() }),
+      api.setCompanyContract(company.id, { ...body, startedOn: zonedYmd(new Date(), tz) }),
     onSuccess: refresh,
   })
 

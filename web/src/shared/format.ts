@@ -82,7 +82,7 @@ export function dueWithinWeek(iso: string | null, now = Date.now()): boolean {
   return due <= now + WEEK_MS
 }
 
-export function createdLabel(iso: string): string {
+export function createdLabel(iso: string, timeZone: string): string {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return ''
   return new Intl.DateTimeFormat('en-GB', {
@@ -91,6 +91,7 @@ export function createdLabel(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    timeZone,
   }).format(at)
 }
 

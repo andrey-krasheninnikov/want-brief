@@ -1,9 +1,11 @@
+import { useTimezone } from '../../shared/timezone'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { api } from '../../api'
 import { Window } from '../../shared/Window'
 
 export function SettingsScreen() {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
@@ -80,7 +82,7 @@ export function SettingsScreen() {
                 {source.connected ? 'connected' : 'no connection'}
                 {source.lastError ? ` · ${source.lastError}` : ''}
                 {' · '}
-                {source.lastSyncAt ? new Date(source.lastSyncAt).toLocaleString() : 'never synced'}
+                {source.lastSyncAt ? new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: tz }).format(new Date(source.lastSyncAt)) : 'never synced'}
               </small>
             </div>
             {source.kind === 'manual' ? null : (

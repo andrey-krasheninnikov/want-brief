@@ -1,3 +1,4 @@
+import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { PencilSimple } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -11,8 +12,8 @@ type Props = {
   notes: CompanyNote[]
 }
 
-function stamp(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(new Date(iso))
+function stamp(iso: string, tz: string): string {
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: tz }).format(new Date(iso))
 }
 
 function preview(body: string): string {
@@ -22,6 +23,7 @@ function preview(body: string): string {
 }
 
 export function CompanyNotes({ companyId, notes }: Props) {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const [sheet, setSheet] = useState<'new' | string | null>(null)
   const [body, setBody] = useState('')
@@ -55,7 +57,7 @@ export function CompanyNotes({ companyId, notes }: Props) {
       <PersonRail>
         {notes.map((note) => (
           <article key={note.id} className="people-rail-card">
-            <p className="people-kicker">{stamp(note.createdAt)}</p>
+            <p className="people-kicker">{stamp(note.createdAt, tz)}</p>
             <p>{preview(note.body)}</p>
             <button
               type="button"
@@ -78,7 +80,7 @@ export function CompanyNotes({ companyId, notes }: Props) {
           }}
         />
       </PersonRail>
-      <TaskSheet open={sheet !== null} kicker="Note" title={editing ? stamp(editing.createdAt) : 'New note'} onClose={() => setSheet(null)}>
+      <TaskSheet open={sheet !== null} kicker="Note" title={editing ? stamp(editing.createdAt, tz) : 'New note'} onClose={() => setSheet(null)}>
         <label>
           Note
           <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} autoFocus />

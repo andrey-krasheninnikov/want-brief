@@ -1,10 +1,11 @@
+import { useTimezone } from '../../shared/timezone'
 import { Heartbeat, Lightning, Smiley, Sparkle, Target, type Icon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { api } from '../../api'
 import { hours } from '../../shared/format'
-import { moscowRange, type LoadPeriod } from '../../shared/moscow'
+import { zonedRange, type LoadPeriod } from '../../shared/zoned'
 import { taskHref } from '../../shared/taskOverlay'
 import { Window } from '../../shared/Window'
 import type { LoadReport } from '../../types'
@@ -32,11 +33,12 @@ function score(value: number | null | undefined): string {
 }
 
 export function PulseScreen() {
+  const tz = useTimezone()
   const [period, setPeriod] = useState<LoadPeriod>('week')
   const load = useQuery({
-    queryKey: ['load', period],
+    queryKey: ['load', period, tz],
     queryFn: () => {
-      const bounds = moscowRange(period)
+      const bounds = zonedRange(period, new Date(), tz)
       return api.load(bounds.from, bounds.to)
     },
     placeholderData: keepPreviousData,

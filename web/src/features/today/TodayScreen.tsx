@@ -2,10 +2,11 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api'
-import { moscowDayRange } from '../../shared/moscow'
+import { zonedDayRange } from '../../shared/zoned'
+import { useTimezone } from '../../shared/timezone'
 import { openEvent, openTask } from '../../shared/taskOverlay'
 import { Window } from '../../shared/Window'
-import { DEFAULT_TZ, pickNow, todayBlocks, zonedYmd } from '../schedule/now'
+import { pickNow, todayBlocks, zonedYmd } from '../schedule/now'
 import { ClockRow } from './ClockRow'
 import { TodayAgenda } from './TodayAgenda'
 import { TodayEarn } from './TodayEarn'
@@ -14,17 +15,18 @@ import { TodayRisk } from './TodayRisk'
 import { atRiskToday, remainingAgenda } from './todayModel'
 import './today.css'
 
-function todayKicker(now: Date): string {
+function todayKicker(now: Date, tz: string): string {
   return new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-    timeZone: 'Europe/Moscow',
+    timeZone: tz,
   }).format(now)
 }
 
 export function TodayScreen() {
   const navigate = useNavigate()
+  const tz = useTimezone()
   const [tick, setTick] = useState(() => Date.now())
   const intervals = useQuery({
     queryKey: ['intervals'],
@@ -38,9 +40,9 @@ export function TodayScreen() {
     return () => window.clearInterval(id)
   }, [running.length])
 
-  const bounds = moscowDayRange(new Date(tick))
+  const bounds = zonedDayRange(new Date(tick), tz)
   const schedule = useQuery({
-    queryKey: ['schedule', 'work', bounds.from, bounds.to],
+    queryKey: ['schedule', 'work', bounds.from, bounds.to, tz],
     queryFn: () => api.schedule(bounds.from, bounds.to),
     refetchInterval: running.length > 0 ? 10_000 : false,
   })
@@ -49,7 +51,6 @@ export function TodayScreen() {
     queryFn: () => api.items({ openOnly: true }),
   })
 
-  const tz = schedule.data?.grid.timezone ?? DEFAULT_TZ
   const today = zonedYmd(new Date(tick), tz)
   const lanes = schedule.data?.lanes ?? []
   const blocks = todayBlocks(lanes, today, tz)
@@ -70,16 +71,16 @@ export function TodayScreen() {
   }
 
   return (
-    <Window className="today-window" kicker={todayKicker(new Date(tick))} title="Today">
+    <Window className="today-window" kicker={todayKicker(new Date(tick), tz)} title="Today">
       <div className="today-bento">
         <div className="today-tile today-clocks" style={{ '--d': 0 } as CSSProperties}>
           <div className="today-core">
-            <ClockRow />
+            <ClockRow tz={tz} />
           </div>
         </div>
         <div className="today-tile today-earn" style={{ '--d': 1 } as CSSProperties}>
           <div className="today-core">
-            <TodayEarn />
+            <TodayEarn ymd={today} />
           </div>
         </div>
         <div className="today-tile today-now" style={{ '--d': 2 } as CSSProperties}>

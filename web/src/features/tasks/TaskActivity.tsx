@@ -1,3 +1,4 @@
+import { useTimezone } from '../../shared/timezone'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
@@ -23,8 +24,8 @@ type Props = {
   itemId: string
 }
 
-function noteStamp(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+function noteStamp(iso: string, tz: string): string {
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: tz }).format(new Date(iso))
 }
 
 function filterLabel(filter: Filter): string {
@@ -44,11 +45,11 @@ function formatSeconds(raw: string): string {
   return `${s}s`
 }
 
-function shortValue(value: string): string {
+function shortValue(value: string, tz: string): string {
   if (!value) return ''
   if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
     const at = new Date(value)
-    if (!Number.isNaN(at.getTime())) return noteStamp(value)
+    if (!Number.isNaN(at.getTime())) return noteStamp(value, tz)
   }
   if (value.length > 42) return `${value.slice(0, 39)}…`
   return value.replaceAll('_', ' ')
@@ -77,7 +78,7 @@ const FIELD_NAMES: Record<string, string> = {
   externalStatus: 'External status',
 }
 
-function fieldLabel(event: ItemEvent): string {
+function fieldLabel(event: ItemEvent, tz: string): string {
   const name = FIELD_NAMES[event.field] ?? event.field
   if (event.field === 'urgent' || event.field === 'important' || event.field === 'pinned') {
     return `${name} ${event.to === 'true' ? 'on' : 'off'}`
@@ -88,13 +89,13 @@ function fieldLabel(event: ItemEvent): string {
   if (event.field === 'archived') {
     return event.to ? 'Stalled' : 'Restored'
   }
-  if (event.from && event.to) return `${name} ${shortValue(event.from)} → ${shortValue(event.to)}`
-  if (event.to) return `${name} ${shortValue(event.to)}`
+  if (event.from && event.to) return `${name} ${shortValue(event.from, tz)} → ${shortValue(event.to, tz)}`
+  if (event.to) return `${name} ${shortValue(event.to, tz)}`
   if (event.from) return `${name} cleared`
   return name
 }
 
-function eventLabel(event: ItemEvent): string {
+function eventLabel(event: ItemEvent, tz: string): string {
   switch (event.kind) {
     case 'status':
       return `Status ${statusLabel(event.from as ItemStatus)} → ${statusLabel(event.to as ItemStatus)}`
@@ -111,11 +112,12 @@ function eventLabel(event: ItemEvent): string {
       if (event.field === 'body') return 'Check renamed'
       return 'Check'
     default:
-      return fieldLabel(event)
+      return fieldLabel(event, tz)
   }
 }
 
 export function TaskActivity({ itemId }: Props) {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const notes = useQuery({ queryKey: ['item-notes', itemId], queryFn: () => api.itemNotes(itemId) })
   const events = useQuery({ queryKey: ['item-events', itemId], queryFn: () => api.itemEvents(itemId) })
@@ -214,7 +216,7 @@ export function TaskActivity({ itemId }: Props) {
                   <span className={row.note.sourceKind === 'manual' ? 'dossier-badge' : 'dossier-badge source'}>
                     {sourceKindLabel(row.note.sourceKind)}
                   </span>
-                  {noteStamp(row.note.createdAt)}
+                  {noteStamp(row.note.createdAt, tz)}
                   {row.note.authorName ? `· ${row.note.authorName}` : ''}
                   <OpenUrl href={row.note.url || ''} label="Open comment" />
                 </p>
@@ -224,10 +226,10 @@ export function TaskActivity({ itemId }: Props) {
               <li key={row.id} className="dossier-entry activity">
                 <p className="dossier-entry-top">
                   <span className="dossier-badge source">Activity</span>
-                  {noteStamp(row.event.createdAt)}
+                  {noteStamp(row.event.createdAt, tz)}
                   {row.event.stress != null ? ` · stress ${row.event.stress}` : ''}
                 </p>
-                <p>{eventLabel(row.event)}</p>
+                <p>{eventLabel(row.event, tz)}</p>
                 {row.event.note ? <p className="muted">{row.event.note}</p> : null}
               </li>
             ),

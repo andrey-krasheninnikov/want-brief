@@ -3,7 +3,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
-import { moscowYmd } from '../../shared/moscow'
+import { useTimezone } from '../../shared/timezone'
+import { zonedYmd } from '../../shared/zoned'
 import type { Person } from '../../types'
 import { personInitials } from './PersonCard'
 import { PersonBonds } from './PersonBonds'
@@ -51,13 +52,13 @@ function dateOnly(iso: string | null): string {
   return iso.slice(0, 10)
 }
 
-function presumeBornOn(age: number): string {
-  const [year, month, day] = moscowYmd().split('-').map(Number)
+function presumeBornOn(age: number, tz: string): string {
+  const [year, month, day] = zonedYmd(new Date(), tz).split('-').map(Number)
   return new Date(Date.UTC(year - age, month - 1, day)).toISOString().slice(0, 10)
 }
 
-function ageFromBornOn(bornOn: string): number {
-  const [ty, tm, td] = moscowYmd().split('-').map(Number)
+function ageFromBornOn(bornOn: string, tz: string): number {
+  const [ty, tm, td] = zonedYmd(new Date(), tz).split('-').map(Number)
   const [by, bm, bd] = bornOn.split('-').map(Number)
   let years = ty - by
   if (tm < bm || (tm === bm && td < bd)) years -= 1
@@ -91,6 +92,7 @@ function payloadFrom(form: Draft) {
 }
 
 export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props) {
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const person = useQuery({
     queryKey: ['person', personId],
@@ -349,7 +351,7 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
             <DateField
               mode="date"
               value={form.bornOn}
-              onChange={(next) => setForm({ ...form, bornOn: next, ageYears: next ? String(ageFromBornOn(next)) : '' })}
+              onChange={(next) => setForm({ ...form, bornOn: next, ageYears: next ? String(ageFromBornOn(next, tz)) : '' })}
             />
           </label>
           <label>
@@ -362,7 +364,7 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
               onChange={(e) => {
                 const raw = e.target.value
                 const years = Number(raw)
-                const bornOn = raw !== '' && Number.isFinite(years) && years >= 0 && years <= 150 ? presumeBornOn(years) : ''
+                const bornOn = raw !== '' && Number.isFinite(years) && years >= 0 && years <= 150 ? presumeBornOn(years, tz) : ''
                 setForm({ ...form, ageYears: raw, bornOn })
               }}
             />

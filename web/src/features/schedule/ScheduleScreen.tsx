@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { span } from '../../shared/format'
-import { moscowWeek, shiftWeeks } from '../../shared/moscow'
+import { shiftWeeks, zonedWeek } from '../../shared/zoned'
+import { useTimezone } from '../../shared/timezone'
 import { openEvent, openTask } from '../../shared/taskOverlay'
 import { Window } from '../../shared/Window'
 import { DayOverridePopover } from './DayOverridePopover'
@@ -63,11 +64,11 @@ function storeView(view: View) {
   }
 }
 
-function gridOf(raw?: ScheduleGrid): Grid {
+function gridOf(raw: ScheduleGrid | undefined, tz: string): Grid {
   const grid = raw ?? FALLBACK_GRID
   const hours = Math.max(1, grid.endHour - grid.startHour)
   return {
-    tz: grid.timezone || DEFAULT_TZ,
+    tz: raw?.timezone || tz,
     start: grid.startHour,
     hours,
     height: hours * HOUR,
@@ -86,9 +87,9 @@ function endMinutes(iso: string, startMin: number, tz: string): number {
   return value
 }
 
-function weekKicker(days: string[], tz: string): string {
+function weekKicker(days: string[]): string {
   const fmt = (ymd: string) =>
-    new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: tz }).format(new Date(`${ymd}T12:00:00Z`))
+    new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${ymd}T12:00:00Z`))
   return `${fmt(days[0])} - ${fmt(days[6])}`
 }
 
@@ -505,6 +506,7 @@ function DayHeads({
 
 export function ScheduleScreen() {
   const navigate = useNavigate()
+  const tz = useTimezone()
   const queryClient = useQueryClient()
   const gantt = useRef<HTMLDivElement>(null)
   const [anchor, setAnchor] = useState(() => new Date())
@@ -518,7 +520,7 @@ export function ScheduleScreen() {
     const id = window.setInterval(() => setTick(Date.now()), 60_000)
     return () => window.clearInterval(id)
   }, [])
-  const week = useMemo(() => moscowWeek(anchor), [anchor])
+  const week = useMemo(() => zonedWeek(anchor, tz), [anchor, tz])
   const intervals = useQuery({
     queryKey: ['intervals'],
     queryFn: api.intervals,
@@ -526,7 +528,7 @@ export function ScheduleScreen() {
   })
   const running = intervals.data ?? []
   const report = useQuery({
-    queryKey: ['schedule', kind, week.from, week.to],
+    queryKey: ['schedule', kind, week.from, week.to, tz],
     queryFn: () => api.schedule(week.from, week.to, kind),
     refetchInterval: running.length > 0 ? 10_000 : false,
   })
@@ -550,7 +552,7 @@ export function ScheduleScreen() {
       void queryClient.invalidateQueries({ queryKey: ['schedule-days'] })
     },
   })
-  const grid = gridOf(report.data?.grid)
+  const grid = gridOf(report.data?.grid, tz)
   const today = zonedYmd(new Date(tick), grid.tz)
   const chartDay = pickChartDay(week.days, today, ganttDay, report.data?.grid.workdays ?? FALLBACK_GRID.workdays)
   const lanes = report.data?.lanes ?? []
@@ -562,7 +564,7 @@ export function ScheduleScreen() {
   const cols = weekColumns(week.days, today, collapseWeekend)
   const gridStyle = { '--sched-cols': cols } as CSSProperties
   const lateId = firstLateId(lanes)
-  const range = weekKicker(week.days, grid.tz)
+  const range = weekKicker(week.days)
   const todays = todayBlocks(lanes, today, grid.tz)
   const pick = pickNow(todays, tick)
   const focusIds = new Set(covering(todays, tick).map((row) => `${row.itemId}-${row.startsAt}`))
@@ -620,13 +622,13 @@ export function ScheduleScreen() {
             </button>
           </div>
           <div className="sched-tabs">
-            <button type="button" className="ghost" aria-label="Previous week" onClick={() => setAnchor((d) => shiftWeeks(d, -1))}>
+            <button type="button" className="ghost" aria-label="Previous week" onClick={() => setAnchor((d) => shiftWeeks(d, -1, tz))}>
               ‹
             </button>
             <button type="button" className="ghost" aria-label="This week" onClick={() => setAnchor(new Date())}>
               This week
             </button>
-            <button type="button" className="ghost" aria-label="Next week" onClick={() => setAnchor((d) => shiftWeeks(d, 1))}>
+            <button type="button" className="ghost" aria-label="Next week" onClick={() => setAnchor((d) => shiftWeeks(d, 1, tz))}>
               ›
             </button>
           </div>
@@ -656,7 +658,7 @@ export function ScheduleScreen() {
           projectOf={(id) => projectByItem.get(id)}
           titleOf={(id) => titleByItem.get(id)}
           onOpen={(id) => openTask(navigate, id)}
-          onNextWeek={() => setAnchor((d) => shiftWeeks(d, 1))}
+          onNextWeek={() => setAnchor((d) => shiftWeeks(d, 1, tz))}
         />
       ) : null}
       {whatIf ? (
@@ -793,7 +795,7 @@ export function ScheduleScreen() {
             ) : null}
           </div>
         </div>
-        <NeedsFields rows={unplanned} kind={kind} />
+        <NeedsFields rows={unplanned} kind={kind} tz={tz} />
       </div>
     </Window>
   )

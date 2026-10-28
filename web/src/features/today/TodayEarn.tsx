@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
 import { money } from '../../shared/format'
-import { moscowYmd } from '../../shared/moscow'
 import { TodayEarnPlot } from './TodayEarnPlot'
 import { TodayFxRate } from './TodayFxRate'
 import {
@@ -18,14 +17,13 @@ import {
 } from './todayModel'
 
 function monthTitle(ymd: string): string {
-  return new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'Europe/Moscow' }).format(
-    new Date(`${ymd}T12:00:00+03:00`),
+  return new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'UTC' }).format(
+    new Date(`${ymd}T12:00:00Z`),
   )
 }
 
-export function TodayEarn() {
+export function TodayEarn({ ymd }: { ymd: string }) {
   const queryClient = useQueryClient()
-  const ymd = moscowYmd()
   const yearStart = `${ymd.slice(0, 4)}-01-01`
   const [rate, setRate] = useState<number | null>(null)
   const [rateDay, setRateDay] = useState(ymd)

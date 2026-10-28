@@ -57,6 +57,7 @@ body {
 }
 
 h1, h2, h3, .brand strong {
+  font-family: inherit;
   font-weight: 600;
   letter-spacing: -0.35px;
   text-wrap: balance;
@@ -253,15 +254,15 @@ nav a.active {
   display: flex;
   flex-direction: column;
 }
-.window-body, .ui-window-body { padding: 1.25rem 1.45rem 1.7rem; display: flex; flex-direction: column; gap: 1.15rem; overflow: auto; flex: 1; }
-.titlebar, .ui-window-header {
+.ui-window-body { padding: 1.25rem 1.45rem 1.7rem; display: flex; flex-direction: column; gap: 1.15rem; overflow: auto; flex: 1; }
+.ui-window-header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 0.8rem;
   padding: 1.35rem 1.45rem 0;
 }
-.title-kicker, .ui-window-kicker {
+.ui-window-kicker {
   margin: 0 0 0.28rem;
   color: var(--muted);
   font-size: 10px;
@@ -269,7 +270,7 @@ nav a.active {
   letter-spacing: 0.2em;
   text-transform: uppercase;
 }
-.titlebar h1, .ui-window-header h1 {
+.ui-window-header h1 {
   margin: 0;
   font-family: inherit;
   font-size: 23px;
@@ -1723,7 +1724,7 @@ a.matrix-cell:hover { background: var(--bg-3); }
 }
 .ui-date-trigger:hover { background: var(--bg-3); color: var(--ink); }
 .ui-date-popover { border: 1px solid var(--line); background: var(--bg-2); }
-.ui-date-popover button { min-height: 44px; padding: 0; background: transparent; color: var(--ink); border: 0; }
+.ui-date-popover button { min-width: 44px; min-height: 44px; padding: 0; background: transparent; color: var(--ink); border: 0; }
 .ui-date-popover button:hover { background: var(--bg-3); color: var(--ink); }
 .ui-date-year { width: auto; min-width: 64px; min-height: 44px; padding: 0 4px; }
 .ui-date-popover .ui-date-day { width: 44px; height: 44px; border-radius: 10px; }

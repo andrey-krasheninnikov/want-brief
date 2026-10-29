@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { ArrowsClockwise } from '@phosphor-icons/react'
 import { useCallback, useMemo, useState, type DragEvent, type FormEvent } from 'react'
@@ -305,14 +307,14 @@ function TasksWorkspace() {
           <h2>
             {statusLabel(status)} <span className={wipWarn ? 'warn' : undefined}>{rows.length}</span>
           </h2>
-          <button
+          <Button
             type="button"
             className="tasks-plus"
             aria-label={`Add to ${statusLabel(status)}`}
             onClick={() => openCreate(status)}
           >
             +
-          </button>
+          </Button>
         </header>
         {rows.map((item) => {
           const yieldRow = cardYield(item, projectList, monthLoad.data)
@@ -345,7 +347,7 @@ function TasksWorkspace() {
         </h1>
         <label className="tasks-search">
           Search
-          <input
+          <Input
             value={query}
             onChange={(e) => setFilter('q', e.target.value)}
             placeholder="Title or key"
@@ -371,13 +373,13 @@ function TasksWorkspace() {
         <div className="tasks-chips">
           <TaskFlag glyph="🏃" label="Urgent" on={onlyU} onClick={() => setFlag('u', !onlyU)} />
           <TaskFlag glyph="🔑" label="Important" on={onlyI} onClick={() => setFlag('i', !onlyI)} />
-          <button type="button" className={week ? 'chip on' : 'chip'} onClick={() => setFlag('week', !week)}>
+          <Button type="button" className={week ? 'chip on' : 'chip'} onClick={() => setFlag('week', !week)}>
             Due this week
-          </button>
+          </Button>
           {filterCount > 0 ? (
-            <button type="button" className="chip" onClick={clearFilters}>
+            <Button type="button" className="chip" onClick={clearFilters}>
               {filterCount} filters · Clear
-            </button>
+            </Button>
           ) : null}
         </div>
         <div className="tasks-filters">
@@ -406,7 +408,7 @@ function TasksWorkspace() {
             ))}
           </select>
         </div>
-        <button
+        <Button
           type="button"
           className="ghost tasks-sync"
           title="Sync active"
@@ -415,10 +417,10 @@ function TasksWorkspace() {
           onClick={() => syncActive.mutate()}
         >
           <ArrowsClockwise size={18} weight="light" />
-        </button>
-        <button type="button" className="tasks-add" onClick={() => openCreate('backlog')}>
+        </Button>
+        <Button type="button" className="tasks-add" onClick={() => openCreate('backlog')}>
           Add task
-        </button>
+        </Button>
       </header>
       {items.isError ? <p className="error">{items.error.message}</p> : null}
       {syncActive.isError ? (
@@ -427,9 +429,9 @@ function TasksWorkspace() {
       {noMatch ? (
         <p className="tasks-empty-match">
           No tasks match{query ? ` “${query}”` : ''}.{' '}
-          <button type="button" className="ghost" onClick={clearFilters}>
+          <Button type="button" className="ghost" onClick={clearFilters}>
             Reset filters
-          </button>
+          </Button>
         </p>
       ) : null}
       {showSkeleton ? (
@@ -458,7 +460,7 @@ function TasksWorkspace() {
         <form className="tasks-form" onSubmit={onSubmit}>
           <label>
             Title
-            <input value={title} onChange={(e) => setTitle(e.target.value)} autoComplete="off" autoFocus />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} autoComplete="off" autoFocus />
           </label>
           <label>
             Type
@@ -471,7 +473,7 @@ function TasksWorkspace() {
             </select>
           </label>
           {formError ? <p className="error">{formError}</p> : null}
-          <button type="submit">Create</button>
+          <Button type="submit">Create</Button>
         </form>
       </TaskSheet>
       {id ? <TaskDossierSheet id={id} onClose={closeDossier} /> : null}

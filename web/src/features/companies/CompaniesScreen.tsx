@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -67,19 +69,19 @@ export function CompaniesScreen() {
       kicker="Studio"
       title="Companies"
       actions={
-        <button
+        <Button
           type="button"
           className="tasks-plus"
           aria-label="Add company"
           onClick={() => navigate(companiesHref({ creating: true }))}
         >
           +
-        </button>
+        </Button>
       }
     >
       <div className={open ? 'people-split open' : 'people-split'}>
         <div className="people-list">
-          <input
+          <Input
             ref={searchRef}
             className="people-search"
             value={query}
@@ -92,9 +94,9 @@ export function CompaniesScreen() {
           {companies.isError ? <p className="error">{companies.error.message}</p> : null}
           {empty ? <p className="people-empty">{query.trim() ? 'No matches.' : none ? 'No companies yet.' : 'No matches.'}</p> : null}
           {none && !query.trim() ? (
-            <button type="button" onClick={() => navigate(companiesHref({ creating: true }))}>
+            <Button type="button" onClick={() => navigate(companiesHref({ creating: true }))}>
               Create company
-            </button>
+            </Button>
           ) : null}
           {list.map((row) => (
             <CompanyCard key={row.id} company={row} selected={row.id === id} onPick={pick} />

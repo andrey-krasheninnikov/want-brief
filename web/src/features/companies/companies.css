@@ -11,9 +11,9 @@
   display: block;
   padding: 5px;
   border-radius: 1.35rem;
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: transform 200ms var(--motion), opacity 200ms var(--motion);
+  background: color-mix(in srgb, var(--foreground) 4.5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+  transition: transform 200ms var(--motion-ease), opacity 200ms var(--motion-ease);
 }
 .companies-tile:hover {
   transform: translateY(-1px);
@@ -23,8 +23,8 @@
   min-height: 5.4rem;
   padding: 0.85rem 0.95rem 0.95rem;
   border-radius: calc(1.35rem - 5px);
-  background: color-mix(in srgb, var(--window) 88%, transparent);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  box-shadow: inset 0 1px 1px color-mix(in srgb, var(--foreground) 12%, transparent);
   display: grid;
   gap: 0.25rem;
   align-content: start;
@@ -57,10 +57,10 @@
 .companies-kpi-meta,
 .companies-kpi-delta {
   margin: 0;
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 14px;
+  color: var(--muted-foreground);
 }
-.companies-kpi-delta.up { color: var(--ok); }
+.companies-kpi-delta.up { color: var(--success-text); }
 .companies-num { font-variant-numeric: tabular-nums; }
 .companies-card-pay { font-variant-numeric: tabular-nums; }
 .companies-tasks {
@@ -77,31 +77,31 @@
   display: block;
 }
 .companies-grid {
-  stroke: rgba(255, 255, 255, 0.08);
+  stroke: color-mix(in srgb, var(--foreground) 8%, transparent);
   stroke-width: 1;
 }
 .companies-axis {
-  fill: var(--muted);
-  font-size: 10px;
+  fill: var(--muted-foreground);
+  font-size: 14px;
 }
-.companies-usd-fill { fill: color-mix(in srgb, var(--accent) 22%, transparent); }
-.companies-rub-fill { fill: color-mix(in srgb, var(--ok) 22%, transparent); }
+.companies-usd-fill { fill: color-mix(in srgb, var(--primary) 22%, transparent); }
+.companies-rub-fill { fill: color-mix(in srgb, var(--success-text) 22%, transparent); }
 .companies-usd-line {
   fill: none;
-  stroke: var(--accent);
+  stroke: var(--primary);
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .companies-rub-line {
   fill: none;
-  stroke: var(--ok);
+  stroke: var(--success-text);
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.companies-usd-dot { fill: var(--accent); }
-.companies-rub-dot { fill: var(--ok); }
+.companies-usd-dot { fill: var(--primary); }
+.companies-rub-dot { fill: var(--success-text); }
 .companies-donut-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -114,7 +114,7 @@
 }
 .companies-donut-track {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.08);
+  stroke: color-mix(in srgb, var(--foreground) 8%, transparent);
   stroke-width: 14;
 }
 .companies-donut-svg circle.companies-slice-0,
@@ -126,14 +126,14 @@
   stroke-width: 14;
   stroke-linecap: butt;
 }
-.companies-slice-0 { stroke: var(--muted); background: var(--muted); }
-.companies-slice-1 { stroke: var(--accent-2); background: var(--accent-2); }
-.companies-slice-2 { stroke: var(--ink); background: var(--ink); }
-.companies-slice-3 { stroke: var(--accent); background: var(--accent); }
-.companies-slice-4 { stroke: var(--danger); background: var(--danger); }
-.companies-slice-ok { stroke: var(--ok); background: var(--ok); }
+.companies-slice-0 { stroke: var(--muted-foreground); background: var(--muted-foreground); }
+.companies-slice-1 { stroke: var(--info); background: var(--info); }
+.companies-slice-2 { stroke: var(--foreground); background: var(--foreground); }
+.companies-slice-3 { stroke: var(--primary); background: var(--primary); }
+.companies-slice-4 { stroke: var(--destructive-text); background: var(--destructive-text); }
+.companies-slice-ok { stroke: var(--success-text); background: var(--success-text); }
 .companies-donut-total {
-  fill: var(--ink);
+  fill: var(--foreground);
   font-size: 22px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
@@ -144,8 +144,8 @@
   padding: 0;
   display: grid;
   gap: 0.4rem;
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 14px;
+  color: var(--muted-foreground);
 }
 .companies-legend.inline {
   display: flex;
@@ -160,7 +160,7 @@
 .companies-legend span {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
-  color: var(--ink);
+  color: var(--foreground);
 }
 .companies-legend.inline span { margin-left: 0; }
 .companies-legend i {
@@ -170,12 +170,12 @@
   background: currentColor;
   flex: none;
 }
-.companies-legend i.companies-slice-0 { background: var(--muted); }
-.companies-legend i.companies-slice-1 { background: var(--accent-2); }
-.companies-legend i.companies-slice-2 { background: var(--ink); }
-.companies-legend i.companies-slice-3 { background: var(--accent); }
-.companies-legend i.companies-slice-4 { background: var(--danger); }
-.companies-legend i.companies-slice-ok { background: var(--ok); }
+.companies-legend i.companies-slice-0 { background: var(--muted-foreground); }
+.companies-legend i.companies-slice-1 { background: var(--info); }
+.companies-legend i.companies-slice-2 { background: var(--foreground); }
+.companies-legend i.companies-slice-3 { background: var(--primary); }
+.companies-legend i.companies-slice-4 { background: var(--destructive-text); }
+.companies-legend i.companies-slice-ok { background: var(--success-text); }
 .companies-empty {
   display: grid;
   gap: 0.2rem;
@@ -199,21 +199,21 @@
 }
 .companies-rail-copy strong { font-size: 14px; }
 .companies-rail-copy span {
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 14px;
+  color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
 }
 .companies-rail-track {
   height: 0.45rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
   overflow: hidden;
 }
 .companies-rail-track i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: color-mix(in srgb, var(--accent) 70%, transparent);
+  background: color-mix(in srgb, var(--primary) 70%, transparent);
 }
 .companies-form {
   display: grid;
@@ -222,9 +222,9 @@
 .companies-form label {
   display: grid;
   gap: 0.35rem;
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .companies-actions {
   display: flex;
@@ -238,10 +238,10 @@
   width: max-content;
   padding: 0.12rem 0.45rem;
   border-radius: 0.45rem;
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.03em;
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--foreground);
 }
 .companies-paper-row {
   display: grid;
@@ -272,7 +272,7 @@
   gap: 0.55rem;
   padding: 0.45rem 0.6rem;
   border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 .companies-link a {
   color: inherit;

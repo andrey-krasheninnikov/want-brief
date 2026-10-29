@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { DotsThree } from '@phosphor-icons/react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -208,9 +210,9 @@ export function CompanyDossier({ companyId, onCreated, onDeleted, onClose }: Pro
     <form className="people-form" onSubmit={onCreate}>
       <div className="people-chrome">
         {onClose ? (
-          <button type="button" className="ghost people-close" onClick={onClose}>
+          <Button type="button" className="ghost people-close" onClick={onClose}>
             Back
-          </button>
+          </Button>
         ) : null}
         <header className="people-detail-head">
           <span className="people-avatar" aria-hidden>
@@ -219,19 +221,19 @@ export function CompanyDossier({ companyId, onCreated, onDeleted, onClose }: Pro
           <div className="people-detail-title">
             <label className="people-name-field">
               Name
-              <input id="company-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoComplete="off" />
+              <Input id="company-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoComplete="off" />
             </label>
             <p className="people-save-state">{companyId ? (waiting ? 'Saving' : 'Saved') : 'New'}</p>
           </div>
           <div className="people-overflow">
             {companyId ? (
-              <button type="button" className="ghost rel-edit" aria-label="More" onClick={() => setMenu((open) => !open)}>
+              <Button type="button" className="ghost rel-edit" aria-label="More" onClick={() => setMenu((open) => !open)}>
                 <DotsThree size={18} weight="bold" />
-              </button>
+              </Button>
             ) : null}
             {menu ? (
               <div className="people-menu">
-                <button
+                <Button
                   type="button"
                   className="ghost"
                   disabled={remove.isPending}
@@ -241,28 +243,28 @@ export function CompanyDossier({ companyId, onCreated, onDeleted, onClose }: Pro
                   }}
                 >
                   Delete
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>
         </header>
         <nav className="people-sec-nav" aria-label="Sections">
           {SECTIONS.map((section) => (
-            <button key={section.id} type="button" className="ghost" onClick={() => jump(section.id)}>
+            <Button key={section.id} type="button" className="ghost" onClick={() => jump(section.id)}>
               {section.label}
-            </button>
+            </Button>
           ))}
         </nav>
       </div>
       {error ? <p className="error">{error}</p> : null}
       {!companyId ? (
-        <button type="submit" disabled={save.isPending || !form.name.trim()}>
+        <Button type="submit" disabled={save.isPending || !form.name.trim()}>
           Create
-        </button>
+        </Button>
       ) : null}
       <label>
         Description
-        <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
       </label>
       {row ? <CompanyOverview company={{ ...row, name: form.name }} people={peopleRows} /> : null}
       {row ? (
@@ -296,9 +298,9 @@ export function CompanyDossier({ companyId, onCreated, onDeleted, onClose }: Pro
           {linkedTasks.length > 0 ? (
             <div className="companies-tasks">
               {linkedTasks.map((item) => (
-                <button key={item.id} type="button" className="ghost" onClick={() => openTask(navigate, item.id)}>
+                <Button key={item.id} type="button" className="ghost" onClick={() => openTask(navigate, item.id)}>
                   {item.title}
-                </button>
+                </Button>
               ))}
             </div>
           ) : null}
@@ -313,13 +315,13 @@ export function CompanyDossier({ companyId, onCreated, onDeleted, onClose }: Pro
               </a>
               <span className="companies-actions">
                 <OpenUrl href={link.url} />
-                <button
+                <Button
                   type="button"
                   className="ghost"
                   onClick={() => setForm({ ...form, links: form.links.filter((_, i) => i !== index) })}
                 >
                   Remove
-                </button>
+                </Button>
               </span>
             </div>
           ))}
@@ -327,16 +329,16 @@ export function CompanyDossier({ companyId, onCreated, onDeleted, onClose }: Pro
         <div className="people-pair">
           <label>
             Label
-            <input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} autoComplete="off" />
+            <Input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} autoComplete="off" />
           </label>
           <label>
             URL
-            <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} autoComplete="off" />
+            <Input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} autoComplete="off" />
           </label>
         </div>
-        <button type="button" className="ghost" onClick={addLink}>
+        <Button type="button" className="ghost" onClick={addLink}>
           Add link
-        </button>
+        </Button>
       </section>
       {row ? <CompanyNotes companyId={row.id} notes={notes.data ?? []} /> : null}
       {row ? <CompanyLog company={row} people={peopleRows} /> : null}

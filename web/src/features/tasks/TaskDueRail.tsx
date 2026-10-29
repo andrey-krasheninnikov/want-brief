@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useState, type CSSProperties } from 'react'
 import { DateField } from '../../shared/DateField'
@@ -96,12 +97,12 @@ export function TaskDueRail({ item, values, onChange, onCommit, compact }: Props
                 }}
               />
             ) : (
-              <button type="button" className="tasks-due-open ghost" onClick={() => setOpen(slot.key)}>
+              <Button type="button" className="tasks-due-open ghost" onClick={() => setOpen(slot.key)}>
                 {remain || 'Set date'}
-              </button>
+              </Button>
             )}
             {iso || values?.[slot.key] ? (
-              <button
+              <Button
                 type="button"
                 className="ghost tasks-due-clear"
                 onClick={() => {
@@ -111,7 +112,7 @@ export function TaskDueRail({ item, values, onChange, onCommit, compact }: Props
                 }}
               >
                 Clear
-              </button>
+              </Button>
             ) : null}
           </article>
         )

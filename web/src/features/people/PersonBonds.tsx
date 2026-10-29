@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -132,9 +134,9 @@ export function PersonBonds({ person }: Props) {
         />
       ))}
       {endedBonds.length > 0 ? (
-        <button type="button" className="ghost" onClick={() => setShowEnded((open) => !open)}>
+        <Button type="button" className="ghost" onClick={() => setShowEnded((open) => !open)}>
           {showEnded ? 'Hide ended' : `Ended (${endedBonds.length})`}
-        </button>
+        </Button>
       ) : null}
       {showEnded
         ? endedBonds.map((bond) => <BondCard key={bond.id} bond={bond} draft={draft} setDraft={setDraft} />)
@@ -168,19 +170,19 @@ export function PersonBonds({ person }: Props) {
           </label>
           <label>
             Comment
-            <input value={draft.comment} onChange={(e) => setDraft({ ...draft, comment: e.target.value })} />
+            <Input value={draft.comment} onChange={(e) => setDraft({ ...draft, comment: e.target.value })} />
           </label>
           <div className="people-contact-actions">
-            <button type="button" className="ghost" onClick={() => open.mutate()} disabled={open.isPending}>
+            <Button type="button" className="ghost" onClick={() => open.mutate()} disabled={open.isPending}>
               Add
-            </button>
-            <button type="button" className="ghost" onClick={() => setAdding(false)}>
+            </Button>
+            <Button type="button" className="ghost" onClick={() => setAdding(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
-        <button
+        <Button
           type="button"
           className="ghost"
           onClick={() => {
@@ -199,7 +201,7 @@ export function PersonBonds({ person }: Props) {
           }}
         >
           Add relation
-        </button>
+        </Button>
       )}
       {open.isError ? <p className="error">{open.error.message}</p> : null}
       {change.isError ? <p className="error">{change.error.message}</p> : null}
@@ -271,7 +273,7 @@ function BondCard({
           </label>
           <label>
             Comment
-            <input value={draft.comment} onChange={(e) => setDraft({ ...draft, otherId: '', comment: e.target.value })} />
+            <Input value={draft.comment} onChange={(e) => setDraft({ ...draft, otherId: '', comment: e.target.value })} />
           </label>
           <label>
             Changed
@@ -283,18 +285,18 @@ function BondCard({
           </label>
           <label>
             Note
-            <input
+            <Input
               value={draft.actionComment}
               onChange={(e) => setDraft({ ...draft, otherId: '', actionComment: e.target.value })}
             />
           </label>
           <div className="people-contact-actions">
-            <button type="button" className="ghost" onClick={onSaveChange} disabled={pending}>
+            <Button type="button" className="ghost" onClick={onSaveChange} disabled={pending}>
               Save
-            </button>
-            <button type="button" className="ghost" onClick={onCancel}>
+            </Button>
+            <Button type="button" className="ghost" onClick={onCancel}>
               Cancel
-            </button>
+            </Button>
           </div>
         </>
       ) : null}
@@ -306,29 +308,29 @@ function BondCard({
           </label>
           <label>
             Note
-            <input
+            <Input
               value={draft.actionComment}
               onChange={(e) => setDraft({ ...draft, otherId: '', actionComment: e.target.value })}
             />
           </label>
           <div className="people-contact-actions">
-            <button type="button" className="ghost" onClick={onSaveEnd} disabled={pending}>
+            <Button type="button" className="ghost" onClick={onSaveEnd} disabled={pending}>
               End
-            </button>
-            <button type="button" className="ghost" onClick={onCancel}>
+            </Button>
+            <Button type="button" className="ghost" onClick={onCancel}>
               Cancel
-            </button>
+            </Button>
           </div>
         </>
       ) : null}
       {!bond.endedOn && !editing && !ending ? (
         <div className="people-contact-actions">
-          <button type="button" className="ghost" onClick={onEdit}>
+          <Button type="button" className="ghost" onClick={onEdit}>
             Change
-          </button>
-          <button type="button" className="ghost" onClick={onEnd}>
+          </Button>
+          <Button type="button" className="ghost" onClick={onEnd}>
             End
-          </button>
+          </Button>
         </div>
       ) : null}
     </article>

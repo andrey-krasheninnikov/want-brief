@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import type { Company } from '../../types'
 import { companyInitials, companySalaryText, openOf, tenureText } from './companiesModel'
 
@@ -13,7 +14,7 @@ export function CompanyCard({ company, selected, onPick }: Props) {
   const tenure = tenureText(company.tenure)
   const meta = [title || 'No title', tenure].filter(Boolean).join(' · ')
   return (
-    <button
+    <Button
       type="button"
       className={selected ? 'people-row on' : 'people-row'}
       onClick={() => onPick(company.id)}
@@ -26,6 +27,6 @@ export function CompanyCard({ company, selected, onPick }: Props) {
         <span>{meta}</span>
       </span>
       {pay ? <span className="people-row-age companies-card-pay">{pay}</span> : null}
-    </button>
+    </Button>
   )
 }

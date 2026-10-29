@@ -1,3 +1,4 @@
+import { Input } from '@want-foundation/desyst-react'
 import type { ReactNode } from 'react'
 
 // Section groups related knobs under a short title and one-line rationale.
@@ -34,7 +35,7 @@ export function NumberField({
     <label className="sset-field">
       <span>{label}</span>
       <span className="sset-input">
-        <input
+        <Input
           type="number"
           value={Number.isFinite(value) ? value : ''}
           min={min}

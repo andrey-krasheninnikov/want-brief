@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { CaretRight } from '@phosphor-icons/react'
 import { span } from '../../shared/format'
 import { TaskTimer } from '../tasks/TaskTimer'
@@ -129,9 +130,9 @@ export function NowDeck({ pick, loading, running, lateCount, lateId, tz, project
           {lateCount > 0 ? (
             <p className="sched-overflow">
               {lateCount} late
-              <button type="button" className="ghost" disabled={!lateId} onClick={() => lateId && onOpen(lateId)}>
+              <Button type="button" className="ghost" disabled={!lateId} onClick={() => lateId && onOpen(lateId)}>
                 Open
-              </button>
+              </Button>
             </p>
           ) : null}
         </header>
@@ -142,9 +143,9 @@ export function NowDeck({ pick, loading, running, lateCount, lateId, tz, project
         {!loading && !featured ? (
           <p className="sched-deck-empty">
             {pick.phase === 'after' ? 'Nothing left in the plan today.' : 'Nothing packed for today.'}
-            <button type="button" className="ghost" onClick={onNextWeek}>
+            <Button type="button" className="ghost" onClick={onNextWeek}>
               Next week ›
-            </button>
+            </Button>
           </p>
         ) : null}
         {alsoNow.length > 0 ? (
@@ -169,9 +170,9 @@ export function NowDeck({ pick, loading, running, lateCount, lateId, tz, project
             <span>
               Running <em>off plan</em>:
             </span>
-            <button type="button" className="ghost sched-deck-link" onClick={() => onOpen(row.itemId)}>
+            <Button type="button" className="ghost sched-deck-link" onClick={() => onOpen(row.itemId)}>
               {titleOf(row.itemId) ?? 'a task outside this plan'}
-            </button>
+            </Button>
             <TaskTimer itemId={row.itemId} running={row} />
           </p>
         ))}

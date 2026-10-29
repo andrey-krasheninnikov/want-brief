@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 
 type Props = {
@@ -18,7 +19,7 @@ export function WeekdayGrid({ value, onChange }: Props) {
           {DAYS.map((label, index) => {
             const slot = week * 7 + index
             return (
-              <button
+              <Button
                 key={slot}
                 type="button"
                 className={value.includes(slot) ? 'on' : ''}
@@ -26,7 +27,7 @@ export function WeekdayGrid({ value, onChange }: Props) {
                 onClick={() => toggle(slot)}
               >
                 {label}
-              </button>
+              </Button>
             )
           })}
         </div>

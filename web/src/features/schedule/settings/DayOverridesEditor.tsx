@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { api } from '../../../api'
@@ -93,7 +95,7 @@ export function DayOverridesEditor({ tz, workStartMin, workEndMin }: { tz: strin
         </label>
         <div className="sset-days-modes" role="radiogroup" aria-label="Exception kind">
           {(['off', 'custom', 'note'] as Mode[]).map((value) => (
-            <button
+            <Button
               key={value}
               type="button"
               role="radio"
@@ -102,7 +104,7 @@ export function DayOverridesEditor({ tz, workStartMin, workEndMin }: { tz: strin
               onClick={() => setMode(value)}
             >
               {value === 'off' ? 'Day off' : value === 'custom' ? 'Custom hours' : 'Note only'}
-            </button>
+            </Button>
           ))}
         </div>
         {mode === 'custom' ? (
@@ -119,12 +121,12 @@ export function DayOverridesEditor({ tz, workStartMin, workEndMin }: { tz: strin
         ) : null}
         <label className="sset-field">
           <span>Note</span>
-          <input type="text" value={note} placeholder="Optional" onChange={(e) => setNote(e.target.value)} />
+          <Input type="text" value={note} placeholder="Optional" onChange={(e) => setNote(e.target.value)} />
         </label>
         {invalid || upsert.isError ? <p className="error">{invalid || upsert.error?.message}</p> : null}
-        <button type="submit" disabled={upsert.isPending}>
+        <Button type="submit" disabled={upsert.isPending}>
           Add exception
-        </button>
+        </Button>
       </form>
       {list.isError ? <p className="error">{list.error.message}</p> : null}
       {rows.length === 0 ? <p className="muted">No exceptions in the next three months.</p> : null}
@@ -134,9 +136,9 @@ export function DayOverridesEditor({ tz, workStartMin, workEndMin }: { tz: strin
             <span className="mono">{dayLabel(row.day, tz)}</span>
             <b>{describe(row)}</b>
             <small>{row.note}</small>
-            <button type="button" className="ghost" disabled={remove.isPending} onClick={() => remove.mutate(row.day)}>
+            <Button type="button" className="ghost" disabled={remove.isPending} onClick={() => remove.mutate(row.day)}>
               Remove
-            </button>
+            </Button>
           </li>
         ))}
       </ul>

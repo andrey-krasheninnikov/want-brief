@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useEffect, type ReactNode } from 'react'
 
 type Props = {
@@ -21,7 +22,7 @@ export function PlazaSheet({ open, title, onClose, children }: Props) {
 
   return (
     <div className="plaza-sheet-root">
-      <button type="button" className="plaza-sheet-back" aria-label="Close" onClick={onClose} />
+      <Button type="button" className="plaza-sheet-back" aria-label="Close" onClick={onClose} />
       <aside className="plaza-sheet" role="dialog" aria-modal="true" aria-labelledby="plaza-sheet-title">
         <div className="plaza-sheet-core">
           <header>

@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useParams } from 'react-router-dom'
@@ -58,9 +59,9 @@ export function ProjectNotesPage() {
                   <time className="muted">{noteStamp(note.createdAt, tz)}</time>
                   <p>{note.body}</p>
                 </div>
-                <button type="button" className="ghost" onClick={() => removeNote.mutate(note.id)}>
+                <Button type="button" className="ghost" onClick={() => removeNote.mutate(note.id)}>
                   Remove
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

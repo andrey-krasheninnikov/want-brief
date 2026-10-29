@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { Play, Stop } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api'
@@ -40,13 +41,13 @@ export function TaskTimer({ itemId, running, prominent }: Props) {
     >
       {running ? <span className="mono">{elapsed(running.startedAt)}</span> : null}
       {running ? (
-        <button type="button" className="on" disabled={stop.isPending} aria-label="Stop" onClick={() => stop.mutate()}>
+        <Button type="button" className="on" disabled={stop.isPending} aria-label="Stop" onClick={() => stop.mutate()}>
           <Stop size={18} weight="light" />
-        </button>
+        </Button>
       ) : (
-        <button type="button" className="ghost" disabled={start.isPending} aria-label="Start" onClick={() => start.mutate()}>
+        <Button type="button" className="ghost" disabled={start.isPending} aria-label="Start" onClick={() => start.mutate()}>
           <Play size={18} weight="light" />
-        </button>
+        </Button>
       )}
     </div>
   )

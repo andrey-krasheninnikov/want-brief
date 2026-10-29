@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { useState } from 'react'
 import { PencilSimple } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -64,11 +66,11 @@ export function PersonAddresses({ personId, addresses }: Props) {
           <article key={address.id} className="people-rail-card">
             <p className="people-kicker">{KINDS.find((row) => row.id === address.kind)?.label ?? address.kind}</p>
             <strong>{address.label || '—'}</strong>
-            <button type="button" className="people-contact-value" disabled={!address.value} onClick={() => void onCopy(address)}>
+            <Button type="button" className="people-contact-value" disabled={!address.value} onClick={() => void onCopy(address)}>
               {copiedId === address.id ? 'Copied' : address.value || '—'}
-            </button>
+            </Button>
             {address.note ? <p className="people-rail-meta">{address.note}</p> : null}
-            <button
+            <Button
               type="button"
               className="ghost rel-edit"
               aria-label="Edit address"
@@ -78,7 +80,7 @@ export function PersonAddresses({ personId, addresses }: Props) {
               }}
             >
               <PencilSimple size={16} weight="light" />
-            </button>
+            </Button>
           </article>
         ))}
         <PersonRailAdd
@@ -102,24 +104,24 @@ export function PersonAddresses({ personId, addresses }: Props) {
         </label>
         <label>
           Name
-          <input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder="Home" />
+          <Input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder="Home" />
         </label>
         <label>
           Value
-          <textarea value={draft.value} onChange={(e) => setDraft({ ...draft, value: e.target.value })} rows={3} />
+          <Textarea value={draft.value} onChange={(e) => setDraft({ ...draft, value: e.target.value })} rows={3} />
         </label>
         <label>
           Note
-          <input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
+          <Input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
         </label>
         <div className="people-contact-actions">
-          <button type="button" onClick={() => save.mutate()} disabled={!draft.label.trim() || !draft.value.trim() || save.isPending}>
+          <Button type="button" onClick={() => save.mutate()} disabled={!draft.label.trim() || !draft.value.trim() || save.isPending}>
             Save
-          </button>
+          </Button>
           {editing ? (
-            <button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
+            <Button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
               Remove
-            </button>
+            </Button>
           ) : null}
         </div>
         {save.isError ? <p className="error">{save.error.message}</p> : null}

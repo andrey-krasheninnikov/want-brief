@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { Link } from 'react-router-dom'
 import { TaskTimer } from '../tasks/TaskTimer'
 import { clock, phaseLabel, type NowPick } from '../schedule/now'
@@ -92,9 +93,9 @@ export function TodayNow({ pick, loading, running, tz, titleOf, onOpen }: Props)
           <span>
             Running <em>off plan</em>:
           </span>
-          <button type="button" className="ghost" onClick={() => onOpen(row.itemId)}>
+          <Button type="button" className="ghost" onClick={() => onOpen(row.itemId)}>
             {titleOf(row.itemId) ?? 'a task outside this plan'}
-          </button>
+          </Button>
           <TaskTimer itemId={row.itemId} running={row} />
         </p>
       ))}

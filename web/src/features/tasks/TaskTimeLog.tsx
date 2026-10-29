@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { zonedInstant, zonedYmd } from '../../shared/zoned'
 import { useState, type FormEvent } from 'react'
@@ -68,11 +70,11 @@ export function TaskTimeLog({ itemId, open, onClose }: Props) {
         <div className="tasks-plan">
           <label>
             Hours
-            <input type="number" min={0} step={1} value={hours} onChange={(e) => setHours(e.target.value)} />
+            <Input type="number" min={0} step={1} value={hours} onChange={(e) => setHours(e.target.value)} />
           </label>
           <label>
             Minutes
-            <input
+            <Input
               type="number"
               min={0}
               max={59}
@@ -84,12 +86,12 @@ export function TaskTimeLog({ itemId, open, onClose }: Props) {
         </div>
         {error ? <p className="error">{error}</p> : null}
         <div className="tasks-confirm-actions">
-          <button type="button" className="ghost" onClick={onClose}>
+          <Button type="button" className="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" disabled={save.isPending}>
+          </Button>
+          <Button type="submit" disabled={save.isPending}>
             Log time
-          </button>
+          </Button>
         </div>
       </form>
     </TaskOverlay>

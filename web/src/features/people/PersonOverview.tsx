@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import type { Person, PersonBond } from '../../types'
 import { PersonBondGraph } from './PersonBondGraph'
 import { bondKindLabel, copyText, primaryContact } from './peopleModel'
@@ -17,9 +18,9 @@ export function PersonOverview({ person }: Props) {
       {primary ? (
         <p className="people-primary">
           <span className="people-kicker">Primary</span>
-          <button type="button" className="people-contact-value" onClick={() => void copyText(primary.value)}>
+          <Button type="button" className="people-contact-value" onClick={() => void copyText(primary.value)}>
             {primary.value}
-          </button>
+          </Button>
         </p>
       ) : (
         <p className="muted">No primary contact.</p>

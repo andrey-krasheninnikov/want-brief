@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../../api'
@@ -111,7 +112,7 @@ export function TaskPacking({ item, task }: { item: Item; task: TaskPatch }) {
         <DateField mode="datetime" value={pinnedAt} onChange={setPinnedAt} onCommit={savePin} />
         <p className="dossier-note">Start no earlier than this instant; the packer keeps the slot for it.</p>
         {item.pinnedAt ? (
-          <button
+          <Button
             type="button"
             className="ghost tasks-due-clear"
             onClick={() => {
@@ -120,7 +121,7 @@ export function TaskPacking({ item, task }: { item: Item; task: TaskPatch }) {
             }}
           >
             Clear
-          </button>
+          </Button>
         ) : null}
         {hint('pinnedAt')}
       </label>

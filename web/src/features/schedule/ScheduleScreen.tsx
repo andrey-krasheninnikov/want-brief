@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { BellSimple, CalendarBlank, CaretRight, GearSix } from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
@@ -190,12 +191,12 @@ function Block({
     .join(' ')
   const label = [row.externalKey, row.title, reasons.length > 0 ? `· ${reasons.join(', ')}` : ''].filter(Boolean).join(' ')
   const fill = row.late
-    ? `color-mix(in srgb, var(--danger) 22%, transparent)`
+    ? `color-mix(in srgb, var(--destructive) 22%, transparent)`
     : `color-mix(in srgb, ${color || 'var(--accent)'} 18%, transparent)`
   const border = focus
-    ? `color-mix(in srgb, var(--accent-2) 80%, transparent)`
+    ? `color-mix(in srgb, var(--primary) 80%, transparent)`
     : row.late
-      ? `color-mix(in srgb, var(--danger) 28%, transparent)`
+      ? `color-mix(in srgb, var(--destructive) 28%, transparent)`
       : `color-mix(in srgb, ${color || 'var(--accent)'} 45%, transparent)`
   const style = {
     top,
@@ -205,7 +206,7 @@ function Block({
     ...(split ? { '--track': row.lane, '--tracks': tracks } : {}),
   } as CSSProperties
   return (
-    <button type="button" className={cls} title={label} style={style} onClick={() => onOpen(row.itemId)}>
+    <Button type="button" className={cls} title={label} style={style} onClick={() => onOpen(row.itemId)}>
       <span className="sched-block-line">
         {ping ? <BellSimple size={11} weight="fill" aria-hidden /> : null}
         {row.externalKey ? <b className="sched-key">{row.externalKey}</b> : null}
@@ -224,7 +225,7 @@ function Block({
           ))}
         </span>
       ) : null}
-    </button>
+    </Button>
   )
 }
 
@@ -242,7 +243,7 @@ function Hatch({ row, grid, onOpen }: { row: ScheduleBusy; grid: Grid; onOpen: (
   )
   if (row.seriesId) {
     return (
-      <button
+      <Button
         type="button"
         className={row.soft ? 'sched-busy meeting soft' : 'sched-busy meeting'}
         style={style}
@@ -250,7 +251,7 @@ function Hatch({ row, grid, onOpen }: { row: ScheduleBusy; grid: Grid; onOpen: (
         onClick={() => onOpen(row.seriesId!, row.originalOn)}
       >
         {body}
-      </button>
+      </Button>
     )
   }
   return (
@@ -398,10 +399,10 @@ function Pressure({
         <p className="sched-atrisk">
           <span>At risk:</span>
           {atRisk.map((row) => (
-            <button key={row.itemId} type="button" className="ghost sched-atrisk-item" onClick={() => onOpen(row.itemId)}>
+            <Button key={row.itemId} type="button" className="ghost sched-atrisk-item" onClick={() => onOpen(row.itemId)}>
               <b className="sched-key">{row.key || row.title}</b>
               <span className="mono">{slackLabel(row.slackSeconds)}</span>
-            </button>
+            </Button>
           ))}
         </p>
       ) : null}
@@ -473,7 +474,7 @@ function DayHeads({
         const override = overrides.get(ymd)
         const custom = override && !override.off && override.workStartMin != null && override.workEndMin != null
         return (
-          <button
+          <Button
             key={ymd}
             type="button"
             className={[
@@ -497,7 +498,7 @@ function DayHeads({
                 {minutesToClock(override.workStartMin!)}–{minutesToClock(override.workEndMin!)}
               </em>
             ) : null}
-          </button>
+          </Button>
         )
       })}
     </div>
@@ -597,52 +598,52 @@ export function ScheduleScreen() {
         <div className="sched-actions">
           <div className="sched-cluster">
             <div className="sched-tabs">
-              <button type="button" className={kind === 'work' ? 'ghost on' : 'ghost'} onClick={() => setKind('work')}>
+              <Button type="button" className={kind === 'work' ? 'ghost on' : 'ghost'} onClick={() => setKind('work')}>
                 Work
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 className={kind === 'followup' ? 'ghost on' : 'ghost'}
                 onClick={() => setKind('followup')}
               >
                 Follow-up
-              </button>
+              </Button>
             </div>
             <p className="sched-pack-hint">{kind === 'work' ? 'Dev due' : 'Review and QA due'}</p>
           </div>
           <div className="sched-tabs">
-            <button type="button" className={view === 'calendar' ? 'ghost on' : 'ghost'} onClick={() => switchView('calendar')}>
+            <Button type="button" className={view === 'calendar' ? 'ghost on' : 'ghost'} onClick={() => switchView('calendar')}>
               Calendar
-            </button>
-            <button type="button" className={view === 'list' ? 'ghost on' : 'ghost'} onClick={() => switchView('list')}>
+            </Button>
+            <Button type="button" className={view === 'list' ? 'ghost on' : 'ghost'} onClick={() => switchView('list')}>
               List
-            </button>
-            <button type="button" className={view === 'gantt' ? 'ghost on' : 'ghost'} onClick={() => switchView('gantt')}>
+            </Button>
+            <Button type="button" className={view === 'gantt' ? 'ghost on' : 'ghost'} onClick={() => switchView('gantt')}>
               Gantt
-            </button>
+            </Button>
           </div>
           <div className="sched-tabs">
-            <button type="button" className="ghost" aria-label="Previous week" onClick={() => setAnchor((d) => shiftWeeks(d, -1, tz))}>
+            <Button type="button" className="ghost" aria-label="Previous week" onClick={() => setAnchor((d) => shiftWeeks(d, -1, tz))}>
               ‹
-            </button>
-            <button type="button" className="ghost" aria-label="This week" onClick={() => setAnchor(new Date())}>
+            </Button>
+            <Button type="button" className="ghost" aria-label="This week" onClick={() => setAnchor(new Date())}>
               This week
-            </button>
-            <button type="button" className="ghost" aria-label="Next week" onClick={() => setAnchor((d) => shiftWeeks(d, 1, tz))}>
+            </Button>
+            <Button type="button" className="ghost" aria-label="Next week" onClick={() => setAnchor((d) => shiftWeeks(d, 1, tz))}>
               ›
-            </button>
+            </Button>
           </div>
           <div className="sched-tabs">
-            <button type="button" className="ghost" aria-label="Now" onClick={scrollNow}>
+            <Button type="button" className="ghost" aria-label="Now" onClick={scrollNow}>
               Now
-            </button>
-            <button type="button" className={whatIf ? 'ghost on' : 'ghost'} onClick={() => setWhatIf((v) => !v)}>
+            </Button>
+            <Button type="button" className={whatIf ? 'ghost on' : 'ghost'} onClick={() => setWhatIf((v) => !v)}>
               What if
-            </button>
-            <button type="button" className="ghost" aria-label="Schedule settings" onClick={() => navigate('/schedule/settings')}>
+            </Button>
+            <Button type="button" className="ghost" aria-label="Schedule settings" onClick={() => navigate('/schedule/settings')}>
               <GearSix size={14} weight="regular" aria-hidden />
               Settings
-            </button>
+            </Button>
           </div>
         </div>
       }

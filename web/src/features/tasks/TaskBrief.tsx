@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { zonedInstant, zonedLocalInput } from '../../shared/zoned'
 import { ArrowCounterClockwise, ArrowsClockwise, ChatTeardrop, Clock, Copy, Snowflake, Trash } from '@phosphor-icons/react'
@@ -205,7 +207,7 @@ export function TaskBrief({ item, task, onGone }: Props) {
               <span className={`dossier-chip ${statusTone(item)}`.trim()}>{item.externalStatus}</span>
             ) : null}
             {!manual && item.externalKey ? (
-              <button
+              <Button
                 type="button"
                 className="dossier-chip mono"
                 aria-label="Copy key"
@@ -217,7 +219,7 @@ export function TaskBrief({ item, task, onGone }: Props) {
               >
                 <Copy size={14} weight="light" aria-hidden />
                 {copied ? 'Copied' : item.externalKey}
-              </button>
+              </Button>
             ) : null}
             <OpenUrl href={link} label="Open source" />
           </div>
@@ -225,7 +227,7 @@ export function TaskBrief({ item, task, onGone }: Props) {
         {manual ? (
           <label className="tasks-key-field">
             External ID
-            <input
+            <Input
               value={externalKey}
               onChange={(e) => setExternalKey(e.target.value)}
               onBlur={(e) => saveKey(e.currentTarget.value)}
@@ -261,7 +263,7 @@ export function TaskBrief({ item, task, onGone }: Props) {
         <div className="dossier-bar">
           <div className="tasks-actions">
             {remote ? (
-              <button
+              <Button
                 type="button"
                 className="ghost"
                 disabled={syncRemote.isPending}
@@ -270,12 +272,12 @@ export function TaskBrief({ item, task, onGone }: Props) {
                 onClick={() => syncRemote.mutate()}
               >
                 <ArrowsClockwise size={18} weight="light" />
-              </button>
+              </Button>
             ) : null}
-            <button type="button" className="ghost" title="Log" aria-label="Log" onClick={() => promptLog(item.id, 'status')}>
+            <Button type="button" className="ghost" title="Log" aria-label="Log" onClick={() => promptLog(item.id, 'status')}>
               <ChatTeardrop size={18} weight="light" />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="ghost"
               title="Log time"
@@ -283,8 +285,8 @@ export function TaskBrief({ item, task, onGone }: Props) {
               onClick={() => setModal('time')}
             >
               <Clock size={18} weight="light" />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="ghost"
               title={item.archivedAt ? 'Restore' : 'Stall'}
@@ -292,8 +294,8 @@ export function TaskBrief({ item, task, onGone }: Props) {
               onClick={() => setModal('stall')}
             >
               {item.archivedAt ? <ArrowCounterClockwise size={18} weight="light" /> : <Snowflake size={18} weight="light" />}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="ghost danger"
               title="Delete"
@@ -302,7 +304,7 @@ export function TaskBrief({ item, task, onGone }: Props) {
               onClick={() => setModal('delete')}
             >
               <Trash size={18} weight="light" />
-            </button>
+            </Button>
             {hint('sync')}
             {hint('delete')}
             <TaskTimer itemId={item.id} running={running} prominent />
@@ -335,7 +337,7 @@ export function TaskBrief({ item, task, onGone }: Props) {
       <section className="dossier-card">
         <label>
           Description
-          <textarea
+          <Textarea
             rows={5}
             value={description}
             onChange={(e) => setDescription(e.target.value)}

@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -204,7 +206,7 @@ export function ProjectPage() {
           <p className="plaza-kicker">{row.archivedAt ? 'Archived' : 'Dossier'}</p>
           <div className="plaza-title">
             <span className="plaza-swatch" style={{ background: color }} />
-            <input
+            <Input
               aria-label="Project name"
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -212,14 +214,14 @@ export function ProjectPage() {
             />
           </div>
         </div>
-        <button
+        <Button
           type="button"
           className="ghost plaza-archive"
           disabled={patch.isPending}
           onClick={() => patch.mutate({ archived: !row.archivedAt })}
         >
           {row.archivedAt ? 'Restore' : 'Archive'}
-        </button>
+        </Button>
       </header>
       {formError && !linkOpen && !noteOpen ? <p className="error">{formError}</p> : null}
       <section className="plaza-metrics">
@@ -298,9 +300,9 @@ export function ProjectPage() {
         <div className="plaza-core">
           <div className="plaza-head">
             <h3>Links</h3>
-            <button type="button" className="plaza-plus" aria-label="Add link" onClick={() => setLinkOpen(true)}>
+            <Button type="button" className="plaza-plus" aria-label="Add link" onClick={() => setLinkOpen(true)}>
               +
-            </button>
+            </Button>
           </div>
           {links.length === 0 ? <p className="muted">No links.</p> : null}
           {links.length > 0 ? (
@@ -325,13 +327,13 @@ export function ProjectPage() {
                       </span>
                     </td>
                     <td>
-                      <button
+                      <Button
                         type="button"
                         className="ghost"
                         onClick={() => patch.mutate({ links: links.filter((_, i) => i !== index) })}
                       >
                         Remove
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -344,9 +346,9 @@ export function ProjectPage() {
         <div className="plaza-core">
           <div className="plaza-head">
             <h3>Log</h3>
-            <button type="button" className="plaza-plus" aria-label="Add note" onClick={() => setNoteOpen(true)}>
+            <Button type="button" className="plaza-plus" aria-label="Add note" onClick={() => setNoteOpen(true)}>
               +
-            </button>
+            </Button>
           </div>
           {log.length === 0 ? <p className="muted">No notes yet.</p> : null}
           {log.length > 0 ? (
@@ -380,14 +382,14 @@ export function ProjectPage() {
         <form className="plaza-form" onSubmit={onAddLink}>
           <label>
             Label
-            <input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} />
+            <Input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} />
           </label>
           <label>
             URL
-            <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://" />
+            <Input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://" />
           </label>
           {formError && linkOpen ? <p className="error">{formError}</p> : null}
-          <button type="submit">Add</button>
+          <Button type="submit">Add</Button>
         </form>
       </PlazaSheet>
       <PlazaSheet
@@ -401,10 +403,10 @@ export function ProjectPage() {
         <form className="plaza-form" onSubmit={onAddNote}>
           <label>
             Note
-            <textarea rows={6} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} />
+            <Textarea rows={6} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} />
           </label>
           {formError && noteOpen ? <p className="error">{formError}</p> : null}
-          <button type="submit">Add</button>
+          <Button type="submit">Add</Button>
         </form>
       </PlazaSheet>
     </div>

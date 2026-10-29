@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 type Props = {
   glyph: string
   label: string
@@ -8,7 +9,7 @@ type Props = {
 
 export function TaskFlag({ glyph, label, on, showLabel, onClick }: Props) {
   return (
-    <button
+    <Button
       type="button"
       className={on ? 'tasks-flag on' : 'tasks-flag'}
       title={label}
@@ -19,6 +20,6 @@ export function TaskFlag({ glyph, label, on, showLabel, onClick }: Props) {
     >
       <span aria-hidden>{glyph}</span>
       {showLabel ? <span aria-hidden>{label}</span> : null}
-    </button>
+    </Button>
   )
 }

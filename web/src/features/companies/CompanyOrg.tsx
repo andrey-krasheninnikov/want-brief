@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -84,14 +85,14 @@ export function CompanyOrg({ company, people }: Props) {
                   <tr key={row.id}>
                     <td>{names.get(row.personId) ?? row.personId}</td>
                     <td>
-                      <button
+                      <Button
                         type="button"
                         className="ghost"
                         onClick={() => endReport.mutate(row.id)}
                         disabled={endReport.isPending}
                       >
                         End
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -108,9 +109,9 @@ export function CompanyOrg({ company, people }: Props) {
               </option>
             ))}
           </select>
-          <button type="button" disabled={!reportId || addReport.isPending} onClick={() => addReport.mutate(reportId)}>
+          <Button type="button" disabled={!reportId || addReport.isPending} onClick={() => addReport.mutate(reportId)}>
             Add
-          </button>
+          </Button>
         </div>
         {addReport.isError ? <p className="error">{addReport.error.message}</p> : null}
 

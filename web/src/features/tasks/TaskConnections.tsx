@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { CloudArrowDown } from '@phosphor-icons/react'
 import { useEffect, useState, type FormEvent } from 'react'
@@ -95,9 +97,9 @@ export function TaskConnections({ item, task }: Props) {
       <section className="dossier-card">
         <div className="tasks-head">
           <h3>Links</h3>
-          <button type="button" className="tasks-plus" aria-label="Add link" onClick={() => setLinkOpen((on) => !on)}>
+          <Button type="button" className="tasks-plus" aria-label="Add link" onClick={() => setLinkOpen((on) => !on)}>
             +
-          </button>
+          </Button>
         </div>
         <div className="tasks-form tasks-slots">
           {filledSlots.map((label) => (
@@ -117,14 +119,14 @@ export function TaskConnections({ item, task }: Props) {
           <form className="tasks-form" onSubmit={onAddLink}>
             <label>
               Label
-              <input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} placeholder="GitLab, Jira…" />
+              <Input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} placeholder="GitLab, Jira…" />
             </label>
             <label>
               URL
-              <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://" />
+              <Input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://" />
             </label>
             {hint('link')}
-            <button type="submit">Add</button>
+            <Button type="submit">Add</Button>
           </form>
         ) : null}
         {extraLinks.length > 0 ? (
@@ -149,7 +151,7 @@ export function TaskConnections({ item, task }: Props) {
                     </span>
                   </td>
                   <td>
-                    <button
+                    <Button
                       type="button"
                       className="ghost"
                       onClick={() =>
@@ -157,7 +159,7 @@ export function TaskConnections({ item, task }: Props) {
                       }
                     >
                       Remove
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}

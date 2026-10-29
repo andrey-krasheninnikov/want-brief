@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import type { ReactNode } from 'react'
 
 type RailProps = {
@@ -15,8 +16,8 @@ type AddProps = {
 
 export function PersonRailAdd({ label, onClick }: AddProps) {
   return (
-    <button type="button" className="people-rail-add" onClick={onClick}>
+    <Button type="button" className="people-rail-add" onClick={onClick}>
       {label}
-    </button>
+    </Button>
   )
 }

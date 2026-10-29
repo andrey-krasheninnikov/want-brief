@@ -1,3 +1,4 @@
+import { Input } from '@want-foundation/desyst-react'
 import { useState } from 'react'
 import { parseUsdRubRate } from './todayModel'
 
@@ -22,7 +23,7 @@ export function TodayFxRate({ rate, onChange }: { rate: number; onChange: (rate:
           <small>Rate</small>
           <label className="today-fx">
             <span>1 USD</span>
-            <input
+            <Input
               type="number"
               min="0.01"
               step="0.01"

@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { Handshake, Heart, Hourglass, Kanban, Lightning, NotePencil, Scales } from '@phosphor-icons/react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -69,7 +71,7 @@ function TaskHero({ item }: { item: Item }) {
       </span>
       <div className="tasks-sheet-title">
         {item.sourceKind === 'manual' ? (
-          <input
+          <Input
             aria-label="Task name"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -111,9 +113,9 @@ export function TaskDossier({ id, onGone }: Props) {
     return (
       <div className="tasks-missing">
         <p>Task not found</p>
-        <button type="button" onClick={onGone}>
+        <Button type="button" onClick={onGone}>
           Close
-        </button>
+        </Button>
       </div>
     )
   }
@@ -127,7 +129,7 @@ export function TaskDossier({ id, onGone }: Props) {
     <div className="tasks-dossier">
       <div className="tasks-tabs sticky" role="tablist" aria-label="Task sections">
         {TABS.map((value) => (
-          <button
+          <Button
             key={value}
             type="button"
             role="tab"
@@ -136,7 +138,7 @@ export function TaskDossier({ id, onGone }: Props) {
             onClick={() => setTab(value)}
           >
             {TAB_LABELS[value]}
-          </button>
+          </Button>
         ))}
       </div>
       {tab === 'brief' ? <TaskBrief item={row} task={task} onGone={onGone} /> : null}

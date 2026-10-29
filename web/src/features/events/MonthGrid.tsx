@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { zonedYmd } from '../../shared/zoned'
 import type { EventOccurrence } from '../../types'
 import { eventMeta, eventTone, type EventLookups } from './eventMeta'
@@ -51,7 +52,7 @@ export function MonthGrid({ timeZone, weeks, month, rows, lookups, today, select
                 {shown.map((row) => {
                   const meta = eventMeta(row, lookups)
                   return (
-                    <button
+                    <Button
                       key={`${row.seriesId}-${row.originalOn}`}
                       type="button"
                       className={row.seriesId === selectedId && row.originalOn === selectedOn ? 'cal-chip on' : 'cal-chip'}
@@ -60,7 +61,7 @@ export function MonthGrid({ timeZone, weeks, month, rows, lookups, today, select
                     >
                       <span>{row.title}</span>
                       {meta.line ? <small>{meta.line}</small> : null}
-                    </button>
+                    </Button>
                   )
                 })}
                 {extra > 0 ? <small>+{extra}</small> : null}

@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { BellSimple, CalendarBlank } from '@phosphor-icons/react'
 import { span } from '../../shared/format'
 import type { ScheduleBlock, ScheduleBusy, ScheduleLane, SchedulePerson } from '../../types'
@@ -115,7 +116,7 @@ export function ScheduleGantt({
         {days.map((ymd) => {
           const head = dayHead(ymd, today)
           return (
-            <button
+            <Button
               key={ymd}
               type="button"
               role="tab"
@@ -127,7 +128,7 @@ export function ScheduleGantt({
             >
               <small>{head.week}</small>
               <strong>{head.num}</strong>
-            </button>
+            </Button>
           )
         })}
       </div>
@@ -208,7 +209,7 @@ function MeetBand({
   )
   if (row.seriesId) {
     return (
-      <button
+      <Button
         type="button"
         className={cls}
         style={{ left, width }}
@@ -216,7 +217,7 @@ function MeetBand({
         onClick={() => onBusy(row.seriesId!, row.originalOn)}
       >
         {body}
-      </button>
+      </Button>
     )
   }
   return (
@@ -254,12 +255,12 @@ function ChartLane({
           const running = runningIds.has(block.itemId)
           const focus = focusIds.has(`${block.itemId}-${block.startsAt}`)
           const fill = block.late
-            ? 'color-mix(in srgb, var(--danger) 28%, transparent)'
+            ? 'color-mix(in srgb, var(--destructive) 28%, transparent)'
             : `color-mix(in srgb, ${row.color} 32%, transparent)`
           const border = focus
-            ? 'color-mix(in srgb, var(--accent-2) 80%, transparent)'
+            ? 'color-mix(in srgb, var(--primary) 80%, transparent)'
             : block.late
-              ? 'color-mix(in srgb, var(--danger) 40%, transparent)'
+              ? 'color-mix(in srgb, var(--destructive) 40%, transparent)'
               : `color-mix(in srgb, ${row.color} 70%, transparent)`
           const cls = [
             'sched-chart-bar',
@@ -279,7 +280,7 @@ function ChartLane({
                   style={{ left: left + width, width: Math.max(offsetPx(next.startsAt, grid) - left - width, 8) }}
                 />
               ) : null}
-              <button
+              <Button
                 type="button"
                 className={cls}
                 style={{ left, width, background: fill, borderColor: border }}
@@ -289,7 +290,7 @@ function ChartLane({
                 {ping ? <BellSimple size={11} weight="fill" aria-hidden /> : null}
                 <em>{span(blockSeconds(block))}</em>
                 <Who people={block.people} />
-              </button>
+              </Button>
             </span>
           )
         })}

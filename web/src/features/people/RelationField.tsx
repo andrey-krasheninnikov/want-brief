@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { Plus } from '@phosphor-icons/react'
 import { useEffect, useMemo, useState } from 'react'
 import { TaskSheet } from '../tasks/TaskSheet'
@@ -70,13 +72,13 @@ export function RelationField({ label, options, value, onChange, requireComment 
             {name}
           </span>
         ))}
-        <button type="button" className="ghost rel-edit" aria-label={`Edit ${label}`} onClick={() => setOpen(true)}>
+        <Button type="button" className="ghost rel-edit" aria-label={`Edit ${label}`} onClick={() => setOpen(true)}>
           <Plus size={16} weight="light" aria-hidden />
-        </button>
+        </Button>
       </div>
       <TaskSheet open={open} kicker="Links" title={label} onClose={() => setOpen(false)}>
         <div className="rel-sheet">
-          <input
+          <Input
             className="people-search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -94,7 +96,7 @@ export function RelationField({ label, options, value, onChange, requireComment 
                     {row.name}
                   </label>
                   {requireComment && rel ? (
-                    <textarea
+                    <Textarea
                       rows={2}
                       value={rel.comment}
                       placeholder="Comment required"
@@ -106,9 +108,9 @@ export function RelationField({ label, options, value, onChange, requireComment 
             })}
           </ul>
           {incomplete ? <p className="error">Comment is required for each selected item.</p> : null}
-          <button type="button" onClick={apply} disabled={incomplete}>
+          <Button type="button" onClick={apply} disabled={incomplete}>
             Done
-          </button>
+          </Button>
         </div>
       </TaskSheet>
     </div>

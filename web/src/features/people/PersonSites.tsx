@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useState } from 'react'
 import { PencilSimple } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -55,7 +57,7 @@ export function PersonSites({ personId, sites }: Props) {
               <OpenUrl href={site.url} />
             </p>
             {site.comment ? <p className="people-rail-meta">{site.comment}</p> : null}
-            <button
+            <Button
               type="button"
               className="ghost rel-edit"
               aria-label="Edit link"
@@ -65,7 +67,7 @@ export function PersonSites({ personId, sites }: Props) {
               }}
             >
               <PencilSimple size={16} weight="light" />
-            </button>
+            </Button>
           </article>
         ))}
         <PersonRailAdd
@@ -90,16 +92,16 @@ export function PersonSites({ personId, sites }: Props) {
         <UrlField label="URL" value={draft.url} onChange={(url) => setDraft({ ...draft, url })} />
         <label>
           Comment
-          <input value={draft.comment} onChange={(e) => setDraft({ ...draft, comment: e.target.value })} />
+          <Input value={draft.comment} onChange={(e) => setDraft({ ...draft, comment: e.target.value })} />
         </label>
         <div className="people-contact-actions">
-          <button type="button" onClick={() => save.mutate()} disabled={!draft.url.trim() || save.isPending}>
+          <Button type="button" onClick={() => save.mutate()} disabled={!draft.url.trim() || save.isPending}>
             Save
-          </button>
+          </Button>
           {editing ? (
-            <button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
+            <Button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
               Remove
-            </button>
+            </Button>
           ) : null}
         </div>
         {save.isError ? <p className="error">{save.error.message}</p> : null}

@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -69,10 +71,10 @@ function NeedCard({ row, delay, kind, tz }: { row: UnplannedItem; delay: number;
       <div className="sched-need-core">
         <p className="sched-need-eye">{gaps.join(' · ')}</p>
         <strong>
-          <button type="button" className="ghost" onClick={() => openTask(navigate, row.item.id)}>
+          <Button type="button" className="ghost" onClick={() => openTask(navigate, row.item.id)}>
             {row.item.externalKey ? <span className="mono">[{row.item.externalKey}] </span> : null}
             {row.item.title}
-          </button>
+          </Button>
         </strong>
         <small>{row.item.projectName || 'No project'}</small>
         {row.missingDevDue ? (
@@ -81,9 +83,9 @@ function NeedCard({ row, delay, kind, tz }: { row: UnplannedItem; delay: number;
               {dueTitle(field, row.item.kind)}
               <DateField mode="datetime" value={due} onChange={setDue} onCommit={saveDue} />
             </label>
-            <button type="button" className="ghost sched-need-chip" onClick={() => patch.mutate({ [field]: nextFriday1800(tz) })}>
+            <Button type="button" className="ghost sched-need-chip" onClick={() => patch.mutate({ [field]: nextFriday1800(tz) })}>
               Friday 18:00
-            </button>
+            </Button>
           </>
         ) : null}
         {row.missingPlan ? (
@@ -97,7 +99,7 @@ function NeedCard({ row, delay, kind, tz }: { row: UnplannedItem; delay: number;
             >
               <label>
                 Hours
-                <input
+                <Input
                   type="number"
                   min={0}
                   step={1}
@@ -108,7 +110,7 @@ function NeedCard({ row, delay, kind, tz }: { row: UnplannedItem; delay: number;
               </label>
               <label>
                 Minutes
-                <input
+                <Input
                   type="number"
                   min={0}
                   max={59}
@@ -121,14 +123,14 @@ function NeedCard({ row, delay, kind, tz }: { row: UnplannedItem; delay: number;
             </form>
             <div className="sched-need-chips">
               {[1, 2, 4].map((h) => (
-                <button
+                <Button
                   key={h}
                   type="button"
                   className="ghost sched-need-chip"
                   onClick={() => patch.mutate({ plannedSeconds: h * 3600 })}
                 >
                   {h}h
-                </button>
+                </Button>
               ))}
             </div>
           </>

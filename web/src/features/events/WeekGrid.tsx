@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { zonedYmd } from '../../shared/zoned'
 import { useEffect, useRef, type CSSProperties } from 'react'
 import type { EventOccurrence } from '../../types'
@@ -87,7 +88,7 @@ export function WeekGrid({ timeZone, days, rows, lookups, today, selectedId, sel
                   const meta = eventMeta(row, lookups)
                   const lane = lanes[i]
                   return (
-                    <button
+                    <Button
                       key={`${row.seriesId}-${row.originalOn}`}
                       type="button"
                       className={row.seriesId === selectedId && row.originalOn === selectedOn ? 'cal-block on' : 'cal-block'}
@@ -96,7 +97,7 @@ export function WeekGrid({ timeZone, days, rows, lookups, today, selectedId, sel
                     >
                       <span>{row.title}</span>
                       {meta.line ? <small>{meta.line}</small> : null}
-                    </button>
+                    </Button>
                   )
                 })}
               </div>

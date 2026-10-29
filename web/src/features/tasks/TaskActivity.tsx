@@ -1,3 +1,4 @@
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -168,14 +169,14 @@ export function TaskActivity({ itemId }: Props) {
     <section className="dossier-card">
       <div className="tasks-head">
         <h3>Log</h3>
-        <button type="button" className="tasks-plus" aria-label="Add note" onClick={() => setOpen((on) => !on)}>
+        <Button type="button" className="tasks-plus" aria-label="Add note" onClick={() => setOpen((on) => !on)}>
           +
-        </button>
+        </Button>
       </div>
       {filters.length > 2 || eventRows.length > 0 ? (
         <div className="tasks-tabs small" role="tablist" aria-label="Log origin">
           {filters.map((value) => (
-            <button
+            <Button
               key={value}
               type="button"
               role="tab"
@@ -184,7 +185,7 @@ export function TaskActivity({ itemId }: Props) {
               onClick={() => setFilter(value)}
             >
               {filterLabel(value)}
-            </button>
+            </Button>
           ))}
         </div>
       ) : null}
@@ -192,12 +193,12 @@ export function TaskActivity({ itemId }: Props) {
         <form className="tasks-form" onSubmit={onAdd}>
           <label>
             Note
-            <textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)} />
+            <Textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)} />
           </label>
           {error ? <p className="error">{error}</p> : null}
-          <button type="submit" disabled={add.isPending}>
+          <Button type="submit" disabled={add.isPending}>
             Add
-          </button>
+          </Button>
         </form>
       ) : null}
       {log.length === 0 && !open ? <p className="dossier-empty">No notes yet. Write the first one.</p> : null}

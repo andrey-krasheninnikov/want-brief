@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { PencilSimple } from '@phosphor-icons/react'
@@ -117,9 +119,9 @@ export function PersonProfessions({ personId, professions }: Props) {
               <strong>{row.title}</strong>
               {pay ? <p>{pay}</p> : null}
               <p className="people-rail-meta">{dateRange(row.startedOn, row.endedOn)}</p>
-              <button type="button" className="ghost rel-edit" aria-label="Edit profession" onClick={() => openEdit(row)}>
+              <Button type="button" className="ghost rel-edit" aria-label="Edit profession" onClick={() => openEdit(row)}>
                 <PencilSimple size={16} weight="light" />
-              </button>
+              </Button>
             </article>
           )
         })}
@@ -133,11 +135,11 @@ export function PersonProfessions({ personId, professions }: Props) {
       >
         <label>
           Title
-          <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} autoFocus />
+          <Input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} autoFocus />
         </label>
         <label>
           Comment
-          <input value={draft.comment} onChange={(e) => setDraft({ ...draft, comment: e.target.value })} />
+          <Input value={draft.comment} onChange={(e) => setDraft({ ...draft, comment: e.target.value })} />
         </label>
         <div className="people-pair">
           <label>
@@ -152,7 +154,7 @@ export function PersonProfessions({ personId, professions }: Props) {
         <div className="people-pair">
           <label>
             Salary USD
-            <input
+            <Input
               type="number"
               min={0}
               step={0.01}
@@ -162,7 +164,7 @@ export function PersonProfessions({ personId, professions }: Props) {
           </label>
           <label>
             Salary RUB
-            <input
+            <Input
               type="number"
               min={0}
               step={0.01}
@@ -181,13 +183,13 @@ export function PersonProfessions({ personId, professions }: Props) {
           </ul>
         ) : null}
         <div className="people-contact-actions">
-          <button type="button" onClick={onSave} disabled={!draft.title.trim() || save.isPending}>
+          <Button type="button" onClick={onSave} disabled={!draft.title.trim() || save.isPending}>
             Save
-          </button>
+          </Button>
           {editing ? (
-            <button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
+            <Button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
               Remove
-            </button>
+            </Button>
           ) : null}
         </div>
         {save.isError ? <p className="error">{save.error.message}</p> : null}

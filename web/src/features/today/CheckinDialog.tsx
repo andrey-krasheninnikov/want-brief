@@ -1,3 +1,4 @@
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -77,7 +78,7 @@ export function CheckinDialog({ open, onClose }: Props) {
 
   return createPortal(
     <div className="tasks-log-root">
-      <button type="button" className="tasks-log-back" aria-label="Close" onClick={onClose} />
+      <Button type="button" className="tasks-log-back" aria-label="Close" onClick={onClose} />
       <div className="tasks-log-dialog checkin-dialog" role="dialog" aria-modal="true" aria-labelledby="checkin-title">
         <div className="tasks-log-core">
           <p className="tasks-kicker">Pulse</p>
@@ -104,7 +105,7 @@ export function CheckinDialog({ open, onClose }: Props) {
           </ul>
           <label>
             Comment
-            <textarea
+            <Textarea
               rows={3}
               value={note}
               onChange={(event) => setNote(event.target.value)}
@@ -112,13 +113,13 @@ export function CheckinDialog({ open, onClose }: Props) {
             />
           </label>
           <div className="tasks-log-actions">
-            <button type="button" className="ghost" onClick={onClose}>
+            <Button type="button" className="ghost" onClick={onClose}>
               Cancel
-            </button>
-            <button type="button" className="tasks-log-save" disabled={!canSave} onClick={() => save.mutate()}>
+            </Button>
+            <Button type="button" className="tasks-log-save" disabled={!canSave} onClick={() => save.mutate()}>
               Save
               <span aria-hidden>↗</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>

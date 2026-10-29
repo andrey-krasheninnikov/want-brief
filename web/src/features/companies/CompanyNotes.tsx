@@ -1,3 +1,4 @@
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { PencilSimple } from '@phosphor-icons/react'
@@ -59,7 +60,7 @@ export function CompanyNotes({ companyId, notes }: Props) {
           <article key={note.id} className="people-rail-card">
             <p className="people-kicker">{stamp(note.createdAt, tz)}</p>
             <p>{preview(note.body)}</p>
-            <button
+            <Button
               type="button"
               className="ghost rel-edit"
               aria-label="Edit note"
@@ -69,7 +70,7 @@ export function CompanyNotes({ companyId, notes }: Props) {
               }}
             >
               <PencilSimple size={16} weight="light" />
-            </button>
+            </Button>
           </article>
         ))}
         <PersonRailAdd
@@ -83,16 +84,16 @@ export function CompanyNotes({ companyId, notes }: Props) {
       <TaskSheet open={sheet !== null} kicker="Note" title={editing ? stamp(editing.createdAt, tz) : 'New note'} onClose={() => setSheet(null)}>
         <label>
           Note
-          <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} autoFocus />
+          <Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} autoFocus />
         </label>
         <div className="people-contact-actions">
-          <button type="button" onClick={() => save.mutate()} disabled={!body.trim() || save.isPending}>
+          <Button type="button" onClick={() => save.mutate()} disabled={!body.trim() || save.isPending}>
             Save
-          </button>
+          </Button>
           {editing ? (
-            <button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
+            <Button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
               Remove
-            </button>
+            </Button>
           ) : null}
         </div>
         {save.isError ? <p className="error">{save.error.message}</p> : null}

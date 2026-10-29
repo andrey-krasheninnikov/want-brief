@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { CalendarBlank, Lightning, MinusCircle, UserSwitch, type Icon } from '@phosphor-icons/react'
 import { type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -80,9 +81,9 @@ export function MatrixScreen() {
                         draggable
                         onDragStart={(event) => event.dataTransfer.setData('text/plain', item.id)}
                       >
-                        <button type="button" className="ghost" onClick={() => openTask(navigate, item.id)}>
+                        <Button type="button" className="ghost" onClick={() => openTask(navigate, item.id)}>
                           {item.title}
-                        </button>
+                        </Button>
                         <small>{item.sourceName}</small>
                       </li>
                     ))}

@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 type Props = {
   days: string[]
   selected: string
@@ -18,9 +19,9 @@ function dayParts(ymd: string) {
 export function WeekRail({ days, selected, today, onSelect, onPrev, onNext }: Props) {
   return (
     <div className="events-rail">
-      <button type="button" className="ghost" aria-label="Previous week" onClick={onPrev}>
+      <Button type="button" className="ghost" aria-label="Previous week" onClick={onPrev}>
         ‹
-      </button>
+      </Button>
       <div className="events-days">
         {days.map((ymd) => {
           const parts = dayParts(ymd)
@@ -32,16 +33,16 @@ export function WeekRail({ days, selected, today, onSelect, onPrev, onNext }: Pr
             .filter(Boolean)
             .join(' ')
           return (
-            <button key={ymd} type="button" className={classes} onClick={() => onSelect(ymd)}>
+            <Button key={ymd} type="button" className={classes} onClick={() => onSelect(ymd)}>
               <small>{parts.week}</small>
               <strong>{parts.num}</strong>
-            </button>
+            </Button>
           )
         })}
       </div>
-      <button type="button" className="ghost" aria-label="Next week" onClick={onNext}>
+      <Button type="button" className="ghost" aria-label="Next week" onClick={onNext}>
         ›
-      </button>
+      </Button>
     </div>
   )
 }

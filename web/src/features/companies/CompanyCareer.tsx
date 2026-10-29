@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -115,16 +117,16 @@ export function CompanyCareer({ company, startedOn, endedOn, onTenure }: Props) 
         <p className="people-kicker">Title</p>
         <label>
           New title
-          <input value={title} onChange={(e) => setTitle(e.target.value)} autoComplete="off" />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} autoComplete="off" />
         </label>
         <label>
           From
           <DateField mode="date" value={titleOn} onChange={setTitleOn} />
         </label>
         <div className="companies-actions">
-          <button type="button" disabled={!title.trim() || addTitle.isPending} onClick={() => addTitle.mutate()}>
+          <Button type="button" disabled={!title.trim() || addTitle.isPending} onClick={() => addTitle.mutate()}>
             Add title
-          </button>
+          </Button>
         </div>
         {addTitle.isError ? <p className="error">{addTitle.error.message}</p> : null}
 
@@ -139,12 +141,12 @@ export function CompanyCareer({ company, startedOn, endedOn, onTenure }: Props) 
           </label>
           <label>
             Amount
-            <input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <Input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </label>
         </div>
         <label>
           Comment
-          <input
+          <Input
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder={openSalary ? 'Required when pay changes' : 'Optional'}
@@ -156,13 +158,13 @@ export function CompanyCareer({ company, startedOn, endedOn, onTenure }: Props) 
           <DateField mode="date" value={salaryOn} onChange={setSalaryOn} />
         </label>
         <div className="companies-actions">
-          <button
+          <Button
             type="button"
             disabled={!amount.trim() || Number(amount) < 0 || addSalary.isPending || blocked}
             onClick={() => addSalary.mutate()}
           >
             Save salary
-          </button>
+          </Button>
         </div>
         {blocked ? <p className="error">Comment is required when pay changes.</p> : null}
         {addSalary.isError ? <p className="error">{addSalary.error.message}</p> : null}

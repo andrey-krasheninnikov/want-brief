@@ -1,3 +1,4 @@
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -68,14 +69,14 @@ export function PulseJournal() {
         <p className="pulse-kicker">Journal</p>
         <div className="pulse-chips">
           {filters.map((item) => (
-            <button
+            <Button
               key={item.id}
               type="button"
               className={filter === item.id ? 'pulse-chip on' : 'pulse-chip'}
               onClick={() => setFilter(item.id)}
             >
               {item.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -106,9 +107,9 @@ export function PulseJournal() {
                     <td className="pulse-note-body">{row.body}</td>
                     <td>
                       {row.source === 'loose' ? (
-                        <button type="button" className="ghost pulse-del" onClick={() => remove.mutate(row.id)}>
+                        <Button type="button" className="ghost pulse-del" onClick={() => remove.mutate(row.id)}>
                           Delete
-                        </button>
+                        </Button>
                       ) : null}
                     </td>
                   </tr>
@@ -119,15 +120,15 @@ export function PulseJournal() {
         </div>
       ) : null}
       <form className="pulse-compose" onSubmit={onSubmit}>
-        <textarea
+        <Textarea
           rows={3}
           placeholder="Loose thought, decision, or agreement"
           value={body}
           onChange={(e) => setBody(e.target.value)}
         />
-        <button type="submit" disabled={!body.trim() || create.isPending}>
+        <Button type="submit" disabled={!body.trim() || create.isPending}>
           Save
-        </button>
+        </Button>
       </form>
     </div>
   )

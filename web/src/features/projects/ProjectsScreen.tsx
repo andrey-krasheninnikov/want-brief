@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -92,9 +94,9 @@ export function ProjectsScreen() {
             />
             Show archived
           </label>
-          <button type="button" className="plaza-plus" aria-label="Add project" onClick={() => setOpen(true)}>
+          <Button type="button" className="plaza-plus" aria-label="Add project" onClick={() => setOpen(true)}>
             +
-          </button>
+          </Button>
         </div>
       </header>
       {projects.isLoading ? (
@@ -135,10 +137,10 @@ export function ProjectsScreen() {
         <form className="plaza-form" onSubmit={onSubmit}>
           <label>
             Title
-            <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" autoFocus />
+            <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" autoFocus />
           </label>
           {formError ? <p className="error">{formError}</p> : null}
-          <button type="submit">Create</button>
+          <Button type="submit">Create</Button>
         </form>
       </PlazaSheet>
     </div>

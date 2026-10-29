@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -287,11 +289,11 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
           <div className="events-pair">
             <label>
               Hours
-              <input type="number" min={0} value={occHours} onChange={(e) => setOccHours(e.target.value)} />
+              <Input type="number" min={0} value={occHours} onChange={(e) => setOccHours(e.target.value)} />
             </label>
             <label>
               Minutes
-              <input type="number" min={0} max={59} value={occMinutes} onChange={(e) => setOccMinutes(e.target.value)} />
+              <Input type="number" min={0} max={59} value={occMinutes} onChange={(e) => setOccMinutes(e.target.value)} />
             </label>
           </div>
           <label className="tasks-toggle">
@@ -299,36 +301,36 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
             Skip this slot
           </label>
           <div className="events-pair">
-            <button type="button" onClick={() => saveOcc.mutate()} disabled={saveOcc.isPending || !occStart}>
+            <Button type="button" onClick={() => saveOcc.mutate()} disabled={saveOcc.isPending || !occStart}>
               Save occurrence
-            </button>
-            <button type="button" className="ghost" onClick={() => resetOcc.mutate()} disabled={resetOcc.isPending}>
+            </Button>
+            <Button type="button" className="ghost" onClick={() => resetOcc.mutate()} disabled={resetOcc.isPending}>
               Reset
-            </button>
+            </Button>
           </div>
           <div className="tasks-head">
             <h3>Log</h3>
             <div className="people-tabs">
-              <button type="button" className={allNotes ? '' : 'on'} onClick={() => setAllNotes(false)}>
+              <Button type="button" className={allNotes ? '' : 'on'} onClick={() => setAllNotes(false)}>
                 This slot
-              </button>
-              <button type="button" className={allNotes ? 'on' : ''} onClick={() => setAllNotes(true)}>
+              </Button>
+              <Button type="button" className={allNotes ? 'on' : ''} onClick={() => setAllNotes(true)}>
                 All notes
-              </button>
+              </Button>
             </div>
-            <button type="button" className="tasks-plus" aria-label="Add note" onClick={() => setNoteOpen((on) => !on)}>
+            <Button type="button" className="tasks-plus" aria-label="Add note" onClick={() => setNoteOpen((on) => !on)}>
               +
-            </button>
+            </Button>
           </div>
           {noteOpen ? (
             <div className="stack">
               <label>
                 Note
-                <textarea rows={4} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} />
+                <Textarea rows={4} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} />
               </label>
-              <button type="button" onClick={() => addNote.mutate()} disabled={addNote.isPending || !noteBody.trim()}>
+              <Button type="button" onClick={() => addNote.mutate()} disabled={addNote.isPending || !noteBody.trim()}>
                 Add
-              </button>
+              </Button>
             </div>
           ) : null}
           {log.length === 0 && !noteOpen ? <p className="muted">No notes yet.</p> : null}
@@ -346,15 +348,15 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
       <p className="events-kicker">{seriesId ? recurrenceLabel(form.recurrence, form.weekdays) : 'New series'}</p>
       <label>
         Title
-        <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} autoComplete="off" />
+        <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} autoComplete="off" />
       </label>
       <label>
         Description
-        <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
       </label>
       <label>
         Agenda
-        <textarea rows={4} value={form.agenda} onChange={(e) => setForm({ ...form, agenda: e.target.value })} />
+        <Textarea rows={4} value={form.agenda} onChange={(e) => setForm({ ...form, agenda: e.target.value })} />
       </label>
       <div className="events-pair">
         <label>
@@ -414,11 +416,11 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
       <div className="events-pair">
         <label>
           Hours
-          <input type="number" min={0} value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })} />
+          <Input type="number" min={0} value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })} />
         </label>
         <label>
           Minutes
-          <input type="number" min={0} max={59} value={form.minutes} onChange={(e) => setForm({ ...form, minutes: e.target.value })} />
+          <Input type="number" min={0} max={59} value={form.minutes} onChange={(e) => setForm({ ...form, minutes: e.target.value })} />
         </label>
       </div>
       <UrlField label="Meet" value={form.meetUrl} onChange={(meetUrl) => setForm({ ...form, meetUrl })} />
@@ -444,11 +446,11 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
         <div className="events-pair">
           <label>
             From min
-            <input value={form.activeStart} onChange={(e) => setForm({ ...form, activeStart: e.target.value })} />
+            <Input value={form.activeStart} onChange={(e) => setForm({ ...form, activeStart: e.target.value })} />
           </label>
           <label>
             To min
-            <input value={form.activeEnd} onChange={(e) => setForm({ ...form, activeEnd: e.target.value })} />
+            <Input value={form.activeEnd} onChange={(e) => setForm({ ...form, activeEnd: e.target.value })} />
           </label>
         </div>
       ) : null}
@@ -467,9 +469,9 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
                 </a>
                 <OpenUrl href={link.url} />
               </span>
-              <button type="button" className="ghost" onClick={() => dropLink(index)}>
+              <Button type="button" className="ghost" onClick={() => dropLink(index)}>
                 Remove
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -477,27 +479,27 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
       <div className="events-pair">
         <label>
           Link label
-          <input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} />
+          <Input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} />
         </label>
         <label>
           Link URL
           <span className="url-field-row">
-            <input value={linkUrl} placeholder="https://" onChange={(e) => setLinkUrl(e.target.value)} />
+            <Input value={linkUrl} placeholder="https://" onChange={(e) => setLinkUrl(e.target.value)} />
             <OpenUrl href={linkUrl} />
           </span>
         </label>
       </div>
-      <button type="button" className="ghost" onClick={addLink}>
+      <Button type="button" className="ghost" onClick={addLink}>
         Add link
-      </button>
+      </Button>
       {error ? <p className="error">{error}</p> : null}
-      <button type="submit" disabled={save.isPending}>
+      <Button type="submit" disabled={save.isPending}>
         {seriesId ? 'Save series' : 'Create'}
-      </button>
+      </Button>
       {seriesId ? (
-        <button type="button" className="ghost" onClick={() => remove.mutate()} disabled={remove.isPending}>
+        <Button type="button" className="ghost" onClick={() => remove.mutate()} disabled={remove.isPending}>
           Delete
-        </button>
+        </Button>
       ) : null}
     </form>
   )

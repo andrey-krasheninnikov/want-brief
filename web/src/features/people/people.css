@@ -1,5 +1,5 @@
 .people-window .ui-window-header h1 {
-  font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(1.9rem, 3.4vw, 2.6rem);
   letter-spacing: -0.08em;
   line-height: 1.02;
@@ -17,8 +17,8 @@
   overflow-x: auto;
   padding: 0.12rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 .people-tabs button {
   flex: 0 0 auto;
@@ -27,18 +27,18 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
   font-weight: 600;
 }
 .people-tabs button:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  color: var(--foreground);
 }
 .people-tabs button.on,
 .people-tabs button.on:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+  color: var(--foreground);
 }
 
 .people-window .ui-window-body {
@@ -52,24 +52,24 @@
   grid-template-columns: minmax(16rem, 22rem) 1fr;
   min-height: 0;
   flex: 1;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 
 .people-list {
   min-width: 0;
   overflow: auto;
   padding: 0.85rem 0.7rem 1.2rem;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  background: #101217;
+  border-right: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
+  background: var(--card);
 }
 .people-search {
   width: 100%;
   margin: 0 0 0.65rem;
   padding: 0.65rem 0.85rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+  color: var(--foreground);
   font-size: 14px;
 }
 
@@ -88,9 +88,9 @@
   color: inherit;
   text-align: left;
 }
-.people-row:hover { background: rgba(255, 255, 255, 0.04); color: inherit; }
+.people-row:hover { background: color-mix(in srgb, var(--foreground) 4%, transparent); color: inherit; }
 .people-row.on,
-.people-row.on:hover { background: rgba(255, 255, 255, 0.08); color: inherit; }
+.people-row.on:hover { background: color-mix(in srgb, var(--foreground) 8%, transparent); color: inherit; }
 .people-row-copy {
   display: grid;
   gap: 0.12rem;
@@ -103,8 +103,8 @@
 }
 .people-row-copy span,
 .people-row-age {
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
 }
 .people-row-age { font-variant-numeric: tabular-nums; }
 
@@ -115,9 +115,9 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--ink);
-  font-size: 11px;
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -126,7 +126,7 @@
   min-width: 0;
   overflow: auto;
   padding: 1.15rem 1.35rem 1.6rem;
-  background: #0e1016;
+  background: var(--secondary);
 }
 .people-detail-empty {
   margin: 2.4rem 0 0;
@@ -138,8 +138,8 @@
   z-index: 4;
   margin: 0 0 1.15rem;
   padding: 0.35rem 0 0.75rem;
-  background: #0e1016;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--secondary);
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 .people-detail-head {
   display: grid;
@@ -154,15 +154,15 @@
   top: 0;
   z-index: 4;
   padding: 0.35rem 0 0.75rem;
-  background: #0e1016;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--secondary);
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 .people-detail-title { min-width: 0; }
 .people-name-field { margin: 0; }
 .people-save-state {
   margin: 0.2rem 0 0;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
 }
 .people-overflow { position: relative; }
 .people-menu {
@@ -173,8 +173,8 @@
   min-width: 8rem;
   padding: 0.35rem;
   border-radius: 0.7rem;
-  background: #161922;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
 }
 .people-sec-nav {
   display: flex;
@@ -187,7 +187,7 @@
 .people-sec-nav button {
   width: auto;
   flex: 0 0 auto;
-  min-height: 0;
+  min-height: 44px;
   padding: 0.3rem 0.65rem;
   border-radius: 999px;
 }
@@ -199,19 +199,19 @@
 }
 .people-detail-head p {
   margin: 0.15rem 0 0;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--muted-foreground);
+  font-size: 14px;
 }
 .people-detail-head .people-avatar {
-  width: 2.6rem;
+  width: 2.75rem;
   height: 2.6rem;
-  font-size: 12px;
+  font-size: 14px;
 }
 .people-close {
   display: none;
   grid-column: 1 / -1;
   justify-self: start;
-  min-height: 0;
+  min-height: 44px;
   padding: 0.35rem 0.7rem;
   border-radius: 999px;
 }
@@ -221,35 +221,35 @@
 .people-form label {
   display: grid;
   gap: 0.35rem;
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .people-form input,
 .people-form textarea,
 .people-form select {
   letter-spacing: 0;
   font-size: 15px;
-  color: var(--ink);
+  color: var(--foreground);
   min-width: 0;
   max-width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
   border-radius: 0.7rem;
 }
 .people-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; }
 .people-kicker {
   margin: 0.4rem 0 0.35rem;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .people-block { display: grid; gap: 0.35rem; }
 .people-block-label {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .people-pick {
   display: grid;
@@ -258,8 +258,8 @@
   overflow: auto;
   padding: 0.55rem 0.7rem;
   border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 .people-pick label {
   display: flex;
@@ -267,7 +267,7 @@
   gap: 0.55rem;
   letter-spacing: 0;
   font-size: 14px;
-  color: var(--ink);
+  color: var(--foreground);
 }
 .rel-chips {
   display: flex;
@@ -278,8 +278,8 @@
 .rel-chip {
   padding: 0.28rem 0.6rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 13px;
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+  font-size: 14px;
 }
 .rel-summary {
   display: grid;
@@ -288,8 +288,8 @@
   gap: 0.55rem;
   padding: 0.7rem 0.8rem;
   border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 .rel-summary p {
   margin: 0;
@@ -299,7 +299,7 @@
   white-space: nowrap;
   font-size: 14px;
   letter-spacing: 0;
-  color: var(--ink);
+  color: var(--foreground);
 }
 .rel-edit {
   width: 2.15rem;
@@ -325,7 +325,7 @@
   gap: 0.4rem;
   padding: 0.55rem 0.65rem;
   border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 .rel-list label {
   display: flex;
@@ -334,16 +334,16 @@
   letter-spacing: 0;
   text-transform: none;
   font-size: 14px;
-  color: var(--ink);
+  color: var(--foreground);
 }
 .rel-list textarea { text-transform: none; letter-spacing: 0; }
 .people-note {
   display: grid;
   gap: 0.2rem;
   padding: 0.7rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
 }
-.people-empty { color: var(--muted); margin: 0.55rem 0.2rem; }
+.people-empty { color: var(--muted-foreground); margin: 0.55rem 0.2rem; }
 
 .people-dir { display: grid; gap: 0.45rem; }
 .people-dir-row {
@@ -353,17 +353,17 @@
   gap: 0.55rem;
   padding: 0.65rem 0.75rem;
   border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 .people-dir-row:has(label) { grid-template-columns: 1fr; }
 .people-dir-row.primary {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+  border-color: color-mix(in srgb, var(--foreground) 12%, transparent);
 }
 .people-dir-kind {
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
   font-weight: 600;
 }
 .people-rail {
@@ -380,13 +380,13 @@
   gap: 0.35rem;
   padding: 0.75rem 0.8rem;
   border-radius: 0.85rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
   position: relative;
 }
 .people-rail-card.primary {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+  border-color: color-mix(in srgb, var(--foreground) 12%, transparent);
 }
 .people-rail-card.absence.now {
   border-color: rgba(255, 176, 96, 0.45);
@@ -401,8 +401,8 @@
 }
 .people-rail-meta {
   margin: 0;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
   letter-spacing: 0;
 }
 .people-rail-card .rel-edit {
@@ -415,9 +415,9 @@
   scroll-snap-align: start;
   min-height: 6.5rem;
   border-radius: 0.85rem;
-  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border: 1px dashed color-mix(in srgb, var(--foreground) 16%, transparent);
   background: transparent;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .people-salary-log {
   list-style: none;
@@ -425,27 +425,27 @@
   padding: 0;
   display: grid;
   gap: 0.35rem;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--muted-foreground);
+  font-size: 14px;
 }
 .people-contact-value {
   min-height: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--ink);
+  color: var(--foreground);
   text-align: left;
   font: inherit;
   letter-spacing: 0;
   word-break: break-all;
   white-space: pre-wrap;
 }
-.people-contact-value:hover:not(:disabled) { color: var(--accent); }
+.people-contact-value:hover:not(:disabled) { color: var(--primary); }
 .people-contact-value:disabled { opacity: 0.55; }
 .people-contact-note {
   margin: 0;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
   letter-spacing: 0;
 }
 .people-contact-actions {
@@ -473,8 +473,8 @@
   gap: 0.4rem;
   padding: 0.7rem 0.8rem;
   border-radius: 0.85rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 .people-site-url {
   display: flex;
@@ -487,8 +487,8 @@
   word-break: break-all;
 }
 .people-bond-log li {
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
 }
 
 .people-browse {
@@ -507,12 +507,12 @@
 }
 .people-table th {
   text-align: left;
-  color: var(--muted);
-  font-size: 11px;
+  color: var(--muted-foreground);
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.04em;
   padding: 0.45rem 0.7rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 .people-th {
   min-height: 0;
@@ -523,12 +523,12 @@
   font: inherit;
   letter-spacing: inherit;
 }
-.people-th:hover { color: var(--ink); background: transparent; }
+.people-th:hover { color: var(--foreground); background: transparent; }
 .people-table tbody tr { cursor: pointer; }
-.people-table tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
+.people-table tbody tr:hover td { background: color-mix(in srgb, var(--foreground) 3%, transparent); }
 .people-table td {
   padding: 0.35rem 0.7rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 5%, transparent);
   vertical-align: middle;
 }
 .people-table-name {
@@ -546,7 +546,7 @@
 }
 .people-table-name:hover {
   background: transparent;
-  color: var(--accent);
+  color: var(--primary);
 }
 
 .people-board {
@@ -561,8 +561,8 @@
   min-width: 16.5rem;
   padding: 0.65rem;
   border-radius: 1rem;
-  background: #101217;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 .people-col header {
   display: flex;
@@ -573,12 +573,12 @@
 }
 .people-col h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 .people-col header span {
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -588,12 +588,12 @@
   height: auto;
 }
 .people-graph circle {
-  fill: #161922;
-  stroke: rgba(255, 255, 255, 0.18);
+  fill: var(--accent);
+  stroke: color-mix(in srgb, var(--foreground) 18%, transparent);
 }
-.people-graph line { stroke: rgba(255, 255, 255, 0.22); }
+.people-graph line { stroke: color-mix(in srgb, var(--foreground) 22%, transparent); }
 .people-graph text {
-  fill: var(--ink);
+  fill: var(--foreground);
   font-size: 9px;
 }
 .people-open-bonds {
@@ -602,8 +602,8 @@
   padding: 0;
   display: grid;
   gap: 0.2rem;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--muted-foreground);
+  font-size: 14px;
 }
 .people-primary {
   display: grid;
@@ -620,13 +620,13 @@
   padding: 0.7rem 0.75rem;
   border: 0;
   border-radius: 0.85rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
   color: inherit;
   text-align: left;
   cursor: pointer;
 }
 .people-tile:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
   color: inherit;
 }
 

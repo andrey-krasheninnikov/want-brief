@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { DayOverride, DayOverrideDraft } from '../../types'
 import { clockToMinutes, minutesToClock } from './now'
@@ -75,7 +77,7 @@ export function DayOverridePopover({ day, label, override, defaultStartMin, defa
       <p className="sched-daypop-title">{label}</p>
       <div className="sched-daypop-modes" role="radiogroup" aria-label="Day mode">
         {(['default', 'off', 'custom'] as Mode[]).map((value) => (
-          <button
+          <Button
             key={value}
             type="button"
             role="radio"
@@ -84,7 +86,7 @@ export function DayOverridePopover({ day, label, override, defaultStartMin, defa
             onClick={() => setMode(value)}
           >
             {value === 'default' ? 'Usual hours' : value === 'off' ? 'Day off' : 'Custom hours'}
-          </button>
+          </Button>
         ))}
       </div>
       {mode === 'custom' ? (
@@ -101,21 +103,21 @@ export function DayOverridePopover({ day, label, override, defaultStartMin, defa
       ) : null}
       <label>
         Note
-        <input type="text" value={note} placeholder="Why this day differs" onChange={(e) => setNote(e.target.value)} />
+        <Input type="text" value={note} placeholder="Why this day differs" onChange={(e) => setNote(e.target.value)} />
       </label>
       {invalid || error ? <p className="error">{invalid || error}</p> : null}
       <div className="sched-daypop-actions">
-        <button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy}>
           Save
-        </button>
+        </Button>
         {override ? (
-          <button type="button" className="ghost" disabled={busy} onClick={onClear}>
+          <Button type="button" className="ghost" disabled={busy} onClick={onClear}>
             Reset
-          </button>
+          </Button>
         ) : null}
-        <button type="button" className="ghost" onClick={onClose}>
+        <Button type="button" className="ghost" onClick={onClose}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   )

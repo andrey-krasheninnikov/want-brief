@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -72,30 +73,30 @@ export function EventsScreen() {
       actions={
         <div className="events-actions">
           <div className="people-tabs">
-            <button type="button" className={view === 'week' ? 'on' : ''} onClick={() => setView('week')}>
+            <Button type="button" className={view === 'week' ? 'on' : ''} onClick={() => setView('week')}>
               Week
-            </button>
-            <button type="button" className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>
+            </Button>
+            <Button type="button" className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>
               Month
-            </button>
+            </Button>
           </div>
-          <button
+          <Button
             type="button"
             className="ghost"
             aria-label="Previous"
             onClick={() => setAnchor((current) => (view === 'week' ? shiftWeeks(current, -1, tz) : shiftMonths(current, -1, tz)))}
           >
             ‹
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className="ghost"
             aria-label="Next"
             onClick={() => setAnchor((current) => (view === 'week' ? shiftWeeks(current, 1, tz) : shiftMonths(current, 1, tz)))}
           >
             ›
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className={stats && !creating ? 'ghost on' : 'ghost'}
             aria-label="Stats"
@@ -103,8 +104,8 @@ export function EventsScreen() {
             onClick={openStats}
           >
             <ChartBar size={18} weight="light" aria-hidden />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className="tasks-plus"
             aria-label="Add event"
@@ -114,7 +115,7 @@ export function EventsScreen() {
             }}
           >
             +
-          </button>
+          </Button>
         </div>
       }
     >

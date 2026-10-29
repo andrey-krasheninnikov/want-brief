@@ -1,3 +1,4 @@
+import { Input } from '@want-foundation/desyst-react'
 import { CalendarBlank, Clock, Coins, CurrencyDollar, CurrencyRub, Target } from '@phosphor-icons/react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -109,7 +110,7 @@ export function TaskStats({ item, task }: Props) {
         <div className="dossier-controls">
           <label>
             Estimate · hours
-            <input
+            <Input
               type="number"
               min={0}
               step={1}
@@ -120,7 +121,7 @@ export function TaskStats({ item, task }: Props) {
           </label>
           <label>
             Estimate · minutes
-            <input
+            <Input
               type="number"
               min={0}
               max={59}

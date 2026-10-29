@@ -7,8 +7,8 @@
       "dependencies": {
         "@phosphor-icons/react": "^2.1.10",
         "@tanstack/react-query": "^5.102.8",
-        "@want-foundation/desyst-foundation": "0.1.2",
-        "@want-foundation/desyst-react": "0.1.2",
+        "@want-foundation/desyst-foundation": "0.3.0",
+        "@want-foundation/desyst-react": "0.3.0",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
         "react-router-dom": "^7.18.3",
@@ -239,9 +239,9 @@
 
     "@vitejs/plugin-react": ["@vitejs/plugin-react@6.1.1", "", { "dependencies": { "@rolldown/pluginutils": "^1.0.1" }, "peerDependencies": { "@rolldown/plugin-babel": "^0.1.7 || ^0.2.0", "babel-plugin-react-compiler": "^1.0.0", "oxc-transform-react": "^0.145.0", "vite": "^8.0.0" }, "optionalPeers": ["@rolldown/plugin-babel", "babel-plugin-react-compiler", "oxc-transform-react"] }, "sha512-yxLaQV9gkhS8ezJqCM6+ndU7mDY6gqAg75NQ+0IjwEI8IYOmQCgkRwHKVSfWXW076DsqMo0Dk+0FK1U+M5RgFw=="],
 
-    "@want-foundation/desyst-foundation": ["@want-foundation/desyst-foundation@0.1.2", "", {}, "sha512-uePkxL8+OE5Ceo7lQuiTpitFlxtglh8dWRZFR7IYUHeNN8TjWHHKn8OCaWderEGchx+H6TxbW4BYN17EwQKPDQ=="],
+    "@want-foundation/desyst-foundation": ["@want-foundation/desyst-foundation@0.3.0", "", { "bin": { "want-design-install": "dist/install-skill.js" } }, "sha512-MZOgEL18ioQeCB3yx2vUQoqDD/k05E4lMAlWeocfLj208s54GnTPP3otrAGB4hlISsJVGhCcp70NONAr7oZJgg=="],
 
-    "@want-foundation/desyst-react": ["@want-foundation/desyst-react@0.1.2", "", { "dependencies": { "@want-foundation/desyst-foundation": "0.1.2", "class-variance-authority": "0.7.1", "clsx": "2.1.1", "lucide-react": "1.50.0", "radix-ui": "1.6.7", "tailwind-merge": "3.7.0" }, "peerDependencies": { "react": "^19.0.0", "react-dom": "^19.0.0" } }, "sha512-Bhv0iy9vWWsT/5QZvf3OXFieOiPjmUKINoT9A8TmQlhPfj618EW8oOppnIGqaDaoYsRBtXowfuxW4U8aQB/Mdw=="],
+    "@want-foundation/desyst-react": ["@want-foundation/desyst-react@0.3.0", "", { "dependencies": { "@want-foundation/desyst-foundation": "0.3.0", "class-variance-authority": "0.7.1", "clsx": "2.1.1", "lucide-react": "1.50.0", "radix-ui": "1.6.7", "tailwind-merge": "3.7.0" }, "peerDependencies": { "react": "^19.0.0", "react-dom": "^19.0.0" } }, "sha512-oGQqGpjFa7pxyZd4RL+FW+Tt0+Pw12cTwC2azd4zm3f1ZYbhij1Um2YqQYywFWYkfHEqf1TPYT1uVtNP62EQVw=="],
 
     "aria-hidden": ["aria-hidden@1.2.6", "", { "dependencies": { "tslib": "^2.0.0" } }, "sha512-ik3ZgC9dY/lYVVM++OISsaYDeg1tb0VtP5uL3ouh1koGOaUMDPpbFIei4JkFimWUFPn90sbMNMXQAIVOlnYKJA=="],
 

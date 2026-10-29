@@ -1,3 +1,4 @@
+import { Button, Textarea } from '@want-foundation/desyst-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -66,7 +67,7 @@ export function TaskLogDialog({ itemId, kind, onClose }: Props) {
 
   return createPortal(
     <div className="tasks-log-root">
-      <button type="button" className="tasks-log-back" aria-label="Skip" onClick={onClose} />
+      <Button type="button" className="tasks-log-back" aria-label="Skip" onClick={onClose} />
       <div className="tasks-log-dialog" role="dialog" aria-modal="true" aria-labelledby="tasks-log-title">
         <div className="tasks-log-core">
           <p className="tasks-kicker">Log</p>
@@ -74,19 +75,19 @@ export function TaskLogDialog({ itemId, kind, onClose }: Props) {
           <p className="muted">Stress and a note are optional. Skip leaves the board as-is.</p>
           <div className="tasks-log-levels" role="group" aria-label="Stress">
             {[1, 2, 3, 4, 5].map((value) => (
-              <button
+              <Button
                 key={value}
                 type="button"
                 className={level === value ? 'tasks-log-level on' : 'tasks-log-level'}
                 onClick={() => setLevel(value)}
               >
                 {value}
-              </button>
+              </Button>
             ))}
           </div>
           <label>
             Comment
-            <textarea
+            <Textarea
               rows={3}
               value={body}
               onChange={(event) => setBody(event.target.value)}
@@ -94,13 +95,13 @@ export function TaskLogDialog({ itemId, kind, onClose }: Props) {
             />
           </label>
           <div className="tasks-log-actions">
-            <button type="button" className="ghost" onClick={onClose}>
+            <Button type="button" className="ghost" onClick={onClose}>
               Skip
-            </button>
-            <button type="button" className="tasks-log-save" disabled={save.isPending} onClick={submit}>
+            </Button>
+            <Button type="button" className="tasks-log-save" disabled={save.isPending} onClick={submit}>
               Save
               <span aria-hidden>↗</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>

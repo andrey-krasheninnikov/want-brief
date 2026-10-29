@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
@@ -87,9 +89,9 @@ export function SettingsScreen() {
             </div>
             {source.kind === 'manual' ? null : (
               <>
-                <button type="button" onClick={() => sync.mutate(source.id)} disabled={sync.isPending}>
+                <Button type="button" onClick={() => sync.mutate(source.id)} disabled={sync.isPending}>
                   Sync
-                </button>
+                </Button>
                 {source.kind === 'jira' ? (
                   <>
                     <label className="row">
@@ -102,7 +104,7 @@ export function SettingsScreen() {
                       />
                       Skip TLS verify
                     </label>
-                    <button
+                    <Button
                       type="button"
                       className="ghost"
                       onClick={() => {
@@ -111,10 +113,10 @@ export function SettingsScreen() {
                       }}
                     >
                       Email
-                    </button>
+                    </Button>
                   </>
                 ) : null}
-                <button
+                <Button
                   type="button"
                   className="ghost"
                   onClick={() => {
@@ -123,10 +125,10 @@ export function SettingsScreen() {
                   }}
                 >
                   Token
-                </button>
-                <button type="button" className="ghost" onClick={() => removeSource.mutate(source.id)}>
+                </Button>
+                <Button type="button" className="ghost" onClick={() => removeSource.mutate(source.id)}>
                   Del
-                </button>
+                </Button>
               </>
             )}
           </li>
@@ -138,7 +140,7 @@ export function SettingsScreen() {
             <option value="jira">Jira</option>
             <option value="todoist">Todoist</option>
           </select>
-          <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <select value={projectId} onChange={(e) => setProjectId(e.target.value)} required>
           <option value="">Project</option>
@@ -148,14 +150,14 @@ export function SettingsScreen() {
             </option>
           ))}
         </select>
-        <input
+        <Input
           placeholder={kind === 'jira' ? 'https://your-domain.atlassian.net' : 'https://api.todoist.com'}
           value={baseUrl}
           onChange={(e) => setBaseUrl(e.target.value)}
         />
         {kind === 'jira' ? (
           <>
-            <input
+            <Input
               placeholder="Atlassian email"
               type="email"
               value={email}
@@ -168,15 +170,15 @@ export function SettingsScreen() {
             </label>
           </>
         ) : null}
-        <input
+        <Input
           placeholder="API token"
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
         />
-        <button type="submit" disabled={!projectId || createSource.isPending}>
+        <Button type="submit" disabled={!projectId || createSource.isPending}>
           Add source
-        </button>
+        </Button>
       </form>
     </Window>
   )

@@ -1,5 +1,5 @@
 .pulse-window .ui-window-header h1 {
-  font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(1.9rem, 3.4vw, 2.6rem);
   letter-spacing: -0.08em;
   line-height: 1.02;
@@ -22,18 +22,18 @@
   display: grid;
   gap: 0.85rem;
   padding: 1.05rem 1.15rem 1.15rem;
-  background: var(--window);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius);
 }
 
 .pulse-kicker {
   margin: 0;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .pulse-chips {
@@ -45,23 +45,23 @@
   min-height: 0;
   padding: 0.4rem 0.8rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--ink);
-  font-size: 12px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .pulse-chip:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+  color: var(--foreground);
 }
 .pulse-chip.on,
 .pulse-chip.on:hover {
-  background: var(--accent);
+  background: var(--primary);
   border-color: transparent;
-  color: var(--ink);
+  color: var(--foreground);
 }
 
 .pulse-kpis {
@@ -76,7 +76,7 @@
   gap: 0.75rem;
 }
 .pulse-kpi-icon {
-  width: 2.4rem;
+  width: 2.75rem;
   height: 2.4rem;
   flex: 0 0 2.4rem;
   border-radius: 999px;
@@ -84,25 +84,25 @@
   align-items: center;
   justify-content: center;
   line-height: 0;
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--accent-2);
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--link);
 }
 .pulse-kpi span.pulse-kpi-icon {
   display: flex;
-  color: var(--accent-2);
+  color: var(--link);
 }
 .pulse-kpi-icon svg {
   display: block;
 }
 .pulse-kpi span:not(.pulse-kpi-icon) {
   display: block;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
 }
 .pulse-kpi strong {
   display: block;
   margin: 0.1rem 0 0;
-  font-family: 'Plus Jakarta Sans', 'Golos Text', system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-size: 1.65rem;
   font-weight: 600;
   letter-spacing: -0.06em;
@@ -118,15 +118,15 @@
 }
 .pulse-load div { min-width: 0; }
 .pulse-load dt {
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .pulse-load dd {
   margin: 0.12rem 0 0;
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .pulse-charts,
@@ -151,8 +151,8 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 14px;
+  color: var(--muted-foreground);
 }
 .pulse-legend i {
   display: inline-block;
@@ -168,12 +168,12 @@
   display: block;
 }
 .pulse-grid {
-  stroke: rgba(255, 255, 255, 0.06);
+  stroke: color-mix(in srgb, var(--foreground) 6%, transparent);
   stroke-width: 1;
 }
 .pulse-axis {
-  fill: var(--muted);
-  font-size: 10px;
+  fill: var(--muted-foreground);
+  font-size: 14px;
 }
 
 .pulse-days {
@@ -198,19 +198,19 @@
   max-width: 1.6rem;
   align-self: end;
   border-radius: 999px 999px 6px 6px;
-  background: color-mix(in srgb, var(--accent) 80%, white 8%);
+  background: color-mix(in srgb, var(--primary) 80%, white 8%);
   min-height: 6px;
 }
 .pulse-days span,
 .pulse-days small {
-  font-size: 11px;
-  color: var(--muted);
+  font-size: 14px;
+  color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
 }
 
 .pulse-window .bars li { grid-template-columns: 6.5rem 1fr auto; }
 .pulse-window .bars small {
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
 }
 
@@ -218,20 +218,20 @@
 .pulse-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 14px;
 }
 .pulse-table th {
   text-align: left;
-  color: var(--muted);
-  font-size: 11px;
+  color: var(--muted-foreground);
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.04em;
   padding: 0.4rem 0.65rem 0.55rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 .pulse-table td {
   padding: 0.55rem 0.65rem 0.55rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 5%, transparent);
   vertical-align: top;
 }
 .pulse-table td:last-child,
@@ -244,9 +244,9 @@
   display: inline-block;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--accent-2);
-  font-size: 11px;
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--link);
+  font-size: 14px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -259,9 +259,9 @@
   gap: 0.7rem;
 }
 .pulse-compose textarea {
-  border-radius: var(--r-control);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 .pulse-compose button {
   justify-self: end;

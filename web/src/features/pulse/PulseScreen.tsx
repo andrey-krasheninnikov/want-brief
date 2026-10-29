@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { Heartbeat, Lightning, Smiley, Sparkle, Target, type Icon } from '@phosphor-icons/react'
 import { useState } from 'react'
@@ -62,7 +63,7 @@ export function PulseScreen() {
       actions={
         <div className="pulse-chips" role="tablist" aria-label="Period">
           {periods.map((item) => (
-            <button
+            <Button
               key={item.id}
               type="button"
               role="tab"
@@ -71,7 +72,7 @@ export function PulseScreen() {
               onClick={() => setPeriod(item.id)}
             >
               {item.label}
-            </button>
+            </Button>
           ))}
         </div>
       }

@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useState } from 'react'
 import { PencilSimple } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -65,11 +67,11 @@ export function PersonContacts({ personId, contacts }: Props) {
           <article key={contact.id} className={primary?.id === contact.id ? 'people-rail-card primary' : 'people-rail-card'}>
             <p className="people-kicker">{KINDS.find((row) => row.id === contact.kind)?.label ?? contact.kind}</p>
             <strong>{contact.label || '—'}</strong>
-            <button type="button" className="people-contact-value" disabled={!contact.value} onClick={() => void onCopy(contact)}>
+            <Button type="button" className="people-contact-value" disabled={!contact.value} onClick={() => void onCopy(contact)}>
               {copiedId === contact.id ? 'Copied' : contact.value || '—'}
-            </button>
+            </Button>
             {contact.note ? <p className="people-rail-meta">{contact.note}</p> : null}
-            <button
+            <Button
               type="button"
               className="ghost rel-edit"
               aria-label="Edit contact"
@@ -79,7 +81,7 @@ export function PersonContacts({ personId, contacts }: Props) {
               }}
             >
               <PencilSimple size={16} weight="light" />
-            </button>
+            </Button>
           </article>
         ))}
         <PersonRailAdd
@@ -103,24 +105,24 @@ export function PersonContacts({ personId, contacts }: Props) {
         </label>
         <label>
           Name
-          <input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder="Work" />
+          <Input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder="Work" />
         </label>
         <label>
           Value
-          <input value={draft.value} onChange={(e) => setDraft({ ...draft, value: e.target.value })} />
+          <Input value={draft.value} onChange={(e) => setDraft({ ...draft, value: e.target.value })} />
         </label>
         <label>
           Note
-          <input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
+          <Input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
         </label>
         <div className="people-contact-actions">
-          <button type="button" onClick={() => save.mutate()} disabled={!draft.label.trim() || !draft.value.trim() || save.isPending}>
+          <Button type="button" onClick={() => save.mutate()} disabled={!draft.label.trim() || !draft.value.trim() || save.isPending}>
             Save
-          </button>
+          </Button>
           {editing ? (
-            <button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
+            <Button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
               Remove
-            </button>
+            </Button>
           ) : null}
         </div>
         {save.isError ? <p className="error">{save.error.message}</p> : null}

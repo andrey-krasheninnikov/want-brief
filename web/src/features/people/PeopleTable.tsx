@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useTimezone } from '../../shared/timezone'
 import { useMemo, useState } from 'react'
 import type { Person } from '../../types'
@@ -62,10 +63,10 @@ export function PeopleTable({ people, companyNames, onPick }: Props) {
           <tr>
             {COLS.map((col) => (
               <th key={col.id}>
-                <button type="button" className="people-th" onClick={() => toggle(col.id)}>
+                <Button type="button" className="people-th" onClick={() => toggle(col.id)}>
                   {col.label}
                   {sort.col === col.id ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
-                </button>
+                </Button>
               </th>
             ))}
           </tr>
@@ -74,12 +75,12 @@ export function PeopleTable({ people, companyNames, onPick }: Props) {
           {rows.map((person) => (
             <tr key={person.id} onClick={() => onPick(person.id)}>
               <td>
-                <button type="button" className="people-table-name" onClick={() => onPick(person.id)}>
+                <Button type="button" className="people-table-name" onClick={() => onPick(person.id)}>
                   <span className="people-avatar" aria-hidden>
                     {personInitials(person.name)}
                   </span>
                   {person.name}
-                </button>
+                </Button>
               </td>
               <td>{professionLabel(person) || 'No profession'}</td>
               <td>{relLabels(person.companies, companyNames)}</td>

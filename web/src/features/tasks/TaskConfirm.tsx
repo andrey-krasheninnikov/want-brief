@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -23,7 +24,7 @@ export function TaskOverlay({ open, onCancel, children }: OverlayProps) {
   if (!open) return null
   return createPortal(
     <div className="tasks-confirm-root">
-      <button type="button" className="tasks-confirm-back" aria-label="Cancel" onClick={onCancel} />
+      <Button type="button" className="tasks-confirm-back" aria-label="Cancel" onClick={onCancel} />
       {children}
     </div>,
     document.body,
@@ -58,12 +59,12 @@ export function TaskConfirm({
         <h3 id="tasks-confirm-title">{title}</h3>
         <p className="muted">{body}</p>
         <div className="tasks-confirm-actions">
-          <button type="button" className="ghost" onClick={onCancel} disabled={busy}>
+          <Button type="button" className="ghost" onClick={onCancel} disabled={busy}>
             Cancel
-          </button>
-          <button type="button" className={danger ? 'danger' : undefined} onClick={onConfirm} disabled={busy}>
+          </Button>
+          <Button type="button" className={danger ? 'danger' : undefined} onClick={onConfirm} disabled={busy}>
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </TaskOverlay>

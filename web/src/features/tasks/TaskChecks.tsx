@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { DotsSixVertical, Trash } from '@phosphor-icons/react'
 import { useEffect, useState, type DragEvent, type KeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -83,9 +85,9 @@ export function TaskChecks({ itemId }: Props) {
     <section className="tasks-checks">
       <div className="tasks-head">
         <h3>Checklist</h3>
-        <button type="button" className="tasks-plus" aria-label="Add check" onClick={() => setOpen(true)}>
+        <Button type="button" className="tasks-plus" aria-label="Add check" onClick={() => setOpen(true)}>
           +
-        </button>
+        </Button>
       </div>
       {rows.length > 0 ? (
         <div className="dossier-progress-row">
@@ -131,7 +133,7 @@ export function TaskChecks({ itemId }: Props) {
       {open ? (
         <label className="tasks-check-draft">
           New check
-          <input
+          <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(event) => {
@@ -203,7 +205,7 @@ function CheckRow({
         if (fromId) onDropOn(fromId)
       }}
     >
-      <button
+      <Button
         type="button"
         className="tasks-check-handle"
         draggable
@@ -212,9 +214,9 @@ function CheckRow({
         onDragEnd={onDragEnd}
       >
         <DotsSixVertical size={16} weight="light" />
-      </button>
+      </Button>
       <input type="checkbox" checked={row.done} onChange={onToggle} aria-label="Done" />
-      <input
+      <Input
         className="tasks-check-text"
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -223,9 +225,9 @@ function CheckRow({
         aria-label="Check body"
         autoComplete="off"
       />
-      <button type="button" className="ghost tasks-check-remove" aria-label="Remove check" onClick={onRemove}>
+      <Button type="button" className="ghost tasks-check-remove" aria-label="Remove check" onClick={onRemove}>
         <Trash size={16} weight="light" />
-      </button>
+      </Button>
     </li>
   )
 }

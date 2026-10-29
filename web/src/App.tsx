@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
 import { api } from './api'
@@ -53,7 +54,7 @@ function Gate() {
   }
   if (!settings.data) {
     return settings.isError
-      ? <div className="login-stage"><p>Could not load schedule settings.</p><button onClick={() => void settings.refetch()}>Retry</button></div>
+      ? <div className="login-stage"><p>Could not load schedule settings.</p><Button onClick={() => void settings.refetch()}>Retry</Button></div>
       : <div className="login-stage">Loading schedule settings…</div>
   }
   return <TimezoneContext.Provider value={settings.data.timezone}><Shell /></TimezoneContext.Provider>

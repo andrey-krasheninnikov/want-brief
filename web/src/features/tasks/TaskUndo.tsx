@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -54,7 +55,7 @@ export function TaskUndoProvider({ children }: { children: ReactNode }) {
             <div className="tasks-undo" role="status">
               <p>{message}</p>
               {extra ? (
-                <button
+                <Button
                   type="button"
                   className="ghost"
                   onClick={() => {
@@ -63,11 +64,11 @@ export function TaskUndoProvider({ children }: { children: ReactNode }) {
                   }}
                 >
                   {extra.label}
-                </button>
+                </Button>
               ) : null}
-              <button type="button" className="ghost" onClick={() => void undo()}>
+              <Button type="button" className="ghost" onClick={() => void undo()}>
                 Undo
-              </button>
+              </Button>
             </div>,
             document.body,
           )

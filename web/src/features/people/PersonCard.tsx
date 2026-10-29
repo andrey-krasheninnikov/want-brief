@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import type { Person } from '../../types'
 import { bondKindLabel, primaryContact, professionLabel, relLabels } from './peopleModel'
 
@@ -20,7 +21,7 @@ export function PersonCard({ person, selected, onPick, companyNames }: Props) {
   const companies = relLabels(person.companies, companyNames)
   const meta = [professionLabel(person) || 'No profession', primary?.value, companies].filter(Boolean).join(' · ')
   return (
-    <button
+    <Button
       type="button"
       className={selected ? 'people-row on' : 'people-row'}
       onClick={() => onPick(person.id)}
@@ -36,6 +37,6 @@ export function PersonCard({ person, selected, onPick, companyNames }: Props) {
         {person.age ?? ''}
         {person.meBond ? ` · ${bondKindLabel(person.meBond.kind)}` : ''}
       </span>
-    </button>
+    </Button>
   )
 }

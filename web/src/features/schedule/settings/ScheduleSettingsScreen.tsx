@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -114,12 +116,12 @@ function SettingsForm({ initial }: { initial: ScheduleSettings }) {
       title="Packer settings"
       actions={
         <div className="sset-actions">
-          <button type="button" className="ghost" onClick={() => navigate('/schedule')}>
+          <Button type="button" className="ghost" onClick={() => navigate('/schedule')}>
             Back to schedule
-          </button>
-          <button type="button" disabled={save.isPending} onClick={submit}>
+          </Button>
+          <Button type="button" disabled={save.isPending} onClick={submit}>
             {save.isPending ? 'Saving…' : saved ? 'Saved' : 'Save'}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -129,7 +131,7 @@ function SettingsForm({ initial }: { initial: ScheduleSettings }) {
             <label className="sset-field">
               <span>Timezone</span>
               <span className="sset-input">
-                <input list="sset-tz" value={draft.timezone} onChange={(e) => patch({ timezone: e.target.value })} />
+                <Input list="sset-tz" value={draft.timezone} onChange={(e) => patch({ timezone: e.target.value })} />
                 <datalist id="sset-tz">
                   {TIMEZONES.map((tz) => (
                     <option key={tz} value={tz} />
@@ -143,14 +145,14 @@ function SettingsForm({ initial }: { initial: ScheduleSettings }) {
               <span>Workdays</span>
               <span className="sset-chips">
                 {WEEKDAYS.map((day) => (
-                  <button
+                  <Button
                     key={day.value}
                     type="button"
                     className={draft.workdays.includes(day.value) ? 'chip on' : 'chip'}
                     onClick={() => toggleWorkday(day.value)}
                   >
                     {day.label}
-                  </button>
+                  </Button>
                 ))}
               </span>
             </div>
@@ -202,7 +204,7 @@ function SettingsForm({ initial }: { initial: ScheduleSettings }) {
             <label className="sset-field">
               <span>Check windows</span>
               <span className="sset-input">
-                <input
+                <Input
                   type="text"
                   value={windowsRaw}
                   placeholder="10:00, 14:00"

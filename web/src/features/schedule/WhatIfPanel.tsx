@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useMutation } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { api } from '../../api'
@@ -131,9 +132,9 @@ export function WhatIfPanel({ kind, from, to, lanes, busy, onClose }: Props) {
             <p className="sched-deck-kicker">What if</p>
             <p className="sched-whatif-hint">Move a due date a week, drop a task or skip a meeting, then compare.</p>
           </div>
-          <button type="button" className="ghost" onClick={onClose}>
+          <Button type="button" className="ghost" onClick={onClose}>
             Close
-          </button>
+          </Button>
         </header>
         <div className="sched-whatif-grid">
           <div>
@@ -151,14 +152,14 @@ export function WhatIfPanel({ kind, from, to, lanes, busy, onClose }: Props) {
                     </span>
                     <span className="sched-whatif-moves">
                       {(['keep', 'week', 'drop'] as TaskMove[]).map((value) => (
-                        <button
+                        <Button
                           key={value}
                           type="button"
                           className={move === value ? 'chip on' : 'chip'}
                           onClick={() => setMove(task.itemId, value)}
                         >
                           {value === 'keep' ? 'Keep' : value === 'week' ? '+1 week' : 'Drop'}
-                        </button>
+                        </Button>
                       ))}
                     </span>
                   </li>
@@ -176,13 +177,13 @@ export function WhatIfPanel({ kind, from, to, lanes, busy, onClose }: Props) {
                     <span>{meeting.title}</span>
                   </span>
                   <span className="sched-whatif-moves">
-                    <button
+                    <Button
                       type="button"
                       className={skips.has(meeting.seriesId) ? 'chip on' : 'chip'}
                       onClick={() => toggleSkip(meeting.seriesId)}
                     >
                       {skips.has(meeting.seriesId) ? 'Skipped' : 'Skip'}
-                    </button>
+                    </Button>
                   </span>
                 </li>
               ))}
@@ -190,9 +191,9 @@ export function WhatIfPanel({ kind, from, to, lanes, busy, onClose }: Props) {
           </div>
         </div>
         <div className="sched-whatif-actions">
-          <button type="button" disabled={!touched || run.isPending} onClick={() => run.mutate()}>
+          <Button type="button" disabled={!touched || run.isPending} onClick={() => run.mutate()}>
             {run.isPending ? 'Comparing…' : 'Compare'}
-          </button>
+          </Button>
           {run.isError ? <p className="error">{run.error.message}</p> : null}
         </div>
         {run.data ? <Summary result={run.data} /> : null}

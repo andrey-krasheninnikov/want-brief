@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { zonedYmd } from '../../shared/zoned'
 import { useTimezone } from '../../shared/timezone'
 import { useState } from 'react'
@@ -94,7 +96,7 @@ export function PersonAbsences({ personId, absences }: Props) {
                 {dayCount(row)} {dayCount(row) === 1 ? 'day' : 'days'}
                 {row.note ? ` · ${row.note}` : ''}
               </p>
-              <button
+              <Button
                 type="button"
                 className="ghost rel-edit"
                 aria-label="Edit absence"
@@ -104,7 +106,7 @@ export function PersonAbsences({ personId, absences }: Props) {
                 }}
               >
                 <PencilSimple size={16} weight="light" />
-              </button>
+              </Button>
             </article>
           )
         })}
@@ -127,16 +129,16 @@ export function PersonAbsences({ personId, absences }: Props) {
         </label>
         <label>
           Note
-          <input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} placeholder="Vacation, conference…" />
+          <Input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} placeholder="Vacation, conference…" />
         </label>
         <div className="people-contact-actions">
-          <button type="button" onClick={() => save.mutate()} disabled={!valid || save.isPending}>
+          <Button type="button" onClick={() => save.mutate()} disabled={!valid || save.isPending}>
             Save
-          </button>
+          </Button>
           {editing ? (
-            <button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
+            <Button type="button" className="ghost" onClick={() => drop.mutate(editing.id)} disabled={drop.isPending}>
               Remove
-            </button>
+            </Button>
           ) : null}
         </div>
         {save.isError ? <p className="error">{save.error.message}</p> : null}

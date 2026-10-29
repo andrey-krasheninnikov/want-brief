@@ -1,25 +1,25 @@
 /* Task dossier sheet: glass cards, segmented tabs, stat tiles, gauge, log timeline. */
 
 .tasks-dossier {
-  --dc-surface: color-mix(in srgb, var(--window) 78%, transparent);
-  --dc-surface-2: rgba(255, 255, 255, 0.035);
-  --dc-edge: rgba(255, 255, 255, 0.09);
-  --dc-hairline: inset 0 1px 0 rgba(255, 255, 255, 0.13);
-  --dc-shadow: 0 18px 44px color-mix(in srgb, var(--accent) 12%, rgba(4, 5, 9, 0.5));
-  --dc-warn: #e8943a;
+  --dc-surface: color-mix(in srgb, var(--card) 78%, transparent);
+  --dc-surface-2: color-mix(in srgb, var(--foreground) 3.5%, transparent);
+  --dc-edge: color-mix(in srgb, var(--foreground) 9%, transparent);
+  --dc-hairline: inset 0 1px 0 color-mix(in srgb, var(--foreground) 13%, transparent);
+  --dc-shadow: 0 18px 44px color-mix(in srgb, var(--primary) 12%, rgba(4, 5, 9, 0.5));
+  --dc-warn: var(--warning-text);
   display: grid;
   gap: 0.9rem;
 }
 
 /* Sheet chrome only for sheets that host a dossier. */
 .tasks-sheet:has(.tasks-dossier) {
-  box-shadow: -26px 0 64px color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: -26px 0 64px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 .tasks-sheet:has(.tasks-dossier) .tasks-sheet-core {
   background:
-    radial-gradient(118% 58% at 88% -10%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%),
-    radial-gradient(90% 52% at -6% 104%, color-mix(in srgb, var(--accent-2) 9%, transparent), transparent 64%),
-    color-mix(in srgb, var(--window) 92%, transparent);
+    radial-gradient(118% 58% at 88% -10%, color-mix(in srgb, var(--primary) 20%, transparent), transparent 62%),
+    radial-gradient(90% 52% at -6% 104%, color-mix(in srgb, var(--link) 9%, transparent), transparent 64%),
+    color-mix(in srgb, var(--card) 92%, transparent);
 }
 
 /* Hero header */
@@ -36,9 +36,9 @@
   border-radius: 1rem;
   display: grid;
   place-items: center;
-  color: var(--ink);
-  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent-2) 70%, var(--accent)));
-  box-shadow: 0 12px 26px color-mix(in srgb, var(--accent) 30%, transparent), var(--dc-hairline);
+  color: var(--foreground);
+  background: linear-gradient(140deg, var(--primary), color-mix(in srgb, var(--link) 70%, var(--primary)));
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--primary) 30%, transparent), var(--dc-hairline);
 }
 .tasks-sheet-title {
   display: grid;
@@ -52,7 +52,7 @@
   font-weight: 700;
   letter-spacing: -0.045em;
   line-height: 1.1;
-  color: var(--ink);
+  color: var(--foreground);
 }
 .tasks-sheet-title input {
   padding: 0;
@@ -62,10 +62,10 @@
   transition: background 200ms ease;
 }
 .tasks-sheet-title input:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 .tasks-sheet-title input:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--primary) 60%, transparent);
   outline-offset: 3px;
 }
 
@@ -79,7 +79,7 @@
   overflow-x: auto;
   padding: 0.25rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--window) 72%, transparent);
+  background: color-mix(in srgb, var(--card) 72%, transparent);
   border: 1px solid var(--dc-edge);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
   scrollbar-width: none;
@@ -89,7 +89,7 @@
   position: sticky;
   top: 0;
   z-index: 3;
-  background: color-mix(in srgb, var(--window) 94%, transparent);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
   backdrop-filter: blur(14px);
 }
 .tasks-tabs button {
@@ -99,21 +99,21 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.02em;
   transition: background 200ms ease, color 200ms ease, box-shadow 200ms ease;
 }
 .tasks-tabs button:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  color: var(--foreground);
 }
 .tasks-tabs button.on,
 .tasks-tabs button.on:hover {
-  color: var(--ink);
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent-2) 65%, var(--accent)));
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 32%, transparent);
+  color: var(--foreground);
+  background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--link) 65%, var(--primary)));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 32%, transparent);
 }
 .tasks-tabs.small {
   justify-self: start;
@@ -121,7 +121,7 @@
 }
 .tasks-tabs.small button {
   padding: 0.3rem 0.65rem;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 /* Cards */
@@ -133,7 +133,7 @@
   background: var(--dc-surface);
   border: 1px solid var(--dc-edge);
   box-shadow: var(--dc-hairline), var(--dc-shadow);
-  animation: dossier-rise 520ms var(--motion) both;
+  animation: dossier-rise 520ms var(--motion-ease) both;
 }
 .dossier-card:nth-child(3) { animation-delay: 55ms; }
 .dossier-card:nth-child(4) { animation-delay: 110ms; }
@@ -145,16 +145,16 @@
 }
 .dossier-card > header h3 {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .dossier-card > header p {
   margin: 0;
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 14px;
+  color: var(--muted-foreground);
 }
 .dossier-card .tasks-head {
   margin: 0;
@@ -162,11 +162,11 @@
 }
 .dossier-card .tasks-head h3 {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 @keyframes dossier-rise {
   from { opacity: 0; transform: translateY(12px); }
@@ -190,31 +190,31 @@
   min-height: 0;
   padding: 0.32rem 0.6rem;
   border-radius: 9px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--ink);
+  color: var(--foreground);
   background: var(--dc-surface-2);
   border: 1px solid var(--dc-edge);
 }
 button.dossier-chip:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+  color: var(--foreground);
 }
 .dossier-chip.mono { font-variant-numeric: tabular-nums; }
 .dossier-chip.tone-progress {
-  color: var(--accent-2);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--link);
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
 }
 .dossier-chip.tone-blocked {
-  color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--destructive-text);
+  border-color: color-mix(in srgb, var(--destructive-text) 45%, transparent);
 }
 .dossier-chip.tone-awaiting {
   color: var(--dc-warn);
   border-color: color-mix(in srgb, var(--dc-warn) 45%, transparent);
 }
-.dossier-chip.tone-stall { color: var(--muted); }
+.dossier-chip.tone-stall { color: var(--muted-foreground); }
 .dossier-identity .url-open { margin-left: -0.1rem; }
 
 /* Controls row */
@@ -236,19 +236,19 @@ button.dossier-chip:hover {
   gap: 0.4rem;
 }
 .dossier-card .tasks-actions button.ghost {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border-radius: 11px;
   background: var(--dc-surface-2);
   border-color: var(--dc-edge);
   transition: background 200ms ease, transform 200ms ease, color 200ms ease;
 }
 .dossier-card .tasks-actions button.ghost:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: color-mix(in srgb, var(--foreground) 9%, transparent);
   transform: translateY(-1px);
 }
 .dossier-card .tasks-actions button.danger:hover {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  background: color-mix(in srgb, var(--destructive-text) 18%, transparent);
 }
 
 /* Timer */
@@ -265,40 +265,40 @@ button.dossier-chip:hover {
   border: 1px solid var(--dc-edge);
 }
 .tasks-dossier .tasks-timer button.ghost {
-  width: 34px;
-  height: 34px;
-  min-height: 0;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   padding: 0;
   border-radius: 11px;
   background: var(--dc-surface-2);
   border-color: var(--dc-edge);
 }
 .tasks-dossier .tasks-timer button.ghost:hover {
-  background: rgba(255, 255, 255, 0.09);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--foreground) 9%, transparent);
+  color: var(--foreground);
   filter: none;
   transform: translateY(-1px);
 }
 .tasks-dossier .tasks-timer button.on {
-  width: 34px;
-  height: 34px;
-  min-height: 0;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   padding: 0;
   border-radius: 999px;
-  color: var(--ink);
+  color: var(--foreground);
   background: linear-gradient(
     120deg,
-    var(--accent),
-    var(--accent-2),
-    color-mix(in srgb, var(--accent-2) 55%, #fff),
-    var(--accent)
+    var(--primary),
+    var(--link),
+    color-mix(in srgb, var(--link) 55%, #fff),
+    var(--primary)
   );
   background-size: 220% 220%;
   animation: timer-wash 7s ease-in-out infinite;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 .tasks-dossier .tasks-timer button.on:hover {
-  color: var(--ink);
+  color: var(--foreground);
   filter: brightness(1.08);
 }
 
@@ -314,11 +314,11 @@ button.dossier-chip:hover {
   border-radius: 999px;
   background: var(--dc-surface-2);
   border-color: var(--dc-edge);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
 }
 .tasks-dossier .tasks-flag.on {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 62%, transparent), color-mix(in srgb, var(--accent-2) 34%, transparent));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 62%, transparent), color-mix(in srgb, var(--link) 34%, transparent));
   border-color: transparent;
 }
 
@@ -336,18 +336,18 @@ button.dossier-chip:hover {
   border-radius: 14px;
   background: var(--dc-surface-2);
   border: 1px solid var(--dc-edge);
-  color: color-mix(in srgb, var(--muted) calc((1 - var(--due-heat, 0)) * 100%), var(--dc-warn) calc(var(--due-heat, 0) * 100%));
+  color: color-mix(in srgb, var(--muted-foreground) calc((1 - var(--due-heat, 0)) * 100%), var(--dc-warn) calc(var(--due-heat, 0) * 100%));
 }
 .tasks-due-card.overdue {
-  color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  color: var(--destructive-text);
+  border-color: color-mix(in srgb, var(--destructive-text) 35%, transparent);
 }
 .tasks-due-card.met {
-  color: var(--ok);
-  border-color: color-mix(in srgb, var(--ok) 28%, transparent);
+  color: var(--success-text);
+  border-color: color-mix(in srgb, var(--success-text) 28%, transparent);
 }
 .tasks-due-card strong {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -362,16 +362,16 @@ button.dossier-chip:hover {
   font-size: 1.05rem;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
-  color: var(--ink);
+  color: var(--foreground);
   background: none;
   text-align: left;
 }
-.tasks-due-open:hover { background: none; color: var(--accent-2); }
+.tasks-due-open:hover { background: none; color: var(--link); }
 .tasks-due-clear {
   min-height: 0;
   padding: 0.25rem 0.55rem;
   border-radius: 8px;
-  font-size: 11px;
+  font-size: 14px;
   justify-self: start;
   align-self: end;
 }
@@ -395,11 +395,11 @@ button.dossier-chip:hover {
 .dossier-tile-text { display: grid; gap: 0.1rem; min-width: 0; }
 .dossier-tile-text p {
   margin: 0;
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .dossier-tile-text strong {
   font-size: 1.2rem;
@@ -413,9 +413,9 @@ button.dossier-chip:hover {
   border-radius: 11px;
   display: grid;
   place-items: center;
-  color: var(--ink);
-  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent-2) 60%, var(--accent)));
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 26%, transparent);
+  color: var(--foreground);
+  background: linear-gradient(140deg, var(--primary), color-mix(in srgb, var(--link) 60%, var(--primary)));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 26%, transparent);
 }
 
 /* Gauge */
@@ -440,13 +440,13 @@ button.dossier-chip:hover {
   border-radius: 50%;
   background: conic-gradient(
     from -90deg,
-    var(--ring-ink, var(--accent)) calc(var(--ring-p, 0) * 1%),
-    rgba(255, 255, 255, 0.07) 0
+    var(--ring-ink, var(--primary)) calc(var(--ring-p, 0) * 1%),
+    color-mix(in srgb, var(--foreground) 7%, transparent) 0
   );
   -webkit-mask: radial-gradient(farthest-side, transparent 70%, #000 72%);
   mask: radial-gradient(farthest-side, transparent 70%, #000 72%);
 }
-.dossier-ring.over { --ring-ink: var(--danger); }
+.dossier-ring.over { --ring-ink: var(--destructive-text); }
 .dossier-ring-value {
   display: grid;
   justify-items: center;
@@ -460,11 +460,11 @@ button.dossier-chip:hover {
   font-variant-numeric: tabular-nums;
 }
 .dossier-ring-value span {
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .dossier-gauge-facts {
   display: grid;
@@ -478,26 +478,26 @@ button.dossier-chip:hover {
 .dossier-progress {
   height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
   overflow: hidden;
 }
 .dossier-progress span {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  transition: width 260ms var(--motion);
+  background: linear-gradient(90deg, var(--primary), var(--link));
+  transition: width 260ms var(--motion-ease);
 }
 .dossier-progress-row {
   display: grid;
   gap: 0.35rem;
 }
 .dossier-progress-row small {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
 }
 
@@ -518,20 +518,20 @@ button.dossier-chip:hover {
   border-radius: 11px;
   transition: background 200ms ease, opacity 200ms ease;
 }
-.tasks-check:hover { background: rgba(255, 255, 255, 0.04); }
+.tasks-check:hover { background: color-mix(in srgb, var(--foreground) 4%, transparent); }
 .tasks-check.dragging { opacity: 0.45; }
-.tasks-check.done .tasks-check-text { color: var(--muted); text-decoration: line-through; }
+.tasks-check.done .tasks-check-text { color: var(--muted-foreground); text-decoration: line-through; }
 .tasks-check-handle {
   display: grid;
   place-items: center;
-  width: 1.6rem;
-  min-height: 1.6rem;
+  width: 44px;
+  min-height: 44px;
   margin: 0;
   padding: 0;
   border: 0;
   border-radius: 0.5rem;
   background: none;
-  color: var(--muted);
+  color: var(--muted-foreground);
   cursor: grab;
 }
 .tasks-check-handle:active { cursor: grabbing; }
@@ -566,20 +566,20 @@ button.dossier-chip:hover {
 }
 .tasks-table th {
   text-align: left;
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-foreground);
   padding: 0 0.5rem 0.5rem;
 }
 .tasks-table td {
   padding: 0.65rem 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 6%, transparent);
   vertical-align: middle;
   transition: background 200ms ease;
 }
-.tasks-table tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
+.tasks-table tbody tr:hover td { background: color-mix(in srgb, var(--foreground) 3%, transparent); }
 .tasks-table a { color: inherit; }
 .tasks-table td:nth-child(2) { word-break: break-all; }
 .tasks-table td:last-child { width: 1%; text-align: right; }
@@ -587,7 +587,7 @@ button.dossier-chip:hover {
   min-height: 0;
   padding: 0.3rem 0.6rem;
   border-radius: 9px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* Log timeline */
@@ -621,11 +621,11 @@ button.dossier-chip:hover {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
 }
 .dossier-entry.manual::before {
-  background: var(--muted);
+  background: var(--muted-foreground);
   box-shadow: none;
 }
 .dossier-entry-top {
@@ -633,8 +633,8 @@ button.dossier-chip:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 14px;
+  color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
 }
 .dossier-entry p {
@@ -645,31 +645,31 @@ button.dossier-chip:hover {
 .dossier-badge {
   padding: 0.1rem 0.4rem;
   border-radius: 7px;
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--muted);
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+  color: var(--muted-foreground);
 }
 .dossier-badge.source {
-  background: color-mix(in srgb, var(--accent) 24%, transparent);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--primary) 24%, transparent);
+  color: var(--foreground);
 }
 
 /* Meta and hints */
 .dossier-note {
   margin: 0;
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 14px;
+  color: var(--muted-foreground);
 }
 .dossier-empty {
   margin: 0;
   padding: 0.85rem 0.9rem;
   border-radius: 14px;
   border: 1px dashed var(--dc-edge);
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--muted-foreground);
+  font-size: 14px;
 }
 .tasks-missing { display: grid; gap: 1rem; justify-items: start; }
 .tasks-key-field { flex: 0 1 12rem; }

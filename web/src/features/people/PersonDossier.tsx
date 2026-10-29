@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { DotsThree } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -222,9 +224,9 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
       <form className="people-form" onSubmit={onCreate}>
         <header className="people-detail-head">
           {onClose ? (
-            <button type="button" className="people-close" onClick={onClose}>
+            <Button type="button" className="people-close" onClick={onClose}>
               Close
-            </button>
+            </Button>
           ) : null}
           <span className="people-avatar" aria-hidden>
             {personInitials(title)}
@@ -236,7 +238,7 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
         </header>
         <label>
           Name
-          <input
+          <Input
             id="person-name"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -245,9 +247,9 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
           />
         </label>
         {error ? <p className="error">{error}</p> : null}
-        <button type="submit" disabled={save.isPending}>
+        <Button type="submit" disabled={save.isPending}>
           Create
-        </button>
+        </Button>
       </form>
     )
   }
@@ -257,9 +259,9 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
       <div className="people-chrome">
       <header className="people-detail-head">
         {onClose ? (
-          <button type="button" className="people-close" onClick={onClose}>
+          <Button type="button" className="people-close" onClick={onClose}>
             Close
-          </button>
+          </Button>
         ) : null}
         <span className="people-avatar" aria-hidden>
           {personInitials(title)}
@@ -267,7 +269,7 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
         <div className="people-detail-title">
           <label className="people-name-field">
             Name
-            <input
+            <Input
               id="person-name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -277,12 +279,12 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
           <p className="people-save-state">{saving ? 'Saving' : 'Saved'}</p>
         </div>
         <div className="people-overflow">
-          <button type="button" className="ghost rel-edit" aria-label="More" onClick={() => setMenu((open) => !open)}>
+          <Button type="button" className="ghost rel-edit" aria-label="More" onClick={() => setMenu((open) => !open)}>
             <DotsThree size={18} weight="bold" />
-          </button>
+          </Button>
           {menu ? (
             <div className="people-menu">
-              <button
+              <Button
                 type="button"
                 className="ghost"
                 disabled={remove.isPending}
@@ -292,16 +294,16 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
                 }}
               >
                 Delete
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>
       </header>
       <nav className="people-sec-nav" aria-label="Sections">
         {SECTIONS.map((section) => (
-          <button key={section.id} type="button" className="ghost" onClick={() => jump(section.id)}>
+          <Button key={section.id} type="button" className="ghost" onClick={() => jump(section.id)}>
             {section.label}
-          </button>
+          </Button>
         ))}
       </nav>
       </div>
@@ -356,7 +358,7 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
           </label>
           <label>
             Age
-            <input
+            <Input
               type="number"
               min={0}
               max={150}

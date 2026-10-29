@@ -1,3 +1,5 @@
+import { Input } from '@want-foundation/desyst-react'
+import { Button } from '@want-foundation/desyst-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -108,7 +110,7 @@ export function PeopleScreen() {
         <>
           <div className="people-tabs" role="tablist" aria-label="View">
             {VIEWS.map((value) => (
-              <button
+              <Button
                 key={value}
                 type="button"
                 role="tab"
@@ -117,24 +119,24 @@ export function PeopleScreen() {
                 onClick={() => goView(value)}
               >
                 {value === 'list' ? 'Table' : value[0].toUpperCase() + value.slice(1)}
-              </button>
+              </Button>
             ))}
           </div>
-          <button
+          <Button
             type="button"
             className="tasks-plus"
             aria-label="Add person"
             onClick={() => navigate(peopleHref({ view: 'split', creating: true }))}
           >
             +
-          </button>
+          </Button>
         </>
       }
     >
       {view === 'split' ? (
         <div className={open ? 'people-split open' : 'people-split'}>
           <div className="people-list">
-            <input
+            <Input
               ref={searchRef}
               className="people-search"
               value={query}
@@ -151,9 +153,9 @@ export function PeopleScreen() {
               </p>
             ) : null}
             {none && !query.trim() ? (
-              <button type="button" onClick={() => navigate(peopleHref({ view: 'split', creating: true }))}>
+              <Button type="button" onClick={() => navigate(peopleHref({ view: 'split', creating: true }))}>
                 Create person
-              </button>
+              </Button>
             ) : null}
             {list.map((person) => (
               <PersonCard key={person.id} person={person} selected={person.id === id} onPick={pick} companyNames={companyNames} />
@@ -173,9 +175,9 @@ export function PeopleScreen() {
             ) : none ? (
               <div className="people-detail-empty">
                 <p className="people-empty">No people yet.</p>
-                <button type="button" onClick={() => navigate(peopleHref({ view: 'split', creating: true }))}>
+                <Button type="button" onClick={() => navigate(peopleHref({ view: 'split', creating: true }))}>
                   Create person
-                </button>
+                </Button>
               </div>
             ) : (
               <p className="people-empty people-detail-empty">{query.trim() ? 'No matches.' : ''}</p>
@@ -184,7 +186,7 @@ export function PeopleScreen() {
         </div>
       ) : (
         <div className="people-browse">
-          <input
+          <Input
             ref={searchRef}
             className="people-search"
             value={query}

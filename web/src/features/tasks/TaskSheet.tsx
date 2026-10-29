@@ -1,3 +1,4 @@
+import { Button } from '@want-foundation/desyst-react'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -75,7 +76,7 @@ export function TaskSheet({ open, title, kicker = 'New', titleSlot, wide, onClos
 
   return createPortal(
     <div className="tasks-sheet-root">
-      <button type="button" className="tasks-sheet-back" aria-label="Close" onClick={onClose} />
+      <Button type="button" className="tasks-sheet-back" aria-label="Close" onClick={onClose} />
       <aside
         ref={dialog}
         className={wide ? 'tasks-sheet wide' : 'tasks-sheet'}

@@ -126,7 +126,7 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
     let original = response.bytes().await.unwrap();
     let backup: Value = serde_json::from_slice(&original).unwrap();
     assert_eq!(backup["formatVersion"], 1);
-    assert_eq!(backup["schemaVersion"], 47);
+    assert_eq!(backup["schemaVersion"], 48);
     let tables: Vec<String> = sqlx::query_scalar("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT IN ('users','sessions','goose_db_version') ORDER BY tablename")
         .fetch_all(&pool).await.unwrap();
     let exported: Vec<String> = backup["tables"]
@@ -140,7 +140,9 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
         .as_array()
         .unwrap()
         .iter()
-        .all(|row| row.get("token_sealed").is_none()));
+        .all(|row| row.get("token_sealed").is_none()
+            && row.get("sync_claim_id").is_none()
+            && row.get("sync_claim_until").is_none()));
     assert!(!String::from_utf8_lossy(&original).contains("private-token"));
     assert_eq!(
         backup["tables"]["person_items"]
@@ -335,6 +337,28 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
             .await
             .unwrap();
     assert_eq!(source, (String::new(), false));
+    let mut previous = backup.clone();
+    previous["schemaVersion"] = json!(47);
+    for row in previous["tables"]["sources"].as_array_mut().unwrap() {
+        let fields = row.as_object_mut().unwrap();
+        fields.remove("sync_interval_minutes");
+        fields.remove("last_attempt_at");
+    }
+    let response = client
+        .post(format!("{root}/api/restore?mode=replace"))
+        .header("Cookie", &cookie)
+        .json(&previous)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::NO_CONTENT);
+    let schedule: (i32, Option<chrono::DateTime<chrono::Utc>>) =
+        sqlx::query_as("SELECT sync_interval_minutes,last_attempt_at FROM sources WHERE id=$1")
+            .bind(source_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(schedule, (0, None));
     assert_eq!(
         client
             .get(format!("{root}/api/me"))

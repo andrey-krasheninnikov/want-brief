@@ -11,3 +11,5 @@ Export application data as versioned JSON with stable record IDs and all current
 ## Consequences
 
 Relationships survive restoration, and a failed restore rolls back. Repeated restoration does not create duplicates. Existing records are removed on a successful restore, so the interface warns users to download a current backup first. Source tokens must be entered again. Schema changes require a deliberate backup format update before older files can be restored.
+
+[ADR 0002](0002-scheduled-source-sync.md) adds a checked conversion for schema version 47 backups.

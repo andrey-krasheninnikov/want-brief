@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-const COLUMNS: &str = "id,kind,name,email,base_url,token_sealed,query_filter,last_sync_at,project_id,connected,last_error,insecure_tls,created_at,updated_at";
+const COLUMNS: &str = "id,kind,name,email,base_url,token_sealed,query_filter,last_sync_at,project_id,connected,last_error,insecure_tls,created_at,updated_at,sync_interval_minutes,last_attempt_at";
 
 #[derive(FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,6 +26,8 @@ pub(crate) struct Source {
     #[serde(rename = "query")]
     query_filter: String,
     last_sync_at: Option<DateTime<Utc>>,
+    sync_interval_minutes: i32,
+    last_attempt_at: Option<DateTime<Utc>>,
     project_id: Option<Uuid>,
     connected: bool,
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -74,6 +76,11 @@ struct SourceInput {
     query: String,
     project_id: Option<Uuid>,
     insecure_tls: Option<bool>,
+    sync_interval_minutes: Option<i32>,
+}
+
+fn valid_interval(minutes: i32) -> bool {
+    matches!(minutes, 0 | 15 | 60 | 360 | 1440)
 }
 
 pub fn router() -> Router<AppState> {
@@ -182,6 +189,10 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     if !matches!(input.kind.as_str(), "jira" | "todoist" | "manual") {
         return error(StatusCode::BAD_REQUEST, "invalid: source kind");
     }
+    let sync_interval_minutes = input.sync_interval_minutes.unwrap_or(0);
+    if !valid_interval(sync_interval_minutes) {
+        return error(StatusCode::BAD_REQUEST, "invalid: sync interval");
+    }
     if input.kind == "manual" {
         return error(StatusCode::CONFLICT, "conflict: manual source is built-in");
     }
@@ -231,6 +242,8 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
             input.query
         },
         last_sync_at: None,
+        sync_interval_minutes,
+        last_attempt_at: None,
         project_id: input.project_id,
         connected: false,
         last_error: String::new(),
@@ -245,7 +258,7 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
             Err(err) => source.last_error = err,
         }
     }
-    let query = format!("INSERT INTO sources ({COLUMNS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING {COLUMNS}");
+    let query = format!("INSERT INTO sources ({COLUMNS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING {COLUMNS}");
     match sqlx::query_as::<_, Source>(&query)
         .bind(source.id)
         .bind(&source.kind)
@@ -261,6 +274,8 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
         .bind(source.insecure_tls)
         .bind(now)
         .bind(now)
+        .bind(source.sync_interval_minutes)
+        .bind(source.last_attempt_at)
         .fetch_one(&state.pool)
         .await
     {
@@ -290,6 +305,12 @@ async fn patch(State(state): State<AppState>, Path(raw): Path<String>, body: Byt
         Ok(input) => input,
         Err(response) => return response,
     };
+    if let Some(minutes) = input.sync_interval_minutes {
+        if !valid_interval(minutes) {
+            return error(StatusCode::BAD_REQUEST, "invalid: sync interval");
+        }
+        source.sync_interval_minutes = minutes;
+    }
     if !input.name.trim().is_empty() {
         source.name = input.name.trim().to_owned();
     }
@@ -330,7 +351,8 @@ async fn patch(State(state): State<AppState>, Path(raw): Path<String>, body: Byt
         };
         Some(token.to_owned())
     };
-    if reprobe || plain.is_some() {
+    let should_reprobe = reprobe || plain.is_some();
+    if should_reprobe {
         let plain = match plain {
             Some(plain) => plain,
             None if source.token_sealed.is_empty() => String::new(),
@@ -353,7 +375,7 @@ async fn patch(State(state): State<AppState>, Path(raw): Path<String>, body: Byt
         }
     }
     source.updated_at = Utc::now();
-    let query = format!("UPDATE sources SET name=$2,email=$3,base_url=$4,token_sealed=$5,query_filter=$6,last_sync_at=$7,project_id=$8,connected=$9,last_error=$10,insecure_tls=$11,updated_at=$12 WHERE id=$1 RETURNING {COLUMNS}");
+    let query = format!("UPDATE sources SET name=$2,email=$3,base_url=$4,token_sealed=$5,query_filter=$6,project_id=$7,connected=CASE WHEN $11 THEN $8 ELSE connected END,last_error=CASE WHEN $11 THEN $9 ELSE last_error END,insecure_tls=$10,updated_at=$12,sync_interval_minutes=$13 WHERE id=$1 RETURNING {COLUMNS}");
     match sqlx::query_as::<_, Source>(&query)
         .bind(source.id)
         .bind(&source.name)
@@ -361,12 +383,13 @@ async fn patch(State(state): State<AppState>, Path(raw): Path<String>, body: Byt
         .bind(&source.base_url)
         .bind(&source.token_sealed)
         .bind(&source.query_filter)
-        .bind(source.last_sync_at)
         .bind(source.project_id)
         .bind(source.connected)
         .bind(&source.last_error)
         .bind(source.insecure_tls)
+        .bind(should_reprobe)
         .bind(source.updated_at)
+        .bind(source.sync_interval_minutes)
         .fetch_one(&state.pool)
         .await
     {
@@ -637,15 +660,25 @@ async fn pull(source: &Source, token: &str) -> Result<Vec<RemoteItem>, String> {
     Ok(items)
 }
 
-async fn mark_disconnected(state: &AppState, source: &Source, message: &str) {
-    let _ =
-        sqlx::query("UPDATE sources SET connected=false,last_error=$2,updated_at=$3 WHERE id=$1 AND token_sealed=$4")
-            .bind(source.id)
-            .bind(message)
-            .bind(Utc::now())
-            .bind(&source.token_sealed)
-            .execute(&state.pool)
-            .await;
+async fn finish_failure(
+    state: &AppState,
+    source: &Source,
+    claim_id: Uuid,
+    message: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE sources SET connected=CASE WHEN updated_at=$4 THEN false ELSE connected END, \
+         last_error=CASE WHEN updated_at=$4 THEN $3 ELSE last_error END, \
+         updated_at=CASE WHEN updated_at=$4 THEN clock_timestamp() ELSE updated_at END, \
+         sync_claim_id=NULL,sync_claim_until=NULL WHERE id=$1 AND sync_claim_id=$2",
+    )
+    .bind(source.id)
+    .bind(claim_id)
+    .bind(message)
+    .bind(source.updated_at)
+    .execute(&state.pool)
+    .await?;
+    Ok(())
 }
 
 pub(crate) fn integration_error(message: String) -> Response {
@@ -698,46 +731,108 @@ async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Respons
         Ok(id) => id,
         Err(response) => return response,
     };
-    let source = match Source::load(&state, source_id).await {
-        Ok(source) => source,
-        Err(response) => return response,
+    sync_source(&state, source_id, false).await
+}
+
+async fn sync_source(state: &AppState, source_id: Uuid, scheduled: bool) -> Response {
+    if !scheduled {
+        let source = match Source::load(state, source_id).await {
+            Ok(source) => source,
+            Err(response) => return response,
+        };
+        if source.kind == "manual" {
+            return error(StatusCode::FORBIDDEN, "forbidden: manual source");
+        }
+        if source.project_id.is_none() {
+            return error(StatusCode::BAD_REQUEST, "invalid: source project");
+        }
+        if let Err(response) = source.token(&state.token_box) {
+            return response;
+        }
+    }
+    let claim_id = Uuid::new_v4();
+    let query = format!(
+        "UPDATE sources SET sync_claim_id=$2,sync_claim_until=clock_timestamp()+INTERVAL '10 minutes', \
+         last_attempt_at=clock_timestamp() WHERE id=$1 AND kind IN ('jira','todoist') \
+         AND project_id IS NOT NULL AND token_sealed<>'' \
+         AND (sync_claim_until IS NULL OR sync_claim_until<=clock_timestamp()) \
+         AND (NOT $3::boolean OR (sync_interval_minutes>0 AND \
+         (last_attempt_at IS NULL OR last_attempt_at + sync_interval_minutes*INTERVAL '1 minute'<=clock_timestamp()))) \
+         RETURNING {COLUMNS}"
+    );
+    let source = match sqlx::query_as::<_, Source>(&query)
+        .bind(source_id)
+        .bind(claim_id)
+        .bind(scheduled)
+        .fetch_optional(&state.pool)
+        .await
+    {
+        Ok(Some(source)) => source,
+        Ok(None) => return error(StatusCode::CONFLICT, "source sync unavailable"),
+        Err(err) => return database_error(err),
     };
-    if source.kind == "manual" {
-        return error(StatusCode::FORBIDDEN, "forbidden: manual source");
-    }
-    if source.project_id.is_none() {
-        return error(StatusCode::BAD_REQUEST, "invalid: source project");
-    }
     let token = match source.token(&state.token_box) {
         Ok(token) => token,
-        Err(response) => return response,
+        Err(response) => {
+            if let Err(err) = finish_failure(state, &source, claim_id, "source token invalid").await
+            {
+                return database_error(err);
+            }
+            return response;
+        }
     };
-    if let Err(message) = probe(&source, &token).await {
-        mark_disconnected(&state, &source, &message).await;
-        return integration_error(message);
-    }
-    let remote = match pull(&source, &token).await {
-        Ok(remote) => remote,
-        Err(message) => {
-            mark_disconnected(&state, &source, &message).await;
+    let remote = tokio::time::timeout(std::time::Duration::from_secs(300), async {
+        probe(&source, &token).await?;
+        pull(&source, &token).await
+    })
+    .await;
+    let remote = match remote {
+        Ok(Ok(remote)) => remote,
+        other => {
+            let message = match other {
+                Ok(Err(message)) => message,
+                Err(_) => "source sync timed out".to_owned(),
+                Ok(Ok(_)) => unreachable!(),
+            };
+            if let Err(err) = finish_failure(state, &source, claim_id, &message).await {
+                return database_error(err);
+            }
             return integration_error(message);
         }
     };
+    match apply_remote(state, &source, claim_id, remote).await {
+        Ok(upserted) => Json(serde_json::json!({"upserted":upserted})).into_response(),
+        Err(response) => {
+            if let Err(err) = finish_failure(state, &source, claim_id, "local sync error").await {
+                return database_error(err);
+            }
+            response
+        }
+    }
+}
+
+async fn apply_remote(
+    state: &AppState,
+    source: &Source,
+    claim_id: Uuid,
+    remote: Vec<RemoteItem>,
+) -> Result<usize, Response> {
+    let source_id = source.id;
     let mut transaction = match state.pool.begin().await {
         Ok(transaction) => transaction,
-        Err(err) => return database_error(err),
+        Err(err) => return Err(database_error(err)),
     };
-    let current_token: Option<String> =
-        match sqlx::query_scalar("SELECT token_sealed FROM sources WHERE id=$1 FOR UPDATE")
+    let current: Option<(Uuid, DateTime<Utc>)> =
+        match sqlx::query_as("SELECT sync_claim_id,updated_at FROM sources WHERE id=$1 AND sync_claim_until>clock_timestamp() FOR UPDATE")
             .bind(source_id)
             .fetch_optional(&mut *transaction)
             .await
         {
-            Ok(token) => token,
-            Err(err) => return database_error(err),
+            Ok(current) => current,
+            Err(err) => return Err(database_error(err)),
         };
-    if current_token.as_deref() != Some(source.token_sealed.as_str()) {
-        return error(StatusCode::CONFLICT, "source changed during sync");
+    if current != Some((claim_id, source.updated_at)) {
+        return Err(error(StatusCode::CONFLICT, "source changed during sync"));
     }
     let mut upserted = 0;
     for item in remote {
@@ -759,25 +854,68 @@ async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Respons
             .bind(created_at).bind(now)
             .fetch_one(&mut *transaction).await;
         if let Err(err) = result {
-            return not_found(err);
+            return Err(not_found(err));
         }
         upserted += 1;
     }
     let now = Utc::now();
     if let Err(err) = sqlx::query(
-        "UPDATE sources SET last_sync_at=$2,connected=true,last_error='',updated_at=$2 WHERE id=$1",
+        "UPDATE sources SET last_sync_at=$2,connected=true,last_error='',updated_at=$2, \
+         sync_claim_id=NULL,sync_claim_until=NULL WHERE id=$1 AND sync_claim_id=$3",
     )
     .bind(source_id)
     .bind(now)
+    .bind(claim_id)
     .execute(&mut *transaction)
     .await
     {
-        return database_error(err);
+        return Err(database_error(err));
     }
     if let Err(err) = transaction.commit().await {
-        return database_error(err);
+        return Err(database_error(err));
     }
-    Json(serde_json::json!({"upserted":upserted})).into_response()
+    Ok(upserted)
+}
+
+pub async fn run_scheduler(state: AppState) {
+    let mut ticker = tokio::time::interval(std::time::Duration::from_secs(60));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut running = tokio::task::JoinSet::new();
+    loop {
+        ticker.tick().await;
+        while running.try_join_next().is_some() {}
+        let available = 4usize.saturating_sub(running.len());
+        if available == 0 {
+            continue;
+        }
+        let due: Vec<Uuid> = match sqlx::query_scalar(
+            "SELECT id FROM sources WHERE kind IN ('jira','todoist') AND project_id IS NOT NULL \
+             AND token_sealed<>'' AND sync_interval_minutes>0 \
+             AND (sync_claim_until IS NULL OR sync_claim_until<=clock_timestamp()) \
+             AND (last_attempt_at IS NULL OR \
+             last_attempt_at+sync_interval_minutes*INTERVAL '1 minute'<=clock_timestamp()) \
+             ORDER BY last_attempt_at NULLS FIRST,id LIMIT $1",
+        )
+        .bind(available as i64)
+        .fetch_all(&state.pool)
+        .await
+        {
+            Ok(due) => due,
+            Err(err) => {
+                eprintln!("scheduled source lookup failed: {err}");
+                continue;
+            }
+        };
+        for source_id in due {
+            let state = state.clone();
+            running.spawn(async move {
+                let response = sync_source(&state, source_id, true).await;
+                if response.status().is_server_error() {
+                    eprintln!("scheduled source sync failed: {}", response.status());
+                }
+            });
+        }
+    }
 }
 
 #[cfg(test)]
@@ -798,6 +936,8 @@ mod tests {
             token_sealed: String::new(),
             query_filter: String::new(),
             last_sync_at: None,
+            sync_interval_minutes: 0,
+            last_attempt_at: None,
             project_id: None,
             connected: false,
             last_error: String::new(),

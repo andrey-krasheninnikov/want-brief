@@ -279,6 +279,8 @@ export type Source = {
 	insecureTls?: boolean
 	lastError?: string
   lastSyncAt: string | null
+  lastAttemptAt: string | null
+  syncIntervalMinutes: number
 }
 
 export type Item = {

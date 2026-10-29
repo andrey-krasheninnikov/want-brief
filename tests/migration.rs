@@ -23,7 +23,7 @@ async fn existing_goose_journal_is_reused() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(version, 47);
+    assert_eq!(version, 48);
     assert!(after >= before);
     migrate(&url, Path::new("migrations")).await.unwrap();
     let repeated: i64 = sqlx::query_scalar("SELECT count(*) FROM goose_db_version")

@@ -118,6 +118,9 @@ textarea { resize: vertical; min-height: 7rem; }
 }
 .grow strong { display: block; font-weight: 600; }
 .list.dense li { padding: 0.75rem 0.9rem; }
+.sources-list li { flex-wrap: wrap; }
+.sources-list .grow { flex-basis: 100%; }
+.sources-list label { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .list small, .muted, .stats span { color: var(--muted-foreground); font-size: 14px; line-height: 1.4; }
 .grow { flex: 1; min-width: 0; }
 .dot {

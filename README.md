@@ -53,7 +53,9 @@ For cutover, stop the Go process, take a fresh database backup, and start the Ru
 
 ## Sources and time
 
-Add Jira or Todoist connections under Sources, then start a sync there. Jira uses a site URL and either a bearer token or an email and API token; Todoist uses a REST token. The default Jira query selects assigned, unfinished issues.
+Add Jira or Todoist connections under Sources. Jira uses a site URL and either a bearer token or an email and API token; Todoist uses a REST token. The default Jira query selects assigned, unfinished issues.
+
+Each source starts in manual sync mode. Select a 15-minute, hourly, six-hour, or daily interval to sync it automatically. The first attempt starts within a minute; later attempts follow the selected interval from the previous attempt. Sources shows the last attempt, last successful sync, and any error. Failed attempts leave imported items in place and are retried on schedule while the source has a token. Manual sync remains available.
 
 Each timer creates a time interval for an item. **Allocated time** sums intervals, including overlaps. **Wall-clock time** counts overlapping intervals only once.
 
@@ -61,7 +63,7 @@ Each timer creates a time interval for an item. **Allocated time** sums interval
 
 Open Sources to download a JSON backup of records, relationships, and schedule settings. The download includes source names, URLs, email addresses, and sync settings, but excludes source tokens, account passwords, sessions, and the database migration journal. It is plain text containing personal data; store it privately. The app does not keep a server-side copy.
 
-To restore, select a backup file in Sources, review its date and record count, and confirm replacement. The app accepts files up to 64 MiB from the same database schema version. It replaces application records in one database transaction, preserving their IDs and relationships. A failed restore leaves the current records in place. Re-enter Jira and Todoist tokens before syncing.
+To restore, select a backup file in Sources, review its date and record count, and confirm replacement. The app accepts files up to 64 MiB from schema versions 47 and 48. Version 47 backups restore with manual source schedules. Restore replaces application records in one database transaction, preserving their IDs and relationships. A failed restore leaves the current records in place. Re-enter Jira and Todoist tokens before syncing.
 
 This application backup does not replace the PostgreSQL backup used for database upgrades or rollback.
 

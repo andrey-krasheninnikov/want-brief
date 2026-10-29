@@ -57,6 +57,7 @@ async fn main() -> Result<()> {
         cors_origin: setting("CORS_ORIGIN", "http://127.0.0.1:5173"),
         token_box,
     };
+    tokio::spawn(want_brief::sources::run_scheduler(state.clone()));
     println!("want brief api on {address}");
     axum::serve(listener, router(state))
         .await

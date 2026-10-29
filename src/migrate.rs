@@ -127,7 +127,7 @@ mod tests {
     fn reads_existing_migrations_in_version_order() {
         let migrations = load_migrations(Path::new("migrations")).unwrap();
         assert_eq!(migrations.first().unwrap().version, 1);
-        assert_eq!(migrations.last().unwrap().version, 47);
+        assert_eq!(migrations.last().unwrap().version, 48);
         assert!(migrations
             .iter()
             .all(|migration| !migration.up.trim().is_empty()));

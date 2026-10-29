@@ -13,7 +13,7 @@ use sqlx::Postgres;
 use std::collections::{BTreeMap, BTreeSet};
 
 const FORMAT_VERSION: u32 = 1;
-const SCHEMA_VERSION: i64 = 47;
+const SCHEMA_VERSION: i64 = 48;
 const MAX_BYTES: usize = 64 * 1024 * 1024;
 
 // Parent tables precede their references so restored IDs keep every relation.
@@ -123,6 +123,8 @@ async fn export(state: &AppState) -> Result<Vec<u8>, Response> {
                     ));
                 };
                 fields.remove("token_sealed");
+                fields.remove("sync_claim_id");
+                fields.remove("sync_claim_until");
                 fields.insert("connected".to_owned(), Value::Bool(false));
                 fields.insert("last_error".to_owned(), Value::String(String::new()));
             }
@@ -183,8 +185,22 @@ async fn restore(
 async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
     let mut backup: Backup = serde_json::from_slice(body)
         .map_err(|_| error(StatusCode::BAD_REQUEST, "invalid backup"))?;
-    if backup.format_version != FORMAT_VERSION || backup.schema_version != SCHEMA_VERSION {
+    if backup.format_version != FORMAT_VERSION || !matches!(backup.schema_version, 47 | 48) {
         return Err(error(StatusCode::CONFLICT, "unsupported backup version"));
+    }
+    if backup.schema_version == 47 {
+        for row in backup.tables.get_mut("sources").into_iter().flatten() {
+            let Some(fields) = row.as_object_mut() else {
+                return Err(error(StatusCode::BAD_REQUEST, "invalid backup row"));
+            };
+            if fields.contains_key("sync_interval_minutes")
+                || fields.contains_key("last_attempt_at")
+            {
+                return Err(error(StatusCode::BAD_REQUEST, "invalid backup row"));
+            }
+            fields.insert("sync_interval_minutes".to_owned(), Value::from(0));
+            fields.insert("last_attempt_at".to_owned(), Value::Null);
+        }
     }
     let columns = table_columns(state).await?;
     if backup.tables.len() != TABLES.len() {
@@ -200,7 +216,7 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
         let expected: BTreeSet<&str> = names
             .iter()
             .map(String::as_str)
-            .filter(|name| table != "sources" || *name != "token_sealed")
+            .filter(|name| exported_column(table, name))
             .collect();
         if rows.iter().any(|row| {
             row.as_object().is_none_or(|fields| {
@@ -231,7 +247,7 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
         let names = columns.get(table).unwrap();
         let names = names
             .iter()
-            .filter(|name| table != "sources" || name.as_str() != "token_sealed")
+            .filter(|name| exported_column(table, name))
             .map(|name| format!("\"{}\"", name.replace('"', "\"\"")))
             .collect::<Vec<_>>()
             .join(",");
@@ -246,6 +262,10 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
     }
     transaction.commit().await.map_err(database_error)?;
     Ok(())
+}
+
+fn exported_column(table: &str, name: &str) -> bool {
+    table != "sources" || !matches!(name, "token_sealed" | "sync_claim_id" | "sync_claim_until")
 }
 
 async fn schema_version(

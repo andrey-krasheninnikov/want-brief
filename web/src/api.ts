@@ -95,8 +95,9 @@ export const api = {
     email?: string
     projectId: string
     insecureTls?: boolean
+    syncIntervalMinutes?: number
   }) => request<Source>('/api/sources', { method: 'POST', body: JSON.stringify(body) }),
-  patchSource: (id: string, body: Record<string, string | boolean>) =>
+  patchSource: (id: string, body: Record<string, string | boolean | number>) =>
     request<Source>(`/api/sources/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteSource: (id: string) => request(`/api/sources/${id}`, { method: 'DELETE' }),
   syncSource: (id: string) =>

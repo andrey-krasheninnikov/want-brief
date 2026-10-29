@@ -1,3 +1,4 @@
+use axum::routing::get;
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use std::path::Path;
@@ -215,6 +216,49 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
         .unwrap();
     assert_eq!(marker, 1);
 
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
+    let release = Arc::new(tokio::sync::Notify::new());
+    let mock = axum::Router::new()
+        .route("/rest/v2/projects", get(|| async { axum::Json(json!([])) }))
+        .route(
+            "/rest/v2/tasks",
+            get({
+                let release = release.clone();
+                move || {
+                    let started_tx = started_tx.clone();
+                    let release = release.clone();
+                    async move {
+                        started_tx.send(()).await.unwrap();
+                        release.notified().await;
+                        axum::Json(json!([{"id":"late-task","content":"Late task"}]))
+                    }
+                }
+            }),
+        );
+    let mock_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let mock_url = format!("http://{}", mock_listener.local_addr().unwrap());
+    let mock_server = tokio::spawn(async move { axum::serve(mock_listener, mock).await.unwrap() });
+    sqlx::query("UPDATE sources SET base_url=$1 WHERE id=$2")
+        .bind(mock_url)
+        .bind(source_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let sync = tokio::spawn({
+        let client = client.clone();
+        let cookie = cookie.clone();
+        let root = root.clone();
+        async move {
+            client
+                .post(format!("{root}/api/sources/{source_id}/sync"))
+                .header("Cookie", cookie)
+                .send()
+                .await
+                .unwrap()
+        }
+    });
+    started_rx.recv().await.unwrap();
+
     for _ in 0..2 {
         let response = client
             .post(format!("{root}/api/restore?mode=replace"))
@@ -226,6 +270,9 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
             .unwrap();
         assert_eq!(response.status(), reqwest::StatusCode::NO_CONTENT);
     }
+    release.notify_one();
+    assert_eq!(sync.await.unwrap().status(), reqwest::StatusCode::CONFLICT);
+    mock_server.abort();
     let restored: Value = client
         .get(format!("{root}/api/backup"))
         .header("Cookie", &cookie)

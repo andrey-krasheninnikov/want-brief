@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod backup;
 pub mod companies;
 pub mod company_career;
 pub mod company_notes;

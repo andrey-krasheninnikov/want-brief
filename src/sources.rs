@@ -637,12 +637,13 @@ async fn pull(source: &Source, token: &str) -> Result<Vec<RemoteItem>, String> {
     Ok(items)
 }
 
-async fn mark_disconnected(state: &AppState, source_id: Uuid, message: &str) {
+async fn mark_disconnected(state: &AppState, source: &Source, message: &str) {
     let _ =
-        sqlx::query("UPDATE sources SET connected=false,last_error=$2,updated_at=$3 WHERE id=$1")
-            .bind(source_id)
+        sqlx::query("UPDATE sources SET connected=false,last_error=$2,updated_at=$3 WHERE id=$1 AND token_sealed=$4")
+            .bind(source.id)
             .bind(message)
             .bind(Utc::now())
+            .bind(&source.token_sealed)
             .execute(&state.pool)
             .await;
 }
@@ -712,16 +713,32 @@ async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Respons
         Err(response) => return response,
     };
     if let Err(message) = probe(&source, &token).await {
-        mark_disconnected(&state, source_id, &message).await;
+        mark_disconnected(&state, &source, &message).await;
         return integration_error(message);
     }
     let remote = match pull(&source, &token).await {
         Ok(remote) => remote,
         Err(message) => {
-            mark_disconnected(&state, source_id, &message).await;
+            mark_disconnected(&state, &source, &message).await;
             return integration_error(message);
         }
     };
+    let mut transaction = match state.pool.begin().await {
+        Ok(transaction) => transaction,
+        Err(err) => return database_error(err),
+    };
+    let current_token: Option<String> =
+        match sqlx::query_scalar("SELECT token_sealed FROM sources WHERE id=$1 FOR UPDATE")
+            .bind(source_id)
+            .fetch_optional(&mut *transaction)
+            .await
+        {
+            Ok(token) => token,
+            Err(err) => return database_error(err),
+        };
+    if current_token.as_deref() != Some(source.token_sealed.as_str()) {
+        return error(StatusCode::CONFLICT, "source changed during sync");
+    }
     let mut upserted = 0;
     for item in remote {
         let now = Utc::now();
@@ -740,7 +757,7 @@ async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Respons
             .bind(Uuid::new_v4()).bind(source_id).bind(&item.key).bind(&item.title).bind(source.project_id)
             .bind(item.urgent).bind(item.important).bind(item.due_at).bind(sqlx::types::Json(links))
             .bind(created_at).bind(now)
-            .fetch_one(&state.pool).await;
+            .fetch_one(&mut *transaction).await;
         if let Err(err) = result {
             return not_found(err);
         }
@@ -752,9 +769,12 @@ async fn sync(State(state): State<AppState>, Path(raw): Path<String>) -> Respons
     )
     .bind(source_id)
     .bind(now)
-    .execute(&state.pool)
+    .execute(&mut *transaction)
     .await
     {
+        return database_error(err);
+    }
+    if let Err(err) = transaction.commit().await {
         return database_error(err);
     }
     Json(serde_json::json!({"upserted":upserted})).into_response()

@@ -58,6 +58,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  downloadBackup: async () => {
+    const response = await fetch('/api/backup', { credentials: 'include' })
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { error?: string }
+      throw new Error(data.error || `HTTP ${response.status}`)
+    }
+    return response.blob()
+  },
+  restoreBackup: (file: File) => request<void>('/api/restore?mode=replace', { method: 'POST', body: file }),
   login: (password: string) =>
     request<{ ok: boolean }>('/api/login', {
       method: 'POST',

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { api } from '../../api'
 import { Window } from '../../shared/Window'
+import { BackupSection } from './BackupSection'
 
 export function SettingsScreen() {
   const tz = useTimezone()
@@ -180,6 +181,7 @@ export function SettingsScreen() {
           Add source
         </Button>
       </form>
+      <BackupSection />
     </Window>
   )
 }

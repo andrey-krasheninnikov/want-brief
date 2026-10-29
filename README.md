@@ -57,6 +57,14 @@ Add Jira or Todoist connections under Sources, then start a sync there. Jira use
 
 Each timer creates a time interval for an item. **Allocated time** sums intervals, including overlaps. **Wall-clock time** counts overlapping intervals only once.
 
+## Application backups
+
+Open Sources to download a JSON backup of records, relationships, and schedule settings. The download includes source names, URLs, email addresses, and sync settings, but excludes source tokens, account passwords, sessions, and the database migration journal. It is plain text containing personal data; store it privately. The app does not keep a server-side copy.
+
+To restore, select a backup file in Sources, review its date and record count, and confirm replacement. The app accepts files up to 64 MiB from the same database schema version. It replaces application records in one database transaction, preserving their IDs and relationships. A failed restore leaves the current records in place. Re-enter Jira and Todoist tokens before syncing.
+
+This application backup does not replace the PostgreSQL backup used for database upgrades or rollback.
+
 ## Checks and documentation
 
 Run `make test` for Rust tests and TypeScript checks. Run `make lint`, `cd web && bun test`, `bun run lint`, and `bun run build` for the remaining local checks. To run database integration tests, set `TEST_DATABASE_URL` to an isolated database whose name starts with `wantbrief_issue92_`, then run `cargo test --tests -- --ignored --test-threads=1`.

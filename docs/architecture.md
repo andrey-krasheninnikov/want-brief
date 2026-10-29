@@ -8,6 +8,7 @@ Want Brief is a React web app backed by a Rust HTTP API and PostgreSQL. The Vite
 - `src/http.rs` defines routes, session checks, and shared HTTP responses. Domain routes live in adjacent modules for items, events, people, companies, tracking, and sources.
 - `src/schedule_plan.rs` calculates work and follow-up schedules. `src/schedule.rs` loads its inputs and serves schedule requests.
 - `src/migrate.rs` applies the existing PostgreSQL migrations. `src/crypto.rs` seals source credentials; `src/auth.rs` manages sessions.
+- `src/backup.rs` exports application tables from a consistent snapshot and replaces their contents in one transaction. It omits authentication records and source tokens.
 
 Jira and Todoist are import sources. Sync reads remote work into local items; local edits and scheduling do not write back to those services. A manual source holds locally created items. Source credentials are sealed before storage and are not returned by the public source representation.
 

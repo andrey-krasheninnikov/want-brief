@@ -8,6 +8,7 @@ Use these terms in documentation and issue titles. Their meanings follow the cur
 | Item kind | The item's category: task, request, note, agreement, obligation, initiative, or life. |
 | Item status | The item's workflow position, such as backlog, in progress, blocked, review, done, or cancelled. Some statuses apply only to tasks. |
 | Source | A Jira, Todoist, or manual origin for items. Connected sources keep sync status and settings. |
+| Application backup | A JSON copy of application records, relationships, and settings. Source tokens, account credentials, and sessions are excluded. Restoring replaces current application records. |
 | Project | A named grouping for work, with links, people, companies, and target hours. |
 | Person | A contact record that can be related to work, projects, events, and other people. |
 | Company | An organization record with related people and career information. |

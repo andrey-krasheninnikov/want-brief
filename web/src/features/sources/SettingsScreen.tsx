@@ -57,7 +57,10 @@ export function SettingsScreen() {
       void queryClient.invalidateQueries({ queryKey: ['sources'] })
       void queryClient.invalidateQueries({ queryKey: ['items'] })
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => {
+      setError(err.message)
+      void queryClient.invalidateQueries({ queryKey: ['sources'] })
+    },
   })
   const patchSource = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, string | boolean | number> }) => api.patchSource(id, body),

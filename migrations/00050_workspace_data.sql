@@ -1,5 +1,5 @@
 -- +goose Up
--- The same additive statements run through prepare-workspaces while schema 48 is live.
+-- The live v48 preparation and cutover use the same table inventory.
 CREATE TEMP TABLE wb_legacy_scope (relation_name text PRIMARY KEY, owned boolean NOT NULL) ON COMMIT DROP;
 INSERT INTO pg_temp.wb_legacy_scope (relation_name, owned) VALUES
     ('projects', false), ('sources', false), ('items', false),
@@ -17,35 +17,8 @@ INSERT INTO pg_temp.wb_legacy_scope (relation_name, owned) VALUES
     ('company_contracts', true), ('item_events', true), ('person_addresses', true),
     ('earn_days', true);
 
-DO $$
-DECLARE
-    legacy_owner uuid;
-    relation record;
-    col text;
-    had_column boolean;
-BEGIN
-    LOCK TABLE users IN SHARE MODE;
-    SELECT id INTO legacy_owner FROM users;
-    FOR relation IN SELECT * FROM pg_temp.wb_legacy_scope ORDER BY relation_name LOOP
-        FOREACH col IN ARRAY (
-            CASE WHEN relation.owned THEN ARRAY['workspace_id','owner_id'] ELSE ARRAY['workspace_id'] END
-        ) LOOP
-            SELECT EXISTS (SELECT FROM pg_attribute WHERE attrelid=relation.relation_name::regclass
-                AND attname=col AND NOT attisdropped) INTO had_column;
-            -- A constant default also backfills existing rows without rewriting the whole table.
-            EXECUTE format('ALTER TABLE %I ADD COLUMN IF NOT EXISTS %I uuid DEFAULT %L::uuid',
-                           relation.relation_name, col, legacy_owner);
-            IF had_column AND legacy_owner IS NOT NULL THEN
-                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT %L::uuid',
-                               relation.relation_name, col, legacy_owner);
-                -- A v48 restore may have supplied an explicit NULL in the new column.
-                EXECUTE format('UPDATE %I SET %I=$1 WHERE %I IS NULL', relation.relation_name, col, col)
-                    USING legacy_owner;
-            END IF;
-        END LOOP;
-    END LOOP;
-END $$;
--- end prepare-workspaces
+-- end v48 scope manifest
+
 
 CREATE FUNCTION wb_workspace() RETURNS uuid LANGUAGE sql STABLE AS $$
     SELECT nullif(current_setting('wantbrief.workspace', true), '')::uuid
@@ -66,6 +39,8 @@ BEGIN
     SELECT * INTO legacy FROM workspaces WHERE legacy_paid;
     FOR relation IN SELECT * FROM pg_temp.wb_legacy_scope ORDER BY relation_name LOOP
         tab := relation.relation_name;
+        -- A constant default assigns old rows without a table rewrite. Requests use wb_workspace thereafter.
+        EXECUTE format('ALTER TABLE %I ADD COLUMN workspace_id uuid DEFAULT %L::uuid',tab,legacy.id);
         IF legacy.id IS NULL THEN
             EXECUTE format('SELECT EXISTS (SELECT 1 FROM %I)',tab) INTO has_data;
             IF has_data THEN RAISE EXCEPTION 'No legacy owner for records in %', tab; END IF;
@@ -73,6 +48,7 @@ BEGIN
         EXECUTE format('ALTER TABLE %I ADD FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
             ALTER workspace_id SET NOT NULL, ALTER workspace_id SET DEFAULT wb_workspace()', tab);
         IF relation.owned THEN
+            EXECUTE format('ALTER TABLE %I ADD COLUMN owner_id uuid DEFAULT %L::uuid',tab,legacy.owner_id);
             EXECUTE format('ALTER TABLE %I ADD FOREIGN KEY (owner_id) REFERENCES users(id),
                 ALTER owner_id SET NOT NULL, ALTER owner_id SET DEFAULT wb_actor()', tab);
         END IF;

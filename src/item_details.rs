@@ -423,6 +423,11 @@ struct ItemEvent {
     created_at: DateTime<Utc>,
 }
 
+const ANNOTATED_EVENTS: &str = "SELECT e.id,e.item_id,e.kind,e.field,e.from_value,e.to_value,
+    COALESCE(NULLIF(a.note,''),e.note) AS note,COALESCE(a.stress,e.stress) AS stress,e.created_at
+    FROM item_events e LEFT JOIN item_event_annotations a
+        ON a.workspace_id=e.workspace_id AND a.event_id=e.id AND a.owner_id=e.owner_id AND a.owner_id=wb_actor()";
+
 #[derive(Default, Deserialize)]
 #[serde(default)]
 struct AnnotateInput {
@@ -439,10 +444,48 @@ async fn list_events(State(state): State<AppState>, Path(raw): Path<String>) -> 
     if let Err(response) = item_exists(&state.pool, item_id).await {
         return response;
     }
-    match sqlx::query_as::<_, ItemEvent>("SELECT id,item_id,kind,field,from_value,to_value,note,stress,created_at FROM item_events WHERE item_id=$1 ORDER BY created_at DESC,id DESC")
-        .bind(item_id).fetch_all(&state.pool).await {
-        Ok(events) => Json(events).into_response(), Err(err) => database_error(err),
+    let query =
+        format!("{ANNOTATED_EVENTS} WHERE e.item_id=$1 ORDER BY e.created_at DESC,e.id DESC");
+    match sqlx::query_as::<_, ItemEvent>(&query)
+        .bind(item_id)
+        .fetch_all(&state.pool)
+        .await
+    {
+        Ok(events) => Json(events).into_response(),
+        Err(err) => database_error(err),
     }
+}
+
+async fn save_annotation(
+    tx: &mut Transaction<'_, Postgres>,
+    mut event: ItemEvent,
+    note: &str,
+    stress: Option<i32>,
+    team: bool,
+) -> Result<ItemEvent, sqlx::Error> {
+    if note.is_empty() && stress.is_none() {
+        return Ok(event);
+    }
+    let query = if team {
+        "INSERT INTO item_event_annotations AS a (event_id,note,stress) VALUES($1,$2,$3)
+         ON CONFLICT(workspace_id,owner_id,event_id) DO UPDATE SET
+         note=COALESCE(NULLIF(excluded.note,''),a.note),stress=COALESCE(excluded.stress,a.stress)
+         RETURNING note,stress"
+    } else {
+        "UPDATE item_events SET note=COALESCE(NULLIF($2,''),note),stress=COALESCE($3,stress)
+         WHERE id=$1 AND owner_id=wb_actor() RETURNING note,stress"
+    };
+    let (saved_note, saved_stress) = sqlx::query_as::<_, (String, Option<i32>)>(query)
+        .bind(event.id)
+        .bind(note)
+        .bind(stress)
+        .fetch_one(&mut **tx)
+        .await?;
+    if !saved_note.is_empty() {
+        event.note = saved_note;
+    }
+    event.stress = saved_stress.or(event.stress);
+    Ok(event)
 }
 
 async fn annotate_event(
@@ -478,26 +521,32 @@ async fn annotate_event(
         Ok(tx) => tx,
         Err(err) => return database_error(err),
     };
-    let event = sqlx::query_as::<_, ItemEvent>("SELECT id,item_id,kind,field,from_value,to_value,note,stress,created_at FROM item_events WHERE item_id=$1 AND owner_id=wb_actor() AND kind=ANY($2) ORDER BY created_at DESC,id DESC LIMIT 1")
-        .bind(item_id).bind(&input.kinds).fetch_optional(&mut *tx).await;
-    let event = match event {
-        Ok(event) => event,
-        Err(err) => return database_error(err),
-    };
+    if let Err(err) = sqlx::query(
+        "SELECT pg_advisory_xact_lock_shared(hashtextextended(wb_workspace()::text,78415))",
+    )
+    .execute(&mut *tx)
+    .await
+    {
+        return database_error(err);
+    }
+    let query = format!(
+        "{ANNOTATED_EVENTS} WHERE e.item_id=$1 AND e.owner_id=wb_actor()
+        AND e.kind=ANY($2) ORDER BY e.created_at DESC,e.id DESC LIMIT 1"
+    );
+    let event = sqlx::query_as::<_, ItemEvent>(&query)
+        .bind(item_id)
+        .bind(&input.kinds)
+        .fetch_optional(&mut *tx)
+        .await;
+    let team = crate::workspace::current().is_some_and(|s| s.kind == "team");
     let note = input.note.trim();
-    let event = if let Some(event) = event {
-        let next_note = if note.is_empty() {
-            event.note
-        } else {
-            note.to_owned()
-        };
-        let next_stress = input.stress.or(event.stress);
-        match sqlx::query_as::<_, ItemEvent>("UPDATE item_events SET note=$2,stress=$3 WHERE id=$1 RETURNING id,item_id,kind,field,from_value,to_value,note,stress,created_at")
-            .bind(event.id).bind(next_note).bind(next_stress).fetch_one(&mut *tx).await {
-            Ok(event) => Some(event), Err(err) => return database_error(err),
-        }
-    } else {
-        None
+    let event = match event {
+        Ok(Some(event)) => match save_annotation(&mut tx, event, note, input.stress, team).await {
+            Ok(updated) => Some(updated),
+            Err(err) => return database_error(err),
+        },
+        Ok(None) => None,
+        Err(err) => return database_error(err),
     };
     if let Some(level) = input.stress {
         if let Err(err) = sqlx::query("INSERT INTO stress_logs (id,item_id,kind,level,logged_at) VALUES ($1,$2,'stress',$3,$4)")
@@ -508,7 +557,7 @@ async fn annotate_event(
             return database_error(err);
         }
     }
-    if !note.is_empty() && crate::workspace::current().is_none_or(|s| s.kind != "team") {
+    if !note.is_empty() && !team {
         if let Err(err) = sqlx::query("INSERT INTO item_notes (id,item_id,body,source_kind,external_id,author_name,url,created_at) VALUES ($1,$2,$3,'manual','','','',$4)")
             .bind(Uuid::new_v4()).bind(item_id).bind(note).bind(Utc::now()).execute(&mut *tx).await {
             return database_error(err);

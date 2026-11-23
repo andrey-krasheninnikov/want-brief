@@ -17,7 +17,7 @@ const SCHEMA_VERSION: i64 = 52;
 const MAX_BYTES: usize = 64 * 1024 * 1024;
 
 // Parent tables precede their references so restored IDs keep every relation.
-const TABLES: [&str; 45] = [
+const TABLES: [&str; 46] = [
     "projects",
     "sources",
     "items",
@@ -56,6 +56,7 @@ const TABLES: [&str; 45] = [
     "company_reports",
     "company_contracts",
     "item_events",
+    "item_event_annotations",
     "person_addresses",
     "earn_days",
     "person_birthdays",
@@ -231,19 +232,10 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
                 "single-owner backup requires a personal workspace",
             ));
         }
-        if backup.schema_version == 48 {
-            // The v48 exporter includes the additive columns while prepare-workspaces is live.
-            // Ownership is always derived from the signed-in user in the destination.
-            for row in backup.tables.values_mut().flatten() {
-                if let Some(fields) = row.as_object_mut() {
-                    fields.remove("workspace_id");
-                    fields.remove("owner_id");
-                }
-            }
-        }
         for table in [
             "person_birthdays",
             "item_ratings",
+            "item_event_annotations",
             "project_personal_income",
             "company_employment_dates",
             "event_participants",

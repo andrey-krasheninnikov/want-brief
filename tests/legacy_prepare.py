@@ -47,7 +47,7 @@ def server(binary, migrations):
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     host = f"127.0.0.1:{port}"
-    env = {**os.environ, "HTTP_ADDR": host, "MIGRATIONS_DIR": str(migrations)}
+    env = {**os.environ, "HTTP_ADDR": host, "MIGRATIONS_DIR": str(migrations), "TOKEN_KEY": "11" * 32}
     with subprocess.Popen([binary], env=env, stdout=subprocess.DEVNULL) as child:
         try:
             for _ in range(100):
@@ -74,21 +74,44 @@ def run(old, old_migrations, new):
     journal_rows = sql("SELECT count(*) FROM goose_db_version")
     password = os.environ.get("LEGACY_TEST_PASSWORD", "sample-password")
     new_env = {**os.environ, "MIGRATIONS_DIR": str(Path("migrations").resolve())}
+    public_columns = """SELECT table_name, column_name, ordinal_position, data_type, is_nullable
+                        FROM information_schema.columns WHERE table_schema='public'
+                        ORDER BY table_name, ordinal_position"""
+    original_schema = sql(public_columns)
+
+    def rejected(command):
+        result = subprocess.run([new, command], env=new_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        assert result.returncode != 0, f"{command} accepted an inconsistent preparation"
+
+    assert sql("SELECT to_regnamespace('wantbrief_v48_ownership') IS NULL") == "t"
+    sql("CREATE SCHEMA wantbrief_v48_ownership")
+    rejected("prepare-workspaces")
+    assert sql("SELECT to_regnamespace('wantbrief_v48_ownership') IS NOT NULL") == "t"
+    sql("DROP SCHEMA wantbrief_v48_ownership RESTRICT")
 
     with server(old, old_migrations) as root:
         _, headers = http(root, "POST", "/api/login", data={"password": password})
         cookie = headers["Set-Cookie"].split(";", 1)[0]
         note, _ = http(root, "POST", "/api/notes", cookie, {"body": "Before prepare"})
         before = UUID(note["id"])
+        old_backup, _ = http(root, "GET", "/api/backup", cookie)
+        assert old_backup["schemaVersion"] == 48
         subprocess.run([new, "prepare-workspaces"], env=new_env, check=True)
         assert version() == "48"
         assert sql("SELECT count(*) FROM goose_db_version") == journal_rows
-        assert sql(f"SELECT workspace_id=owner_id AND owner_id='{owner}' FROM notes WHERE id='{before}'") == "t"
-        assert sql("""SELECT is_nullable FROM information_schema.columns WHERE table_schema='public'
-                      AND table_name='notes' AND column_name='owner_id'""") == "YES"
+        assert sql(public_columns) == original_schema
+        assert sql("SELECT count(*) FROM pg_views WHERE schemaname='wantbrief_v48_ownership'") == "40"
+        assert sql("""SELECT count(*) FROM pg_namespace n, LATERAL aclexplode(n.nspacl) a
+                      WHERE n.nspname='wantbrief_v48_ownership' AND a.grantee<>n.nspowner""") == "0"
+        assert sql("""SELECT count(*) FROM pg_class c, LATERAL aclexplode(c.relacl) a
+                      WHERE c.relnamespace='wantbrief_v48_ownership'::regnamespace AND a.grantee<>c.relowner""") == "0"
+        assert sql("""SELECT string_agg(column_name,',' ORDER BY ordinal_position)
+                      FROM information_schema.columns WHERE table_schema='wantbrief_v48_ownership'
+                        AND table_name='sources'""") == "id,workspace_id"
+        assert sql(f"SELECT workspace_id=owner_id AND owner_id='{owner}' FROM wantbrief_v48_ownership.notes WHERE id='{before}'") == "t"
         note, _ = http(root, "POST", "/api/notes", cookie, {"body": "After prepare"})
         after = UUID(note["id"])
-        assert sql(f"SELECT workspace_id=owner_id AND owner_id='{owner}' FROM notes WHERE id='{after}'") == "t"
+        assert sql(f"SELECT workspace_id=owner_id AND owner_id='{owner}' FROM wantbrief_v48_ownership.notes WHERE id='{after}'") == "t"
         record, _ = http(root, "POST", "/api/projects", cookie, {"name": "Before cutover"})
         project = UUID(record["id"])
         http(root, "GET", f"/api/projects/{project}", cookie)
@@ -104,8 +127,28 @@ def run(old, old_migrations, new):
         subprocess.run([new, "prepare-workspaces"], env=new_env, check=True)
         assert version() == "48"
         assert sql("SELECT count(*) FROM goose_db_version") == journal_rows
+        http(root, "POST", "/api/restore?mode=replace", cookie, old_backup)
+        restored, _ = http(root, "GET", "/api/backup", cookie)
+        assert restored["schemaVersion"] == old_backup["schemaVersion"]
+        assert restored["tables"] == old_backup["tables"]
+        assert sql(f"SELECT count(*) FROM wantbrief_v48_ownership.notes WHERE id='{after}'") == "0"
+        assert sql(f"SELECT workspace_id=owner_id AND owner_id='{owner}' FROM wantbrief_v48_ownership.notes WHERE id='{before}'") == "t"
+        note, _ = http(root, "POST", "/api/notes", cookie, {"body": "After restore"})
+        after = UUID(note["id"])
+        http(root, "PUT", "/api/earn/days/2090-01-02", cookie, {"usd": 2, "rate": 1})
+    sql("UPDATE wantbrief_v48_ownership.installation SET owner_id=gen_random_uuid()")
+    rejected("-migrate-only")
+    assert version() == "48"
+    sql(f"UPDATE wantbrief_v48_ownership.installation SET owner_id='{owner}'")
+    sql("CREATE TABLE wantbrief_v48_ownership.unrelated(id integer)")
+    rejected("-migrate-only")
+    assert version() == "48"
+    assert sql("SELECT count(*) FROM pg_views WHERE schemaname='wantbrief_v48_ownership'") == "40"
+    assert sql("SELECT to_regclass('wantbrief_v48_ownership.unrelated') IS NOT NULL") == "t"
+    sql("DROP TABLE wantbrief_v48_ownership.unrelated")
     subprocess.run([new, "-migrate-only"], env=new_env, check=True)
     assert version() == "52"
+    assert sql("SELECT to_regnamespace('wantbrief_v48_ownership') IS NULL") == "t"
     assert sql(f"SELECT id=owner_id AND legacy_paid FROM workspaces WHERE owner_id='{owner}'") == "t"
     assert sql(f"""SELECT count(*) FROM notes WHERE workspace_id='{owner}' AND owner_id='{owner}'
                    AND id IN ('{before}', '{after}')""") == "2"
@@ -116,7 +159,7 @@ def run(old, old_migrations, new):
         assert account["workspace"]["plan"] == "paid"
         notes, _ = http(root, "GET", "/api/notes", cookie)
         assert {str(before), str(after)} <= {note["id"] for note in notes}
-    print("v48 restart, CRUD, upsert, repeated preparation and v52 cutover passed")
+    print("v48 restart, CRUD, upsert, repeatable preparation, archive round trip and v52 cutover passed")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ CREATE FUNCTION wb_runtime_role() RETURNS name LANGUAGE sql STABLE AS $$
 $$;
 CREATE FUNCTION wb_private_table(tab text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
     SELECT tab=ANY(ARRAY['notes','time_intervals','stress_logs','person_notes','person_contacts',
-       'item_ratings','project_personal_income','person_sites','person_bonds','person_bond_events','person_professions','person_profession_salaries',
+       'item_ratings','item_event_annotations','project_personal_income','person_sites','person_bonds','person_bond_events','person_professions','person_profession_salaries',
        'person_absences','person_addresses','person_birthdays','company_notes','company_titles','company_salaries',
        'company_contracts','company_managers','company_reports','company_employment_dates','earn_days','schedule_settings','schedule_day_overrides','schedule_snapshots'])
 $$;

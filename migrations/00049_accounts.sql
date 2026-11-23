@@ -1,11 +1,99 @@
 -- +goose Up
--- A single existing account owns this installation. Do not assign ambiguous data.
-DO $$
+-- Optional preflight uses a private schema. The v48 API still owns the complete public schema.
+CREATE FUNCTION pg_temp.wb_v48_ownership(preparing boolean) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+    marker constant text := 'Want Brief v48 workspace ownership';
+    stage oid := to_regnamespace('wantbrief_v48_ownership');
+    creator oid;
+    owner_id uuid;
+    users_count bigint;
+    saved_owner uuid;
+    saved_views text[];
+    expected_views text[];
+    relation record;
+    view_name text;
+    key_columns text;
+    grantee_name text;
 BEGIN
-    IF (SELECT count(*) FROM users) > 1 THEN
-        RAISE EXCEPTION 'Cannot identify the owner of this installation';
+    LOCK TABLE public.users IN SHARE MODE;
+    SELECT count(*) INTO users_count FROM public.users;
+    IF users_count > 1 OR (preparing AND users_count <> 1) THEN
+        RAISE EXCEPTION 'Workspace preparation requires exactly one installation owner';
+    END IF;
+    SELECT id INTO owner_id FROM public.users;
+    IF stage IS NULL AND NOT preparing THEN RETURN; END IF;
+
+    IF preparing THEN
+        SELECT array_agg(relation_name ORDER BY relation_name) INTO expected_views
+        FROM pg_temp.wb_legacy_scope;
+    END IF;
+    IF stage IS NULL THEN
+        CREATE SCHEMA wantbrief_v48_ownership;
+        stage := 'wantbrief_v48_ownership'::regnamespace;
+        EXECUTE format('COMMENT ON SCHEMA wantbrief_v48_ownership IS %L', marker);
+        CREATE TABLE wantbrief_v48_ownership.installation (owner_id uuid NOT NULL, view_names text[] NOT NULL);
+        INSERT INTO wantbrief_v48_ownership.installation VALUES (owner_id, expected_views);
+        EXECUTE format('COMMENT ON TABLE wantbrief_v48_ownership.installation IS %L', marker);
+
+        FOR relation IN SELECT * FROM pg_temp.wb_legacy_scope LOOP
+            SELECT string_agg(format('r.%I', a.attname), ', ' ORDER BY k.position)
+                INTO key_columns FROM pg_index i
+                CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS k(attnum,position)
+                JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.attnum
+                WHERE i.indrelid=format('public.%I',relation.relation_name)::regclass
+                  AND i.indisprimary AND k.position<=i.indnkeyatts;
+            IF key_columns IS NULL THEN RAISE EXCEPTION 'Missing primary key for %', relation.relation_name; END IF;
+            EXECUTE format('CREATE VIEW wantbrief_v48_ownership.%I WITH (security_invoker=true) AS
+                SELECT %s, %L::uuid AS workspace_id%s FROM public.%I r OFFSET 0',
+                relation.relation_name, key_columns, owner_id,
+                CASE WHEN relation.owned THEN format(', %L::uuid AS owner_id',owner_id) ELSE '' END,
+                relation.relation_name);
+            EXECUTE format('COMMENT ON VIEW wantbrief_v48_ownership.%I IS %L',relation.relation_name,marker);
+        END LOOP;
+
+        -- A deployment can grant access through ALTER DEFAULT PRIVILEGES.
+        REVOKE ALL ON SCHEMA wantbrief_v48_ownership FROM PUBLIC;
+        REVOKE ALL ON ALL TABLES IN SCHEMA wantbrief_v48_ownership FROM PUBLIC;
+        FOR grantee_name IN
+            SELECT pg_get_userbyid(a.grantee) FROM pg_namespace n, LATERAL aclexplode(n.nspacl) a
+                WHERE n.oid=stage AND a.grantee<>n.nspowner AND a.grantee<>0
+            UNION
+            SELECT pg_get_userbyid(a.grantee) FROM pg_class c, LATERAL aclexplode(c.relacl) a
+                WHERE c.relnamespace=stage AND a.grantee<>c.relowner AND a.grantee<>0
+        LOOP
+            EXECUTE format('REVOKE ALL ON SCHEMA wantbrief_v48_ownership FROM %I',grantee_name);
+            EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA wantbrief_v48_ownership FROM %I',grantee_name);
+        END LOOP;
+        RETURN;
+    END IF;
+
+    SELECT nspowner INTO creator FROM pg_namespace WHERE oid=stage;
+    IF obj_description(stage,'pg_namespace') IS DISTINCT FROM marker OR NOT pg_has_role(creator,'USAGE')
+       OR NOT EXISTS (SELECT FROM pg_class WHERE relnamespace=stage AND relname='installation'
+           AND relkind='r' AND relowner=creator AND obj_description(oid,'pg_class')=marker) THEN
+        RAISE EXCEPTION 'Reserved workspace preparation schema is already in use';
+    END IF;
+    SELECT s.owner_id,s.view_names INTO STRICT saved_owner,saved_views FROM wantbrief_v48_ownership.installation s;
+    IF owner_id IS DISTINCT FROM saved_owner OR (preparing AND saved_views IS DISTINCT FROM expected_views) THEN
+        RAISE EXCEPTION 'Prepared workspace owner or table inventory has changed';
+    END IF;
+    FOREACH view_name IN ARRAY saved_views LOOP
+        IF NOT EXISTS (SELECT FROM pg_class WHERE relnamespace=stage AND relname=view_name
+            AND relkind='v' AND relowner=creator AND obj_description(oid,'pg_class')=marker) THEN
+            RAISE EXCEPTION 'Workspace preparation view % was replaced', view_name;
+        END IF;
+        IF NOT preparing THEN
+            EXECUTE format('DROP VIEW wantbrief_v48_ownership.%I RESTRICT',view_name);
+        END IF;
+    END LOOP;
+    IF NOT preparing THEN
+        DROP TABLE wantbrief_v48_ownership.installation RESTRICT;
+        -- Unrelated objects or dependent views abort the whole migration before v49 is recorded.
+        DROP SCHEMA wantbrief_v48_ownership RESTRICT;
     END IF;
 END $$;
+-- end v48 ownership routine
+SELECT pg_temp.wb_v48_ownership(false);
 
 ALTER TABLE users
     ADD COLUMN email TEXT UNIQUE,

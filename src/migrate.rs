@@ -4,7 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const LOCK_KEY: i64 = 0x77616e7462726965;
-const V48_PREPARATION_END: &str = "-- end prepare-workspaces\n";
+const V48_SCOPE_END: &str = "-- end v48 scope manifest\n";
+const V48_ROUTINE_END: &str = "-- end v48 ownership routine\n";
 
 struct Migration {
     version: i64,
@@ -47,12 +48,16 @@ async fn current_version(connection: &mut PgConnection) -> Result<i64> {
 /// Expand a single-owner v48 installation while its API is still serving requests.
 pub async fn prepare_workspaces(database_url: &str, directory: &Path) -> Result<()> {
     let migrations = load_migrations(directory)?;
-    let preparation = migrations
-        .iter()
-        .find(|migration| migration.version == 50)
-        .and_then(|migration| migration.up.split_once(V48_PREPARATION_END))
-        .map(|(preparation, _)| preparation)
-        .context("migration 50 has no workspace preparation stage")?;
+    let prefix = |version, end| -> Result<&str> {
+        migrations
+            .iter()
+            .find(|migration| migration.version == version)
+            .and_then(|migration| migration.up.split_once(end))
+            .map(|(prefix, _)| prefix)
+            .with_context(|| format!("missing workspace preparation SQL in migration {version}"))
+    };
+    let manifest = prefix(50, V48_SCOPE_END)?;
+    let routine = prefix(49, V48_ROUTINE_END)?;
     let mut connection = PgConnection::connect(database_url)
         .await
         .context("connect for preparation")?;
@@ -65,17 +70,9 @@ pub async fn prepare_workspaces(database_url: &str, directory: &Path) -> Result<
         current_version(&mut tx).await? == 48,
         "prepare-workspaces requires schema 48"
     );
-    sqlx::query("LOCK TABLE users IN SHARE MODE")
-        .execute(&mut *tx)
-        .await?;
-    let users: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
-        .fetch_one(&mut *tx)
-        .await?;
-    anyhow::ensure!(
-        users == 1,
-        "prepare-workspaces requires exactly one installation owner"
-    );
-    sqlx::raw_sql(preparation)
+    sqlx::raw_sql(manifest).execute(&mut *tx).await?;
+    sqlx::raw_sql(routine).execute(&mut *tx).await?;
+    sqlx::query("SELECT pg_temp.wb_v48_ownership(true)")
         .execute(&mut *tx)
         .await
         .context("prepare workspace ownership")?;

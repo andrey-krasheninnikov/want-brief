@@ -26,5 +26,19 @@ CREATE UNIQUE INDEX company_managers_open_idx ON company_managers(owner_id,compa
 DROP INDEX company_reports_open_idx;
 CREATE UNIQUE INDEX company_reports_open_idx ON company_reports(owner_id,company_id,person_id) WHERE ended_on IS NULL;
 
+ALTER TABLE item_events ADD UNIQUE(workspace_id, owner_id, id);
+CREATE TABLE item_event_annotations (
+    workspace_id uuid NOT NULL DEFAULT wb_workspace(),
+    owner_id uuid NOT NULL DEFAULT wb_actor() REFERENCES users(id),
+    event_id uuid NOT NULL,
+    note text NOT NULL DEFAULT '',
+    stress integer CHECK(stress BETWEEN 1 AND 5),
+    CHECK(note<>'' OR stress IS NOT NULL),
+    PRIMARY KEY(workspace_id, owner_id, event_id),
+    FOREIGN KEY(workspace_id, owner_id, event_id)
+        REFERENCES item_events(workspace_id, owner_id, id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+
 -- +goose Down
 DO $$ BEGIN RAISE EXCEPTION 'Restore the pre-upgrade database to downgrade'; END $$;

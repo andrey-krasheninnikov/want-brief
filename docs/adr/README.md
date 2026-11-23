@@ -4,3 +4,4 @@ Record decisions that affect long-lived contracts or the structure of the applic
 
 - [0001: Application backup format and restore policy](0001-application-backup.md)
 - [0002: Scheduled source sync](0002-scheduled-source-sync.md)
+- [0003: Workspace ownership and private records](0003-workspace-ownership.md)

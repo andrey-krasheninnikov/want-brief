@@ -1,6 +1,6 @@
+mod support;
 use axum::routing::get;
 use serde_json::{json, Value};
-use sqlx::PgPool;
 use std::path::Path;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -16,7 +16,7 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
     let database_name = url.split('?').next().unwrap().rsplit('/').next().unwrap();
     assert!(database_name.starts_with("wantbrief_issue92_issue3_"));
     migrate(&url, Path::new("migrations")).await.unwrap();
-    let pool = PgPool::connect(&url).await.unwrap();
+    let pool = support::legacy_pool(&url).await;
     let auth = Auth::new(pool.clone());
     auth.ensure_user("sample-password").await.unwrap();
     let token = auth.login("sample-password").await.unwrap().unwrap();
@@ -92,7 +92,7 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
         .execute(&pool)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO schedule_settings (id,data) VALUES (1,'{\"timezone\":\"Europe/Moscow\"}'::jsonb) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data")
+    sqlx::query("INSERT INTO schedule_settings (id,data) VALUES (1,'{\"timezone\":\"Europe/Moscow\"}'::jsonb) ON CONFLICT (workspace_id,owner_id,id) DO UPDATE SET data=EXCLUDED.data")
         .execute(&pool).await.unwrap();
 
     let app = router(AppState {
@@ -126,8 +126,8 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
     let original = response.bytes().await.unwrap();
     let backup: Value = serde_json::from_slice(&original).unwrap();
     assert_eq!(backup["formatVersion"], 1);
-    assert_eq!(backup["schemaVersion"], 48);
-    let tables: Vec<String> = sqlx::query_scalar("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT IN ('users','sessions','goose_db_version') ORDER BY tablename")
+    assert_eq!(backup["schemaVersion"], 52);
+    let tables: Vec<String> = sqlx::query_scalar("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename NOT IN ('users','sessions','goose_db_version','workspaces','workspace_members','workspace_invitations','account_tokens','auth_limits') ORDER BY tablename")
         .fetch_all(&pool).await.unwrap();
     let exported: Vec<String> = backup["tables"]
         .as_object()
@@ -325,7 +325,7 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
     .await
     .unwrap();
     assert_eq!(event_links, 1);
-    let settings: Value = sqlx::query_scalar("SELECT data FROM schedule_settings WHERE id=1")
+    let settings: Value = sqlx::query_scalar("SELECT data FROM schedule_settings WHERE workspace_id=wb_workspace() AND owner_id=wb_actor() AND id=1")
         .fetch_one(&pool)
         .await
         .unwrap();
@@ -338,6 +338,29 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
             .unwrap();
     assert_eq!(source, (String::new(), false));
     let mut previous = backup.clone();
+    previous["schemaVersion"] = json!(48);
+    previous.as_object_mut().unwrap().remove("workspaceKind");
+    for table in [
+        "person_birthdays",
+        "item_ratings",
+        "item_event_annotations",
+        "project_personal_income",
+        "company_employment_dates",
+        "event_participants",
+    ] {
+        previous["tables"].as_object_mut().unwrap().remove(table);
+    }
+    for row in previous["tables"]["items"].as_array_mut().unwrap() {
+        row.as_object_mut().unwrap().remove("assignee_user_id");
+    }
+    let v48 = client
+        .post(format!("{root}/api/restore?mode=replace"))
+        .header("Cookie", &cookie)
+        .json(&previous)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(v48.status(), reqwest::StatusCode::NO_CONTENT);
     previous["schemaVersion"] = json!(47);
     for row in previous["tables"]["sources"].as_array_mut().unwrap() {
         let fields = row.as_object_mut().unwrap();

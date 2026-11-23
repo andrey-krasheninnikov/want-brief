@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../../api'
+import { useAccount } from '../../../shared/account'
 import { Window } from '../../../shared/Window'
 import type { ScheduleSettings } from '../../../types'
 import { DayOverridesEditor } from './DayOverridesEditor'
@@ -52,7 +53,8 @@ function validate(s: ScheduleSettings): string {
 
 // ScheduleSettingsScreen loads the stored settings once and hands them to the form as its initial draft.
 export function ScheduleSettingsScreen() {
-  const stored = useQuery({ queryKey: ['schedule-settings'], queryFn: api.scheduleSettings })
+  const { capabilities } = useAccount()
+  const stored = useQuery({ queryKey: ['schedule-settings', capabilities.canAnalyze], queryFn: api.scheduleSettings })
   if (!stored.data) {
     return (
       <Window className="sset-window" kicker="Schedule" title="Packer settings">
@@ -60,10 +62,12 @@ export function ScheduleSettingsScreen() {
       </Window>
     )
   }
-  return <SettingsForm initial={stored.data} />
+  return <SettingsForm key={capabilities.canAnalyze ? 'paid' : 'free'} initial={stored.data} />
 }
 
 function SettingsForm({ initial }: { initial: ScheduleSettings }) {
+  const { capabilities } = useAccount()
+  const canAnalyze = capabilities.canAnalyze
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<ScheduleSettings>(initial)
@@ -94,7 +98,13 @@ function SettingsForm({ initial }: { initial: ScheduleSettings }) {
       .split(/[,\s]+/)
       .map((raw) => raw.trim())
       .filter(Boolean)
-    const body: ScheduleSettings = { ...draft, checkWindows: windows }
+    const body: ScheduleSettings = {
+      ...draft, checkWindows: windows,
+      estimateBuffer: canAnalyze && draft.estimateBuffer,
+      estimateMaxK: canAnalyze ? draft.estimateMaxK : initial.estimateMaxK,
+      energyAware: canAnalyze && draft.energyAware,
+      goldenHours: canAnalyze && draft.goldenHours,
+    }
     const problem = validate(body)
     if (problem) {
       setError(problem)
@@ -191,8 +201,6 @@ function SettingsForm({ initial }: { initial: ScheduleSettings }) {
             <NumberField label="Target lead" value={draft.targetLeadWorkdays} min={0} max={10} unit="workdays" onChange={(v) => patch({ targetLeadWorkdays: v })} />
             <NumberField label="Stress shift" value={draft.stressShiftHours} min={0} max={48} unit="h per stress point" onChange={(v) => patch({ stressShiftHours: v })} />
             <Toggle label="Oldest first" hint="Among equals, the older task goes first." value={draft.oldestFirst} onChange={(v) => patch({ oldestFirst: v })} />
-            <Toggle label="Estimate buffer" hint="Scale estimates by each project's tracked-to-planned history." value={draft.estimateBuffer} onChange={(v) => patch({ estimateBuffer: v })} />
-            <NumberField label="Estimate cap" value={draft.estimateMaxK} min={1} max={5} step={0.1} unit="×" onChange={(v) => patch({ estimateMaxK: v })} />
           </Section>
 
           <Section title="Parallel work" hint="One active track plus waiting tracks for tasks that mostly wait on someone else.">
@@ -217,10 +225,18 @@ function SettingsForm({ initial }: { initial: ScheduleSettings }) {
             </label>
           </Section>
 
-          <Section title="Human factor" hint="Signals from check-ins and tracked history shape where tasks land.">
-            <Toggle label="Energy aware" hint="Low energy or focus keeps the first two hours for light tasks." value={draft.energyAware} onChange={(v) => patch({ energyAware: v })} />
-            <Toggle label="Golden hours" hint="Do-first tasks prefer the hours where the last eight weeks show the most tracked work." value={draft.goldenHours} onChange={(v) => patch({ goldenHours: v })} />
-          </Section>
+          <section className="sset-section">
+            <header>
+              <h3 id="planning-analysis">Personal history analysis</h3>
+              <p id="analysis-access">{canAnalyze ? 'Use your check-ins and tracked time to adjust estimates and find focus hours.' : 'A paid workspace can use check-ins and tracked time to adjust estimates and find focus hours.'}</p>
+            </header>
+            <fieldset className="sset-grid sset-analysis" disabled={!canAnalyze} aria-labelledby="planning-analysis" aria-describedby="analysis-access">
+              <Toggle label="Estimate buffer" hint="Scale estimates by each project's tracked-to-planned history." value={canAnalyze && draft.estimateBuffer} onChange={(v) => patch({ estimateBuffer: v })} />
+              <NumberField label="Estimate cap" value={canAnalyze ? draft.estimateMaxK : initial.estimateMaxK} min={1} max={5} step={0.1} unit="×" onChange={(v) => patch({ estimateMaxK: v })} />
+              <Toggle label="Energy aware" hint="Low energy or focus keeps the first two hours for light tasks." value={canAnalyze && draft.energyAware} onChange={(v) => patch({ energyAware: v })} />
+              <Toggle label="Golden hours" hint="Do-first tasks prefer the hours where the last eight weeks show the most tracked work." value={canAnalyze && draft.goldenHours} onChange={(v) => patch({ goldenHours: v })} />
+            </fieldset>
+          </section>
 
           <Section title="Stability" hint="Blocks stay put unless a fresh layout wins by more than the threshold.">
             <NumberField label="Threshold" value={draft.stabilityThresholdMin} min={0} max={480} unit="min" onChange={(v) => patch({ stabilityThresholdMin: v })} />

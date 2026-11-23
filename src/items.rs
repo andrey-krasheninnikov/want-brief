@@ -13,12 +13,14 @@ use sqlx::{FromRow, PgPool};
 use std::collections::HashSet;
 use uuid::Uuid;
 
-const SELECT: &str = "SELECT i.id,i.source_id,i.external_key,i.title,i.status,i.occupancy,i.external_status,i.kind,i.project_id,i.urgent,i.important,i.pinned,i.pinned_at,i.stress,i.due_at,i.dev_due_at,i.review_due_at,i.test_due_at,i.description,i.planned_seconds,i.links,COALESCE(t.tracked_seconds,0)::bigint AS tracked_seconds,i.archived_at,i.deleted_at,i.created_at,i.updated_at,s.name AS source_name,s.kind AS source_kind,COALESCE(p.name,'') AS project_name,COALESCE(p.color,'') AS project_color,COALESCE((SELECT COUNT(*)::int FROM item_checks c WHERE c.item_id=i.id),0) AS check_total,COALESCE((SELECT COUNT(*)::int FROM item_checks c WHERE c.item_id=i.id AND c.done),0) AS check_done,COALESCE((SELECT array_agg(person_id) FROM person_items WHERE item_id=i.id),ARRAY[]::uuid[]) AS person_ids FROM items i JOIN sources s ON s.id=i.source_id LEFT JOIN projects p ON p.id=i.project_id LEFT JOIN (SELECT item_id,EXTRACT(EPOCH FROM SUM(ended_at-started_at))::bigint AS tracked_seconds FROM time_intervals WHERE ended_at IS NOT NULL GROUP BY item_id) t ON t.item_id=i.id";
+const SELECT: &str = "SELECT i.id,i.workspace_id,i.assignee_user_id,i.source_id,i.external_key,i.title,i.status,i.occupancy,i.external_status,i.kind,i.project_id,i.urgent,i.important,i.pinned,i.pinned_at,COALESCE((SELECT r.stress FROM item_ratings r WHERE r.item_id=i.id),i.stress) AS stress,i.due_at,i.dev_due_at,i.review_due_at,i.test_due_at,i.description,i.planned_seconds,i.links,COALESCE(t.tracked_seconds,0)::bigint AS tracked_seconds,i.archived_at,i.deleted_at,i.created_at,i.updated_at,s.name AS source_name,s.kind AS source_kind,COALESCE(p.name,'') AS project_name,COALESCE(p.color,'') AS project_color,COALESCE((SELECT COUNT(*)::int FROM item_checks c WHERE c.item_id=i.id),0) AS check_total,COALESCE((SELECT COUNT(*)::int FROM item_checks c WHERE c.item_id=i.id AND c.done),0) AS check_done,COALESCE((SELECT array_agg(person_id) FROM person_items WHERE item_id=i.id),ARRAY[]::uuid[]) AS person_ids FROM items i JOIN sources s ON s.id=i.source_id LEFT JOIN projects p ON p.id=i.project_id LEFT JOIN (SELECT item_id,EXTRACT(EPOCH FROM SUM(ended_at-started_at))::bigint AS tracked_seconds FROM time_intervals WHERE ended_at IS NOT NULL GROUP BY item_id) t ON t.item_id=i.id";
 
 #[derive(Clone, FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Item {
     pub(crate) id: Uuid,
+    pub(crate) workspace_id: Uuid,
+    pub(crate) assignee_user_id: Option<Uuid>,
     source_id: Uuid,
     pub(crate) external_key: String,
     pub(crate) title: String,
@@ -74,6 +76,8 @@ mod schedule_tests {
     fn item(key: &str, index: i64) -> Item {
         Item {
             id: Uuid::new_v4(),
+            workspace_id: Uuid::nil(),
+            assignee_user_id: None,
             source_id: Uuid::nil(),
             external_key: key.to_owned(),
             title: key.to_owned(),
@@ -202,6 +206,7 @@ mod schedule_tests {
             history: Vec::new(),
             checkins: None,
             previous: Vec::new(),
+            horizon_end: at(15, 0, 0) + chrono::Duration::days(120),
             now: at(15, 9, 30),
             from: at(14, 0, 0),
             to: at(21, 0, 0),
@@ -343,7 +348,7 @@ mod schedule_tests {
             .unwrap();
         prior.starts_at = at(15, 11, 20);
         prior.ends_at = at(15, 12, 20);
-        input.previous = vec![prior.clone()];
+        input.previous = vec![(&prior).into()];
         let near = plan(&input);
         let block = near
             .horizon
@@ -354,7 +359,7 @@ mod schedule_tests {
         assert!(block.reasons.iter().any(|reason| reason == "sticky"));
         prior.starts_at = at(16, 10, 0);
         prior.ends_at = at(16, 11, 0);
-        input.previous = vec![prior];
+        input.previous = vec![(&prior).into()];
         let far = plan(&input);
         assert_eq!(
             far.horizon
@@ -551,6 +556,7 @@ impl Item {
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct ItemInput {
+    assignee_user_id: Option<Uuid>,
     title: String,
     kind: String,
     project_id: Option<String>,
@@ -615,8 +621,18 @@ pub(crate) async fn fetch(pool: &PgPool, item_id: Uuid) -> Result<Item, sqlx::Er
 }
 
 pub(crate) async fn open(pool: &PgPool) -> Result<Vec<Item>, sqlx::Error> {
-    let query = format!("{SELECT} WHERE i.archived_at IS NULL AND i.deleted_at IS NULL");
-    let rows = sqlx::query_as::<_, Item>(&query).fetch_all(pool).await?;
+    open_for(pool, None).await
+}
+
+pub(crate) async fn open_for(
+    pool: &PgPool,
+    assignee: Option<Uuid>,
+) -> Result<Vec<Item>, sqlx::Error> {
+    let query = format!("{SELECT} WHERE i.archived_at IS NULL AND i.deleted_at IS NULL AND ($1::uuid IS NULL OR i.assignee_user_id=$1)");
+    let rows = sqlx::query_as::<_, Item>(&query)
+        .bind(assignee)
+        .fetch_all(pool)
+        .await?;
     Ok(rows.into_iter().map(Item::with_quadrant).collect())
 }
 
@@ -724,10 +740,10 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     let now = Utc::now();
     let item_id = Uuid::new_v4();
     let occupancy = if kind == "request" { "waiting" } else { "solo" };
-    if let Err(err) = sqlx::query("INSERT INTO items (id,source_id,title,status,kind,project_id,urgent,important,occupancy,created_at,updated_at) VALUES ($1,$2,$3,'backlog',$4,$5,$6,$7,$8,$9,$9)")
-        .bind(item_id).bind(source_id).bind(title).bind(kind).bind(project_id).bind(input.urgent).bind(input.important).bind(occupancy).bind(now)
+    if let Err(err) = sqlx::query("INSERT INTO items (id,source_id,title,status,kind,project_id,urgent,important,occupancy,created_at,updated_at,assignee_user_id) VALUES ($1,$2,$3,'backlog',$4,$5,$6,$7,$8,$9,$9,$10)")
+        .bind(item_id).bind(source_id).bind(title).bind(kind).bind(project_id).bind(input.urgent).bind(input.important).bind(occupancy).bind(now).bind(input.assignee_user_id)
         .execute(&state.pool).await {
-        return database_error(err);
+        return assignment_error(err);
     }
     match fetch(&state.pool, item_id).await {
         Ok(item) => (StatusCode::CREATED, Json(item)).into_response(),
@@ -779,6 +795,8 @@ async fn undelete(State(state): State<AppState>, Path(raw): Path<String>) -> Res
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct ItemPatch {
+    #[serde(default, deserialize_with = "present_assignee")]
+    assignee_user_id: Option<Option<Uuid>>,
     title: Option<String>,
     status: Option<String>,
     kind: Option<String>,
@@ -800,6 +818,22 @@ struct ItemPatch {
     occupancy: Option<String>,
     external_status: Option<String>,
     archived: Option<bool>,
+}
+
+fn present_assignee<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Option<Uuid>>, D::Error> {
+    Option::<Uuid>::deserialize(deserializer).map(Some)
+}
+
+fn assignment_error(err: sqlx::Error) -> Response {
+    if err.as_database_error().and_then(|err| err.constraint())
+        == Some("items_workspace_assignee_fk")
+    {
+        error(StatusCode::NOT_FOUND, "member not found")
+    } else {
+        database_error(err)
+    }
 }
 
 fn status_allowed(kind: &str, status: &str) -> bool {
@@ -835,6 +869,12 @@ fn snapshot_time(value: Option<DateTime<Utc>>) -> String {
 fn snapshots(item: &Item) -> Vec<(&'static str, String)> {
     vec![
         ("title", item.title.clone()),
+        (
+            "assigneeUserId",
+            item.assignee_user_id
+                .map(|id| id.to_string())
+                .unwrap_or_default(),
+        ),
         ("kind", item.kind.clone()),
         ("status", item.status.clone()),
         (
@@ -881,8 +921,47 @@ async fn patch(State(state): State<AppState>, Path(raw): Path<String>, body: Byt
         Ok(id) => id,
         Err(response) => return response,
     };
-    let mut item = match fetch(&state.pool, item_id).await {
-        Ok(item) if item.deleted_at.is_none() => item,
+    if crate::workspace::current().is_some_and(|s| !s.can_edit_shared()) {
+        if let Err(response) = crate::http::private_patch(&body, &["stress"]) {
+            return response;
+        }
+        let input: ItemPatch = match decode(&body) {
+            Ok(input) => input,
+            Err(response) => return response,
+        };
+        let Some(stress) = input.stress.filter(|v| (0..=5).contains(v)) else {
+            return error(StatusCode::BAD_REQUEST, "invalid: stress must be 1-5");
+        };
+        if let Err(response) = crate::track::item_exists(&state.pool, item_id).await {
+            return response;
+        }
+        let mut tx = match state.pool.begin().await {
+            Ok(tx) => tx,
+            Err(err) => return database_error(err),
+        };
+        let level = (stress > 0).then_some(stress as i16);
+        if let Err(err) = crate::track::set_item_stress(&mut tx, item_id, level).await {
+            return database_error(err);
+        }
+        if let Err(err) = tx.commit().await {
+            return database_error(err);
+        }
+        return match fetch(&state.pool, item_id).await {
+            Ok(item) => Json(item).into_response(),
+            Err(err) => not_found(err),
+        };
+    }
+    let mut tx = match state.pool.begin().await {
+        Ok(tx) => tx,
+        Err(err) => return database_error(err),
+    };
+    let select = format!("{SELECT} WHERE i.id=$1 FOR UPDATE OF i");
+    let mut item = match sqlx::query_as::<_, Item>(&select)
+        .bind(item_id)
+        .fetch_one(&mut *tx)
+        .await
+    {
+        Ok(item) if item.deleted_at.is_none() => item.with_quadrant(),
         Ok(_) => return error(StatusCode::NOT_FOUND, "not found"),
         Err(err) => return not_found(err),
     };
@@ -891,6 +970,9 @@ async fn patch(State(state): State<AppState>, Path(raw): Path<String>, body: Byt
         Ok(input) => input,
         Err(response) => return response,
     };
+    if let Some(assignee) = input.assignee_user_id {
+        item.assignee_user_id = assignee;
+    }
     if let Some(title) = input.title {
         let title = title.trim();
         if title.is_empty() {
@@ -1019,20 +1101,16 @@ async fn patch(State(state): State<AppState>, Path(raw): Path<String>, body: Byt
     }
     item.updated_at = now;
     let after = snapshots(&item);
-    let mut tx = match state.pool.begin().await {
-        Ok(tx) => tx,
-        Err(err) => return database_error(err),
-    };
-    let result = sqlx::query("UPDATE items SET title=$2,status=$3,kind=$4,project_id=$5,urgent=$6,important=$7,pinned=$8,stress=$9,due_at=$10,dev_due_at=$11,review_due_at=$12,test_due_at=$13,description=$14,planned_seconds=$15,links=$16,external_key=$17,archived_at=$18,deleted_at=$19,updated_at=$20,occupancy=$21,external_status=$22,pinned_at=$23 WHERE id=$1")
+    let result = sqlx::query("UPDATE items SET title=$2,status=$3,kind=$4,project_id=$5,urgent=$6,important=$7,pinned=$8,stress=$9,due_at=$10,dev_due_at=$11,review_due_at=$12,test_due_at=$13,description=$14,planned_seconds=$15,links=$16,external_key=$17,archived_at=$18,deleted_at=$19,updated_at=$20,occupancy=$21,external_status=$22,pinned_at=$23,assignee_user_id=$24 WHERE id=$1")
         .bind(item.id).bind(&item.title).bind(&item.status).bind(&item.kind).bind(item.project_id)
         .bind(item.urgent).bind(item.important).bind(item.pinned).bind(item.stress)
         .bind(item.due_at).bind(item.dev_due_at).bind(item.review_due_at).bind(item.test_due_at)
         .bind(&item.description).bind(item.planned_seconds).bind(DbJson(item.links.0.clone()))
         .bind(&item.external_key).bind(item.archived_at).bind(item.deleted_at).bind(item.updated_at)
-        .bind(&item.occupancy).bind(&item.external_status).bind(item.pinned_at)
+        .bind(&item.occupancy).bind(&item.external_status).bind(item.pinned_at).bind(item.assignee_user_id)
         .execute(&mut *tx).await;
     if let Err(err) = result {
-        return database_error(err);
+        return assignment_error(err);
     }
     if replace_people {
         if let Err(err) = sqlx::query("DELETE FROM person_items WHERE item_id=$1")

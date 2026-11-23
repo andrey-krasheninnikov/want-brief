@@ -1,5 +1,7 @@
 import { Input } from '@want-foundation/desyst-react'
 import { Button } from '@want-foundation/desyst-react'
+import { useAccount } from '../../shared/account'
+import { AssigneeField } from '../account/MemberField'
 import { useTimezone } from '../../shared/timezone'
 import { ArrowsClockwise } from '@phosphor-icons/react'
 import { useCallback, useMemo, useState, type DragEvent, type FormEvent } from 'react'
@@ -84,6 +86,7 @@ export function TasksScreen() {
 }
 
 function TasksWorkspace() {
+  const { workspace } = useAccount()
   const tz = useTimezone()
   const promptLog = useTaskLogPrompt()
   const offerUndo = useTaskUndo()
@@ -109,6 +112,7 @@ function TasksWorkspace() {
   const [dropStatus, setDropStatus] = useState<ItemStatus | null>(null)
   const [dragging, setDragging] = useState<{ id: string; kind: ItemKind; status: ItemStatus } | null>(null)
   const [title, setTitle] = useState('')
+  const [assignee, setAssignee] = useState<string | null>(null)
   const [newKind, setNewKind] = useState<ItemKind>('task')
   const [formError, setFormError] = useState('')
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
@@ -135,13 +139,14 @@ function TasksWorkspace() {
   const intervals = useQuery({ queryKey: ['intervals'], queryFn: api.intervals, refetchInterval: 1000 })
   const create = useMutation({
     mutationFn: async () => {
-      const item = await api.createItem({ title: title.trim(), kind: newKind })
+      const item = await api.createItem({ title: title.trim(), kind: newKind, assigneeUserId: workspace.kind === 'team' ? assignee : undefined })
       if (createStatus === 'backlog') return item
       if (!statusesForKind(newKind).includes(createStatus)) return item
       return api.patchItem(item.id, { status: createStatus })
     },
     onSuccess: (item) => {
       setTitle('')
+      setAssignee(null)
       setFormError('')
       setOpen(false)
       setCreateStatus('backlog')
@@ -408,7 +413,7 @@ function TasksWorkspace() {
             ))}
           </select>
         </div>
-        <Button
+        {workspace.role === 'owner' ? <Button
           type="button"
           className="ghost tasks-sync"
           title="Sync active"
@@ -417,7 +422,7 @@ function TasksWorkspace() {
           onClick={() => syncActive.mutate()}
         >
           <ArrowsClockwise size={18} weight="light" />
-        </Button>
+        </Button> : null}
         <Button type="button" className="tasks-add" onClick={() => openCreate('backlog')}>
           Add task
         </Button>
@@ -472,6 +477,7 @@ function TasksWorkspace() {
               ))}
             </select>
           </label>
+          <AssigneeField value={assignee} onChange={setAssignee} />
           {formError ? <p className="error">{formError}</p> : null}
           <Button type="submit">Create</Button>
         </form>

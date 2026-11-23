@@ -230,7 +230,7 @@ export function ProjectPage() {
             <p className="plaza-kicker">This month</p>
             <p className="plaza-stat">
               <strong className="mono">{hours(monthSeconds)}</strong>
-              <span>tracked</span>
+              <span>tracked by me</span>
             </p>
             <p className="plaza-stat">
               <strong className="mono">{hourlyRate(row.monthlyIncomeUsd, monthSeconds, 'en-US')}</strong>
@@ -252,14 +252,14 @@ export function ProjectPage() {
               onBlur={(value) => saveNumber('targetHoursDay', value, row.targetHoursDay)}
             />
             <Field
-              label="Income USD"
+              label="My income, USD"
               type="number"
               value={usd}
               onChange={setUsd}
               onBlur={(value) => saveNumber('monthlyIncomeUsd', value, row.monthlyIncomeUsd)}
             />
             <Field
-              label="Income RUB"
+              label="My income, RUB"
               type="number"
               value={rub}
               onChange={setRub}

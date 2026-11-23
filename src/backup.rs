@@ -13,11 +13,11 @@ use sqlx::Postgres;
 use std::collections::{BTreeMap, BTreeSet};
 
 const FORMAT_VERSION: u32 = 1;
-const SCHEMA_VERSION: i64 = 48;
+const SCHEMA_VERSION: i64 = 52;
 const MAX_BYTES: usize = 64 * 1024 * 1024;
 
 // Parent tables precede their references so restored IDs keep every relation.
-const TABLES: [&str; 40] = [
+const TABLES: [&str; 46] = [
     "projects",
     "sources",
     "items",
@@ -56,8 +56,14 @@ const TABLES: [&str; 40] = [
     "company_reports",
     "company_contracts",
     "item_events",
+    "item_event_annotations",
     "person_addresses",
     "earn_days",
+    "person_birthdays",
+    "item_ratings",
+    "project_personal_income",
+    "company_employment_dates",
+    "event_participants",
 ];
 
 #[derive(Serialize, Deserialize)]
@@ -66,6 +72,8 @@ struct Backup {
     format_version: u32,
     schema_version: i64,
     exported_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    workspace_kind: Option<String>,
     tables: BTreeMap<String, Vec<Value>>,
 }
 
@@ -107,9 +115,12 @@ async fn export(state: &AppState) -> Result<Vec<u8>, Response> {
     if schema_version(&mut transaction).await? != SCHEMA_VERSION {
         return Err(error(StatusCode::CONFLICT, "unsupported database schema"));
     }
+    let scope = crate::workspace::current()
+        .ok_or_else(|| error(StatusCode::UNAUTHORIZED, "unauthorized"))?;
+    archive_scope(&mut transaction, &scope.kind).await?;
     let mut tables = BTreeMap::new();
     for table in TABLES {
-        let query = format!("SELECT to_jsonb(row) FROM {table} row");
+        let query = format!("SELECT to_jsonb(row) - 'workspace_id' - 'owner_id' FROM {table} row");
         let mut rows: Vec<Value> = sqlx::query_scalar(&query)
             .fetch_all(&mut *transaction)
             .await
@@ -137,6 +148,7 @@ async fn export(state: &AppState) -> Result<Vec<u8>, Response> {
         format_version: FORMAT_VERSION,
         schema_version: SCHEMA_VERSION,
         exported_at: Utc::now(),
+        workspace_kind: Some(scope.kind),
         tables,
     };
     let bytes = serde_json::to_vec(&backup)
@@ -185,7 +197,9 @@ async fn restore(
 async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
     let mut backup: Backup = serde_json::from_slice(body)
         .map_err(|_| error(StatusCode::BAD_REQUEST, "invalid backup"))?;
-    if backup.format_version != FORMAT_VERSION || !matches!(backup.schema_version, 47 | 48) {
+    if backup.format_version != FORMAT_VERSION
+        || !matches!(backup.schema_version, 47 | 48 | SCHEMA_VERSION)
+    {
         return Err(error(StatusCode::CONFLICT, "unsupported backup version"));
     }
     if backup.schema_version == 47 {
@@ -200,6 +214,46 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
             }
             fields.insert("sync_interval_minutes".to_owned(), Value::from(0));
             fields.insert("last_attempt_at".to_owned(), Value::Null);
+        }
+    }
+    let scope = crate::workspace::current()
+        .ok_or_else(|| error(StatusCode::UNAUTHORIZED, "unauthorized"))?;
+    if backup.schema_version == SCHEMA_VERSION {
+        if backup.workspace_kind.as_deref() != Some(scope.kind.as_str()) {
+            return Err(error(
+                StatusCode::CONFLICT,
+                "backup belongs to a different workspace kind",
+            ));
+        }
+    } else {
+        if scope.kind != "personal" || backup.workspace_kind.is_some() {
+            return Err(error(
+                StatusCode::CONFLICT,
+                "single-owner backup requires a personal workspace",
+            ));
+        }
+        for table in [
+            "person_birthdays",
+            "item_ratings",
+            "item_event_annotations",
+            "project_personal_income",
+            "company_employment_dates",
+            "event_participants",
+        ] {
+            if backup.tables.insert(table.into(), Vec::new()).is_some() {
+                return Err(error(StatusCode::BAD_REQUEST, "invalid legacy table"));
+            }
+        }
+        for row in backup.tables.get_mut("items").into_iter().flatten() {
+            let fields = row
+                .as_object_mut()
+                .ok_or_else(|| error(StatusCode::BAD_REQUEST, "invalid backup row"))?;
+            if fields
+                .insert("assignee_user_id".into(), Value::Null)
+                .is_some()
+            {
+                return Err(error(StatusCode::BAD_REQUEST, "invalid legacy item"));
+            }
         }
     }
     let columns = table_columns(state).await?;
@@ -226,6 +280,17 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
             return Err(error(StatusCode::BAD_REQUEST, "invalid backup row"));
         }
     }
+    if backup.tables["sources"]
+        .iter()
+        .filter(|row| row["kind"] == "manual")
+        .count()
+        != 1
+    {
+        return Err(error(
+            StatusCode::BAD_REQUEST,
+            "backup must contain one manual source",
+        ));
+    }
     for row in backup.tables.get_mut("sources").unwrap() {
         row["connected"] = Value::Bool(false);
         row["last_error"] = Value::String(String::new());
@@ -234,11 +299,41 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
     if schema_version(&mut transaction).await? != SCHEMA_VERSION {
         return Err(error(StatusCode::CONFLICT, "unsupported database schema"));
     }
-    let truncate = format!("TRUNCATE TABLE {}", TABLES.join(","));
-    sqlx::query(&truncate)
+    archive_scope(&mut transaction, &scope.kind).await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended(wb_workspace()::text,78415))")
         .execute(&mut *transaction)
         .await
         .map_err(database_error)?;
+    sqlx::query("SELECT wb_check_restore_sources(ARRAY(SELECT src.id FROM jsonb_to_recordset($1::jsonb) src(id uuid,kind text) WHERE src.kind<>'manual'))")
+        .bind(Json(&backup.tables["sources"]))
+        .execute(&mut *transaction).await.map_err(import_error)?;
+    let keys = primary_keys(&mut transaction).await?;
+    let shared = scope.kind == "team";
+    for table in TABLES.into_iter().rev() {
+        let mut delete = format!("DELETE FROM {table} dest");
+        if shared {
+            let key = keys
+                .get(table)
+                .ok_or_else(|| error(StatusCode::CONFLICT, "missing table key"))?;
+            let equal = key
+                .iter()
+                .filter(|k| exported_column(table, k))
+                .map(|k| format!("src.{k}=dest.{k}"))
+                .collect::<Vec<_>>()
+                .join(" AND ");
+            delete.push_str(&format!(" WHERE NOT EXISTS (SELECT FROM jsonb_populate_recordset(NULL::{table},$1::jsonb) src WHERE {equal})"));
+            sqlx::query(&delete)
+                .bind(Json(&backup.tables[table]))
+                .execute(&mut *transaction)
+                .await
+                .map_err(import_error)?;
+        } else {
+            sqlx::query(&delete)
+                .execute(&mut *transaction)
+                .await
+                .map_err(import_error)?;
+        }
+    }
     for table in TABLES {
         let rows = backup.tables.remove(table).unwrap();
         if rows.is_empty() {
@@ -251,9 +346,33 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
             .map(|name| format!("\"{}\"", name.replace('"', "\"\"")))
             .collect::<Vec<_>>()
             .join(",");
-        let insert = format!(
+        let mut insert = format!(
             "INSERT INTO {table} ({names}) SELECT {names} FROM jsonb_populate_recordset(NULL::{table}, $1::jsonb)"
         );
+        if shared {
+            let key = &keys[table];
+            let mut updates = columns[table]
+                .iter()
+                .filter(|n| exported_column(table, n) && !key.contains(n))
+                .map(|n| format!("{n}=excluded.{n}"))
+                .collect::<Vec<_>>();
+            if table == "sources" {
+                updates.extend(
+                    [
+                        "token_sealed=DEFAULT",
+                        "sync_claim_id=DEFAULT",
+                        "sync_claim_until=DEFAULT",
+                    ]
+                    .map(str::to_owned),
+                );
+            }
+            let action = if updates.is_empty() {
+                "NOTHING".into()
+            } else {
+                format!("UPDATE SET {}", updates.join(","))
+            };
+            insert.push_str(&format!(" ON CONFLICT ({}) DO {action}", key.join(",")));
+        }
         sqlx::query(&insert)
             .bind(Json(rows))
             .execute(&mut *transaction)
@@ -265,7 +384,38 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
 }
 
 fn exported_column(table: &str, name: &str) -> bool {
-    table != "sources" || !matches!(name, "token_sealed" | "sync_claim_id" | "sync_claim_until")
+    !matches!(name, "workspace_id" | "owner_id")
+        && (table != "sources"
+            || !matches!(name, "token_sealed" | "sync_claim_id" | "sync_claim_until"))
+}
+
+async fn archive_scope(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    kind: &str,
+) -> Result<(), Response> {
+    if kind == "team" {
+        sqlx::query("SELECT set_config('wantbrief.backup','shared',true)")
+            .execute(&mut **tx)
+            .await
+            .map_err(database_error)?;
+    }
+    Ok(())
+}
+
+async fn primary_keys(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+) -> Result<BTreeMap<String, Vec<String>>, Response> {
+    sqlx::query_as::<_, (String, Vec<String>)>(
+        "SELECT c.relname::text,array_agg(a.attname::text ORDER BY k.n)
+         FROM pg_index i JOIN pg_class c ON c.oid=i.indrelid
+         CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY k(attnum,n)
+         JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.attnum
+         WHERE i.indisprimary AND c.relnamespace='public'::regnamespace GROUP BY c.relname",
+    )
+    .fetch_all(&mut **tx)
+    .await
+    .map(|keys| keys.into_iter().collect())
+    .map_err(database_error)
 }
 
 async fn schema_version(
@@ -296,7 +446,7 @@ fn import_error(err: sqlx::Error) -> Response {
     if let sqlx::Error::Database(database) = &err {
         if database
             .code()
-            .is_some_and(|code| code.starts_with("22") || code.starts_with("23"))
+            .is_some_and(|code| code.starts_with("22") || code.starts_with("23") || code == "21000")
         {
             return error(StatusCode::BAD_REQUEST, "invalid backup data");
         }

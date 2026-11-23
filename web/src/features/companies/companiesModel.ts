@@ -178,12 +178,12 @@ export function companyMatches(company: Company, query: string): boolean {
   return `${company.name} ${company.description} ${titles}`.toLowerCase().includes(needle)
 }
 
-export function rememberCompany(id: string) {
-  sessionStorage.setItem(LAST_COMPANY_KEY, id)
+export function rememberCompany(id: string, scope: string) {
+  sessionStorage.setItem(`${LAST_COMPANY_KEY}:${scope}`, id)
 }
 
-export function rememberedCompany(ids: string[]): string | null {
-  const last = sessionStorage.getItem(LAST_COMPANY_KEY)
+export function rememberedCompany(ids: string[], scope: string): string | null {
+  const last = sessionStorage.getItem(`${LAST_COMPANY_KEY}:${scope}`)
   if (last && ids.includes(last)) return last
   return ids[0] ?? null
 }

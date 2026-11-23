@@ -1,6 +1,8 @@
 import { Button } from '@want-foundation/desyst-react'
 import { Play, Stop } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAccount } from '../../shared/account'
+import { workspaceUrl } from '../../shared/workspacePath'
 import { api } from '../../api'
 import { elapsed } from '../../shared/format'
 import type { TimeInterval } from '../../types'
@@ -8,11 +10,13 @@ import { useTaskLogPrompt } from './TaskLogPrompt'
 
 type Props = {
   itemId: string
+  workspaceId?: string
   running?: TimeInterval
   prominent?: boolean
 }
 
-export function TaskTimer({ itemId, running, prominent }: Props) {
+export function TaskTimer({ itemId, workspaceId, running, prominent }: Props) {
+  const { workspace } = useAccount()
   const promptLog = useTaskLogPrompt()
   const queryClient = useQueryClient()
   const start = useMutation({
@@ -32,6 +36,9 @@ export function TaskTimer({ itemId, running, prominent }: Props) {
   })
 
   if (!running && !prominent) return null
+  if (workspaceId && workspaceId !== workspace.id) {
+    return <a href={workspaceUrl(workspaceId, '/tasks/' + encodeURIComponent(itemId))}>Open task timer</a>
+  }
 
   return (
     <div

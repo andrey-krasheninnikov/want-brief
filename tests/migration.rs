@@ -23,7 +23,7 @@ async fn existing_goose_journal_is_reused() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(version, 48);
+    assert_eq!(version, 52);
     assert!(after >= before);
     migrate(&url, Path::new("migrations")).await.unwrap();
     let repeated: i64 = sqlx::query_scalar("SELECT count(*) FROM goose_db_version")
@@ -45,7 +45,7 @@ async fn rust_sessions_use_existing_go_format() {
     let auth = Auth::new(pool.clone());
     auth.ensure_user("sample-password").await.unwrap();
     let password_hash: String =
-        sqlx::query_scalar("SELECT password_hash FROM users ORDER BY created_at LIMIT 1")
+        sqlx::query_scalar("SELECT password_hash FROM users WHERE is_legacy")
             .fetch_one(&pool)
             .await
             .unwrap();

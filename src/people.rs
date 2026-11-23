@@ -16,7 +16,7 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 const COLUMNS: &str =
-    "id,name,born_on::timestamp AT TIME ZONE 'UTC' AS born_on,created_at,updated_at";
+    "id,name,COALESCE((SELECT b.born_on FROM person_birthdays b WHERE b.person_id=people.id),born_on)::timestamp AT TIME ZONE 'UTC' AS born_on,created_at,updated_at";
 
 #[derive(FromRow)]
 struct PersonRow {
@@ -327,27 +327,34 @@ async fn show(State(state): State<AppState>, Path(raw): Path<String>) -> Respons
 }
 
 #[allow(clippy::result_large_err)]
+fn birthday(write: &PersonWrite, zone: Tz) -> Result<Option<NaiveDate>, Response> {
+    if write.age_years.is_some_and(|age| !(0..=150).contains(&age)) {
+        return Err(error(StatusCode::BAD_REQUEST, "invalid: ageYears"));
+    }
+    Ok(
+        match write.born_on.as_deref().filter(|raw| !raw.is_empty()) {
+            Some(raw) => Some(
+                NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+                    .or_else(|_| DateTime::parse_from_rfc3339(raw).map(|stamp| stamp.date_naive()))
+                    .map_err(|_| error(StatusCode::BAD_REQUEST, "invalid: bornOn"))?,
+            ),
+            None => write.age_years.map(|age| {
+                let today = Utc::now().with_timezone(&zone).date_naive();
+                let year = today.year() - age;
+                let first = NaiveDate::from_ymd_opt(year, today.month(), 1).unwrap();
+                first + chrono::Duration::days(i64::from(today.day() - 1))
+            }),
+        },
+    )
+}
+
+#[allow(clippy::result_large_err)]
 fn normalize(write: &mut PersonWrite, zone: Tz) -> Result<Option<NaiveDate>, Response> {
     write.name = write.name.trim().to_owned();
     if write.name.is_empty() {
         return Err(error(StatusCode::BAD_REQUEST, "invalid: person name"));
     }
-    if write.age_years.is_some_and(|age| !(0..=150).contains(&age)) {
-        return Err(error(StatusCode::BAD_REQUEST, "invalid: ageYears"));
-    }
-    let born_on = match write.born_on.as_deref().filter(|raw| !raw.is_empty()) {
-        Some(raw) => Some(
-            NaiveDate::parse_from_str(raw, "%Y-%m-%d")
-                .or_else(|_| DateTime::parse_from_rfc3339(raw).map(|stamp| stamp.date_naive()))
-                .map_err(|_| error(StatusCode::BAD_REQUEST, "invalid: bornOn"))?,
-        ),
-        None => write.age_years.map(|age| {
-            let today = Utc::now().with_timezone(&zone).date_naive();
-            let year = today.year() - age;
-            let first = NaiveDate::from_ymd_opt(year, today.month(), 1).unwrap();
-            first + chrono::Duration::days(i64::from(today.day() - 1))
-        }),
-    };
+    let born_on = birthday(write, zone)?;
     write.projects = normalize_rels(std::mem::take(&mut write.projects))?;
     write.events = normalize_rels(std::mem::take(&mut write.events))?;
     let mut seen = HashSet::new();
@@ -486,6 +493,32 @@ async fn replace(State(state): State<AppState>, Path(raw): Path<String>, body: B
         Ok(write) => write,
         Err(response) => return response,
     };
+    if crate::workspace::current().is_some_and(|s| !s.can_edit_shared()) {
+        if let Err(response) = crate::http::private_patch(&body, &["bornOn", "ageYears"]) {
+            return response;
+        }
+        let day = match birthday(&write, zone) {
+            Ok(day) => day,
+            Err(response) => return response,
+        };
+        let result = if let Some(day) = day {
+            sqlx::query("INSERT INTO person_birthdays(person_id,born_on) VALUES($1,$2)
+                ON CONFLICT(workspace_id,owner_id,person_id) DO UPDATE SET born_on=excluded.born_on")
+                .bind(person_id).bind(day).execute(&state.pool).await
+        } else {
+            sqlx::query("DELETE FROM person_birthdays WHERE person_id=$1")
+                .bind(person_id)
+                .execute(&state.pool)
+                .await
+        };
+        if let Err(err) = result {
+            return database_error(err);
+        }
+        return match fetch(&state.pool, person_id, zone).await {
+            Ok(person) => Json(person).into_response(),
+            Err(err) => not_found(err),
+        };
+    }
     let born_on = match normalize(&mut write, zone) {
         Ok(born_on) => born_on,
         Err(response) => return response,

@@ -1,12 +1,14 @@
+mod workspaces;
+
 use crate::http::{database_error, decode, error, AppState};
-use crate::schedule_plan::{self, Absence, Block, DayOverride, Input};
+use crate::schedule_plan::{self, Absence, DayOverride, Input, Reservation};
 use axum::body::Bytes;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use chrono::{DateTime, Duration, NaiveDate, Timelike, Utc};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Json as DbJson;
@@ -19,6 +21,7 @@ struct Range {
     from: String,
     to: String,
     kind: String,
+    view: String,
 }
 
 #[derive(Deserialize)]
@@ -34,6 +37,7 @@ struct Scenario {
     from: String,
     to: String,
     kind: String,
+    view: String,
     move_due: Vec<DueMove>,
     drop_items: Vec<Uuid>,
     skip_events: Vec<Uuid>,
@@ -69,13 +73,18 @@ fn parse_range(
     from: &str,
     to: &str,
     kind: &str,
+    view: &str,
 ) -> Result<(DateTime<Utc>, DateTime<Utc>, String), Response> {
-    let from = DateTime::parse_from_rfc3339(from)
-        .map_err(|_| error(StatusCode::BAD_REQUEST, "invalid"))?
-        .with_timezone(&Utc);
-    let to = DateTime::parse_from_rfc3339(to)
-        .map_err(|_| error(StatusCode::BAD_REQUEST, "invalid"))?
-        .with_timezone(&Utc);
+    let parse = |raw: &str| {
+        DateTime::parse_from_rfc3339(raw)
+            .map(|stamp| stamp.with_timezone(&Utc))
+            .map_err(|_| error(StatusCode::BAD_REQUEST, "invalid"))
+    };
+    let (from, to) = if view == "team" && from.is_empty() && to.is_empty() {
+        (DateTime::<Utc>::MIN_UTC, DateTime::<Utc>::MAX_UTC)
+    } else {
+        (parse(from)?, parse(to)?)
+    };
     if to <= from {
         return Err(error(StatusCode::BAD_REQUEST, "invalid"));
     }
@@ -90,26 +99,11 @@ fn parse_range(
     ))
 }
 
-async fn input(
+async fn running_intervals(
     state: &AppState,
-    from: DateTime<Utc>,
-    to: DateTime<Utc>,
-    kind: String,
-) -> Result<Input, Response> {
-    let settings = crate::schedule_settings::settings(state).await?;
-    let zone: Tz = settings
-        .timezone
-        .parse()
-        .map_err(|_| error(StatusCode::INTERNAL_SERVER_ERROR, "internal error"))?;
-    let now = Utc::now().with_nanosecond(0).unwrap();
-    let horizon = (now + Duration::days(120)).max(to);
-    let event_from = now.min(from);
-    let mut items = crate::items::open(&state.pool)
-        .await
-        .map_err(database_error)?;
-    let events = crate::events::occurrences(&state.pool, event_from, horizon)
-        .await
-        .map_err(database_error)?;
+    items: &mut [crate::items::Item],
+    now: DateTime<Utc>,
+) -> Result<HashSet<Uuid>, Response> {
     let open: Vec<(Uuid, DateTime<Utc>)> =
         sqlx::query_as("SELECT item_id,started_at FROM time_intervals WHERE ended_at IS NULL")
             .fetch_all(&state.pool)
@@ -124,9 +118,36 @@ async fn input(
             *elapsed.entry(item_id).or_default() += seconds;
         }
     }
-    for item in &mut items {
+    for item in items {
         item.tracked_seconds += elapsed.get(&item.id).copied().unwrap_or(0);
     }
+    Ok(active)
+}
+
+async fn input(
+    state: &AppState,
+    window: workspaces::Window,
+    kind: String,
+    settings: crate::schedule_settings::Settings,
+) -> Result<Input, Response> {
+    let workspaces::Window {
+        from,
+        to,
+        now,
+        horizon_end: horizon,
+    } = window;
+    let zone: Tz = settings
+        .timezone
+        .parse()
+        .map_err(|_| error(StatusCode::INTERNAL_SERVER_ERROR, "internal error"))?;
+    let event_from = now.min(from);
+    let mut items = crate::items::open(&state.pool)
+        .await
+        .map_err(database_error)?;
+    let events = crate::events::occurrences(&state.pool, event_from, horizon)
+        .await
+        .map_err(database_error)?;
+    let active = running_intervals(state, &mut items, now).await?;
     let rows: Vec<(NaiveDate, bool, Option<i32>, Option<i32>)> = sqlx::query_as("SELECT day,\"off\",work_start_min,work_end_min FROM schedule_day_overrides WHERE day BETWEEN $1 AND $2")
         .bind(event_from.with_timezone(&zone).date_naive())
         .bind(horizon.with_timezone(&zone).date_naive())
@@ -217,6 +238,7 @@ async fn input(
         history,
         checkins,
         previous: Vec::new(),
+        horizon_end: horizon,
         now,
         from,
         to,
@@ -224,28 +246,58 @@ async fn input(
 }
 
 async fn get_schedule(State(state): State<AppState>, Query(range): Query<Range>) -> Response {
-    let (from, to, kind) = match parse_range(&range.from, &range.to, &range.kind) {
+    let (from, to, kind) = match parse_range(&range.from, &range.to, &range.kind, &range.view) {
         Ok(range) => range,
         Err(response) => return response,
     };
-    let mut input = match input(&state, from, to, kind.clone()).await {
-        Ok(input) => input,
-        Err(response) => return response,
+    let Some(actor) = crate::workspace::current() else {
+        return error(StatusCode::UNAUTHORIZED, "unauthorized");
     };
+    let result = match range.view.as_str() {
+        "team" if actor.kind == "team" => workspaces::team(&state, &actor, from, to, kind).await,
+        "team" => Err(error(StatusCode::BAD_REQUEST, "select a team workspace")),
+        "" | "personal" => {
+            let personal =
+                match crate::workspace::access(state.auth.pool(), actor.user_id, None).await {
+                    Ok(scope) => scope,
+                    Err(err) => return crate::http::not_found(err),
+                };
+            crate::workspace::in_scope(personal.clone(), async {
+                let input = workspaces::personal(&state, &personal, from, to, kind).await?;
+                snapshot(&state, &personal, input).await
+            })
+            .await
+        }
+        _ => Err(error(StatusCode::BAD_REQUEST, "invalid: schedule view")),
+    };
+    result.unwrap_or_else(|err| err)
+}
+
+async fn snapshot(
+    state: &AppState,
+    personal: &crate::workspace::Scope,
+    mut input: Input,
+) -> Result<Response, Response> {
+    let kind = input.kind.clone();
     let previous: Option<DbJson<serde_json::Value>> =
         sqlx::query_scalar("SELECT blocks FROM schedule_snapshots WHERE kind=$1")
             .bind(&kind)
             .fetch_optional(&state.pool)
             .await
-            .ok()
-            .flatten();
+            .map_err(database_error)?;
     input.previous = previous
-        .and_then(|DbJson(blocks)| serde_json::from_value::<Vec<Block>>(blocks).ok())
+        .and_then(|DbJson(blocks)| serde_json::from_value::<Vec<Reservation>>(blocks).ok())
         .unwrap_or_default();
     let report = schedule_plan::plan(&input);
-    let _ = sqlx::query("INSERT INTO schedule_snapshots(kind,taken_at,blocks) VALUES($1,$2,$3) ON CONFLICT(kind) DO UPDATE SET taken_at=EXCLUDED.taken_at,blocks=EXCLUDED.blocks")
-        .bind(&kind).bind(input.now).bind(DbJson(&report.horizon)).execute(&state.pool).await;
-    Json(report).into_response()
+    let own: Vec<_> = report
+        .horizon
+        .iter()
+        .filter(|block| block.workspace_id == personal.workspace_id)
+        .map(Reservation::from)
+        .collect();
+    sqlx::query("INSERT INTO schedule_snapshots(kind,taken_at,blocks) VALUES($1,$2,$3) ON CONFLICT(workspace_id,owner_id,kind) DO UPDATE SET taken_at=EXCLUDED.taken_at,blocks=EXCLUDED.blocks")
+        .bind(&kind).bind(input.now).bind(DbJson(own)).execute(&state.pool).await.map_err(database_error)?;
+    Ok(Json(report).into_response())
 }
 
 fn summarize(report: &schedule_plan::Schedule) -> Summary {
@@ -265,11 +317,30 @@ async fn what_if(State(state): State<AppState>, body: Bytes) -> Response {
         Ok(value) => value,
         Err(response) => return response,
     };
-    let (from, to, kind) = match parse_range(&scenario.from, &scenario.to, &scenario.kind) {
-        Ok(range) => range,
-        Err(response) => return response,
+    let (from, to, kind) =
+        match parse_range(&scenario.from, &scenario.to, &scenario.kind, &scenario.view) {
+            Ok(range) => range,
+            Err(response) => return response,
+        };
+    if !matches!(scenario.view.as_str(), "" | "personal") {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "what-if uses the personal schedule",
+        );
+    }
+    let Some(actor) = crate::workspace::current() else {
+        return error(StatusCode::UNAUTHORIZED, "unauthorized");
     };
-    let input = match input(&state, from, to, kind).await {
+    let personal = match crate::workspace::access(state.auth.pool(), actor.user_id, None).await {
+        Ok(scope) => scope,
+        Err(err) => return crate::http::not_found(err),
+    };
+    let input = match crate::workspace::in_scope(
+        personal.clone(),
+        workspaces::personal(&state, &personal, from, to, kind),
+    )
+    .await
+    {
         Ok(input) => input,
         Err(response) => return response,
     };

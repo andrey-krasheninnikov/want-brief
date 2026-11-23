@@ -1525,3 +1525,16 @@ tbody:first-of-type .sched-table-day th {
     transition: none;
   }
 }
+
+.team-plan { min-width: 0; padding-block: .4rem; }
+.team-plan.stack, .team-plan section.stack { max-width: none; }
+.team-plan h2, .team-plan h3, .team-plan h4, .team-plan p { margin: 0; }
+.team-plan-range { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem; }
+.team-plan-range p, .team-member dt { color: var(--muted-foreground); }
+.team-member { border-top: 1px solid var(--border); padding-block: .75rem; }
+.team-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .6rem; margin: .6rem 0 0; }
+.team-days div { padding: .55rem .7rem; border-radius: .7rem; background: var(--secondary); }
+.team-days dt { font-size: .9rem; }
+.team-days dd { margin: .2rem 0 0; }
+.member-choices { display: grid; gap: .5rem; border: 1px solid var(--border); border-radius: .75rem; min-width: 0; }
+.member-choices label { overflow-wrap: anywhere; }

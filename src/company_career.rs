@@ -259,11 +259,19 @@ async fn mutate(state: AppState, raw: String, body: Bytes, action: Action) -> Re
         Ok(tx) => tx,
         Err(err) => return database_error(err),
     };
-    let exists: Result<Uuid, _> =
-        sqlx::query_scalar("SELECT id FROM companies WHERE id=$1 FOR UPDATE")
-            .bind(company)
-            .fetch_one(&mut *tx)
-            .await;
+    let team = crate::workspace::current().is_some_and(|s| s.kind == "team");
+    let find = if team {
+        // The first entry has no row yet. Serialize histories for this author and company.
+        if let Err(err)=sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended(wb_actor()::text || $1::uuid::text,3125))")
+            .bind(company).execute(&mut *tx).await {return database_error(err);}
+        "SELECT id FROM companies WHERE id=$1"
+    } else {
+        "SELECT id FROM companies WHERE id=$1 FOR UPDATE"
+    };
+    let exists = sqlx::query_scalar::<_, Uuid>(find)
+        .bind(company)
+        .fetch_one(&mut *tx)
+        .await;
     if let Err(err) = exists {
         return not_found(err);
     }
@@ -271,7 +279,7 @@ async fn mutate(state: AppState, raw: String, body: Bytes, action: Action) -> Re
         Ok(value) => value,
         Err(response) => return response,
     };
-    if changed {
+    if changed && !team {
         if let Err(err) = sqlx::query("UPDATE companies SET updated_at=$2 WHERE id=$1")
             .bind(company)
             .bind(Utc::now())
@@ -332,13 +340,15 @@ async fn end_report(
         {
             return database_error(err);
         }
-        if let Err(err) = sqlx::query("UPDATE companies SET updated_at=$2 WHERE id=$1")
-            .bind(company)
-            .bind(Utc::now())
-            .execute(&mut *tx)
-            .await
-        {
-            return database_error(err);
+        if crate::workspace::current().is_none_or(|s| s.kind != "team") {
+            if let Err(err) = sqlx::query("UPDATE companies SET updated_at=$2 WHERE id=$1")
+                .bind(company)
+                .bind(Utc::now())
+                .execute(&mut *tx)
+                .await
+            {
+                return database_error(err);
+            }
         }
     }
     if let Err(err) = tx.commit().await {

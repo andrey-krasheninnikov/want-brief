@@ -16,12 +16,14 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-const COLUMNS: &str = "id,title,description,agenda,kind,type,project_id,starts_at,timezone,duration_seconds,recurrence,repeat_until,weekdays,links,meet_url,involvement,active_start_offset,active_end_offset,can_skip,created_at,updated_at";
+const COLUMNS: &str = "id,workspace_id,ARRAY(SELECT ep.user_id FROM event_participants ep WHERE ep.event_id=events.id AND ep.workspace_id=events.workspace_id ORDER BY ep.user_id) AS participant_user_ids,title,description,agenda,kind,type,project_id,starts_at,timezone,duration_seconds,recurrence,repeat_until,weekdays,links,meet_url,involvement,active_start_offset,active_end_offset,can_skip,created_at,updated_at";
 
 #[derive(FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Event {
     id: Uuid,
+    workspace_id: Uuid,
+    participant_user_ids: Vec<Uuid>,
     title: String,
     description: String,
     agenda: String,
@@ -51,6 +53,7 @@ pub(crate) struct Event {
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct EventWrite {
+    participant_user_ids: Option<Vec<Uuid>>,
     title: String,
     description: String,
     agenda: String,
@@ -112,8 +115,15 @@ pub(crate) async fn fetch(pool: &PgPool, event_id: Uuid) -> Result<Event, sqlx::
 }
 
 pub(crate) async fn all(pool: &PgPool) -> Result<Vec<Event>, sqlx::Error> {
-    let query = format!("SELECT {COLUMNS} FROM events ORDER BY starts_at");
-    let mut events = sqlx::query_as::<_, Event>(&query).fetch_all(pool).await?;
+    series_for(pool, None).await
+}
+
+async fn series_for(pool: &PgPool, member: Option<Uuid>) -> Result<Vec<Event>, sqlx::Error> {
+    let query = format!("SELECT {COLUMNS} FROM events WHERE $1::uuid IS NULL OR EXISTS (SELECT 1 FROM event_participants ep WHERE ep.event_id=events.id AND ep.workspace_id=events.workspace_id AND ep.user_id=$1) ORDER BY starts_at");
+    let mut events = sqlx::query_as::<_, Event>(&query)
+        .bind(member)
+        .fetch_all(pool)
+        .await?;
     for event in &mut events {
         attach_people(pool, event).await?;
     }
@@ -278,6 +288,30 @@ async fn save_people(
     Ok(())
 }
 
+async fn save_participants(
+    tx: &mut Transaction<'_, Postgres>,
+    event_id: Uuid,
+    participants: Option<&[Uuid]>,
+) -> Result<(), Response> {
+    let Some(participants) = participants else {
+        return Ok(());
+    };
+    sqlx::query("DELETE FROM event_participants WHERE event_id=$1")
+        .bind(event_id)
+        .execute(&mut **tx)
+        .await
+        .map_err(database_error)?;
+    sqlx::query("INSERT INTO event_participants (event_id,user_id) SELECT $1, member FROM (SELECT DISTINCT unnest($2::uuid[]) AS member) requested")
+        .bind(event_id).bind(participants).execute(&mut **tx).await.map_err(|err| {
+            if err.as_database_error().is_some_and(|err| err.is_foreign_key_violation()) {
+                error(StatusCode::NOT_FOUND, "member not found")
+            } else {
+                database_error(err)
+            }
+        })?;
+    Ok(())
+}
+
 async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     let mut write: EventWrite = match decode(&body) {
         Ok(write) => write,
@@ -311,6 +345,11 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     }
     if let Err(err) = save_people(&mut tx, event_id, write.people.as_deref().unwrap_or(&[])).await {
         return database_error(err);
+    }
+    if let Err(response) =
+        save_participants(&mut tx, event_id, write.participant_user_ids.as_deref()).await
+    {
+        return response;
     }
     if let Err(err) = tx.commit().await {
         return database_error(err);
@@ -360,6 +399,11 @@ async fn replace(State(state): State<AppState>, Path(raw): Path<String>, body: B
             return database_error(err);
         }
     }
+    if let Err(response) =
+        save_participants(&mut tx, event_id, write.participant_user_ids.as_deref()).await
+    {
+        return response;
+    }
     if let Err(err) = tx.commit().await {
         return database_error(err);
     }
@@ -397,6 +441,8 @@ struct EventOverride {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct EventOccurrence {
+    pub(crate) workspace_id: Uuid,
+    pub(crate) participant_user_ids: Vec<Uuid>,
     pub(crate) id: Uuid,
     pub(crate) series_id: Uuid,
     pub(crate) title: String,
@@ -434,6 +480,8 @@ pub(crate) fn schedule_fixture(
 ) -> EventOccurrence {
     EventOccurrence {
         id: Uuid::new_v4(),
+        workspace_id: Uuid::nil(),
+        participant_user_ids: Vec::new(),
         series_id: Uuid::new_v4(),
         title: title.to_owned(),
         description: String::new(),
@@ -570,6 +618,8 @@ fn occurrence(
         .unwrap_or(event.duration_seconds);
     EventOccurrence {
         id: event.id,
+        workspace_id: event.workspace_id,
+        participant_user_ids: event.participant_user_ids.clone(),
         series_id: event.id,
         title: event.title.clone(),
         description: event.description.clone(),
@@ -625,7 +675,16 @@ pub(crate) async fn occurrences(
     from: DateTime<Utc>,
     to: DateTime<Utc>,
 ) -> Result<Vec<EventOccurrence>, sqlx::Error> {
-    let events = all(pool).await?;
+    occurrences_for(pool, from, to, None).await
+}
+
+pub(crate) async fn occurrences_for(
+    pool: &PgPool,
+    from: DateTime<Utc>,
+    to: DateTime<Utc>,
+    member: Option<Uuid>,
+) -> Result<Vec<EventOccurrence>, sqlx::Error> {
+    let events = series_for(pool, member).await?;
     let ids: Vec<Uuid> = events.iter().map(|event| event.id).collect();
     let rows = overrides(pool, &ids).await?;
     let mut by_override: HashMap<(Uuid, NaiveDate), EventOverride> = rows
@@ -635,7 +694,9 @@ pub(crate) async fn occurrences(
     let mut result = Vec::new();
     for event in &events {
         let zone = timezone(event);
-        let mut day = from.with_timezone(&zone).date_naive();
+        let mut day = (from - Duration::seconds(i64::from(event.duration_seconds)))
+            .with_timezone(&zone)
+            .date_naive();
         let end_day = to
             .with_timezone(&zone)
             .date_naive()
@@ -649,7 +710,7 @@ pub(crate) async fn occurrences(
             if has_slot(event, day) {
                 let row = by_override.remove(&(event.id, day));
                 let entry = occurrence(event, day, row.as_ref());
-                if !entry.skipped && entry.starts_at >= from && entry.starts_at < to {
+                if !entry.skipped && entry.ends_at > from && entry.starts_at < to {
                     result.push(entry);
                 }
             }
@@ -664,7 +725,7 @@ pub(crate) async fn occurrences(
         {
             if *series_id == event.id && has_slot(event, *on) && !row.skipped {
                 let entry = occurrence(event, *on, Some(row));
-                if entry.starts_at >= from && entry.starts_at < to {
+                if entry.ends_at > from && entry.starts_at < to {
                     result.push(entry);
                 }
             }

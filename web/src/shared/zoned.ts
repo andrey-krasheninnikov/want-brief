@@ -132,3 +132,16 @@ export function shiftMonths(anchor: Date, months: number, timeZone: string): Dat
   const target = new Date(Date.UTC(year, month - 1 + months, Math.min(day, 28)))
   return new Date(zonedInstant(`${target.toISOString().slice(0, 10)}T12:00`, timeZone)!)
 }
+
+export function schedulePage(today: string, timeZone: string, plan: 'free' | 'paid', page: number) {
+  const pageCount = plan === 'paid' ? 4 : 1
+  const pageIndex = Math.max(0, Math.min(pageCount - 1, page))
+  const first = shiftYmd(today, pageIndex * 7)
+  const length = plan === 'paid' ? 7 : 1
+  return {
+    pageIndex, pageCount,
+    days: Array.from({ length }, (_, index) => shiftYmd(first, index)),
+    from: zonedStartOfDay(first, timeZone).toISOString(),
+    to: zonedStartOfDay(shiftYmd(first, length), timeZone).toISOString(),
+  }
+}

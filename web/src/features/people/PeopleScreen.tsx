@@ -3,6 +3,7 @@ import { Button } from '@want-foundation/desyst-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useAccount } from '../../shared/account'
 import { api } from '../../api'
 import { Window } from '../../shared/Window'
 import { PeopleBoard } from './PeopleBoard'
@@ -30,6 +31,8 @@ function peopleHref(opts: { id?: string; view: PeopleView; creating?: boolean })
 }
 
 export function PeopleScreen() {
+  const { user, workspace } = useAccount()
+  const scope = user.id + ':' + workspace.id
   const { id } = useParams()
   const [params] = useSearchParams()
   const view = parseView(params.get('view'))
@@ -53,7 +56,7 @@ export function PeopleScreen() {
   }
 
   function pick(next: string) {
-    rememberPerson(next)
+    rememberPerson(next, scope)
     navigate(peopleHref({ id: next, view: 'split' }))
   }
 
@@ -62,9 +65,9 @@ export function PeopleScreen() {
     const rows = people.data ?? []
     if (rows.length === 0) return
     if (!window.matchMedia('(min-width: 769px)').matches) return
-    const next = rememberedPerson(rows.map((row) => row.id))
+    const next = rememberedPerson(rows.map((row) => row.id), scope)
     if (next) navigate(peopleHref({ id: next, view: 'split' }), { replace: true })
-  }, [view, creating, id, people.isLoading, people.data, navigate])
+  }, [view, creating, id, people.isLoading, people.data, navigate, scope])
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -166,7 +169,7 @@ export function PeopleScreen() {
               <PersonDossier
                 personId={id}
                 onCreated={(next) => {
-                  rememberPerson(next)
+                  rememberPerson(next, scope)
                   navigate(peopleHref({ id: next, view: 'split' }))
                 }}
                 onDeleted={() => navigate(peopleHref({ view: 'split' }))}

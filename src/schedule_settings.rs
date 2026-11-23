@@ -119,7 +119,26 @@ pub fn router() -> Router<AppState> {
         )
 }
 
+fn analysis_enabled() -> bool {
+    crate::workspace::current().is_some_and(|scope| scope.can_analyze())
+}
+
+impl Settings {
+    fn for_current_plan(mut self) -> Self {
+        if !analysis_enabled() {
+            self.estimate_buffer = false;
+            self.golden_hours = false;
+            self.energy_aware = false;
+        }
+        self
+    }
+}
+
 pub(crate) async fn settings(state: &AppState) -> Result<Settings, Response> {
+    saved_settings(state).await.map(Settings::for_current_plan)
+}
+
+async fn saved_settings(state: &AppState) -> Result<Settings, Response> {
     let row: Option<DbJson<serde_json::Value>> =
         sqlx::query_scalar("SELECT data FROM schedule_settings WHERE id=1")
             .fetch_optional(&state.pool)
@@ -231,9 +250,19 @@ async fn put_settings(State(state): State<AppState>, body: Bytes) -> Response {
     if let Err(response) = normalize(&mut settings) {
         return response;
     }
-    match sqlx::query("INSERT INTO schedule_settings (id,data,updated_at) VALUES (1,$1,now()) ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data,updated_at=now()")
+    if !analysis_enabled() {
+        // Keep paid preferences through a downgrade and subsequent edits on Free.
+        let previous = match saved_settings(&state).await {
+            Ok(saved) => saved,
+            Err(response) => return response,
+        };
+        settings.estimate_buffer = previous.estimate_buffer;
+        settings.energy_aware = previous.energy_aware;
+        settings.golden_hours = previous.golden_hours;
+    }
+    match sqlx::query("INSERT INTO schedule_settings (id,data,updated_at) VALUES (1,$1,now()) ON CONFLICT (workspace_id,owner_id,id) DO UPDATE SET data=EXCLUDED.data,updated_at=now()")
         .bind(DbJson(&settings)).execute(&state.pool).await {
-        Ok(_) => Json(settings).into_response(),
+        Ok(_) => Json(settings.for_current_plan()).into_response(),
         Err(err) => database_error(err),
     }
 }
@@ -282,7 +311,7 @@ async fn put_day(State(state): State<AppState>, Path(raw): Path<String>, body: B
             _ => return invalid("day window"),
         }
     }
-    match sqlx::query_as::<_, DayOverride>("INSERT INTO schedule_day_overrides (day,\"off\",work_start_min,work_end_min,note,updated_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (day) DO UPDATE SET \"off\"=EXCLUDED.\"off\",work_start_min=EXCLUDED.work_start_min,work_end_min=EXCLUDED.work_end_min,note=EXCLUDED.note,updated_at=EXCLUDED.updated_at RETURNING day,\"off\",work_start_min,work_end_min,note,updated_at")
+    match sqlx::query_as::<_, DayOverride>("INSERT INTO schedule_day_overrides (day,\"off\",work_start_min,work_end_min,note,updated_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (workspace_id,owner_id,day) DO UPDATE SET \"off\"=EXCLUDED.\"off\",work_start_min=EXCLUDED.work_start_min,work_end_min=EXCLUDED.work_end_min,note=EXCLUDED.note,updated_at=EXCLUDED.updated_at RETURNING day,\"off\",work_start_min,work_end_min,note,updated_at")
         .bind(day).bind(write.off).bind(write.work_start_min).bind(write.work_end_min).bind(write.note).bind(Utc::now())
         .fetch_one(&state.pool).await {
         Ok(day) => Json(day).into_response(),

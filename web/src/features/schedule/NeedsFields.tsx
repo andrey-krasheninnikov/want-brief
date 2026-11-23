@@ -41,7 +41,7 @@ function NeedCard({ row, delay, kind, tz }: { row: UnplannedItem; delay: number;
   const [minutes, setMinutes] = useState('0')
   const field = dueField(row.item, kind)
   const patch = useMutation({
-    mutationFn: (body: Record<string, unknown>) => api.patchItem(row.item.id, body),
+    mutationFn: (body: Record<string, unknown>) => api.patchItem(row.item.id, body, row.item.workspaceId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['schedule'] })
       void queryClient.invalidateQueries({ queryKey: ['items'] })
@@ -71,7 +71,7 @@ function NeedCard({ row, delay, kind, tz }: { row: UnplannedItem; delay: number;
       <div className="sched-need-core">
         <p className="sched-need-eye">{gaps.join(' · ')}</p>
         <strong>
-          <Button type="button" className="ghost" onClick={() => openTask(navigate, row.item.id)}>
+          <Button type="button" className="ghost" onClick={() => openTask(navigate, row.item.id, row.item.workspaceId)}>
             {row.item.externalKey ? <span className="mono">[{row.item.externalKey}] </span> : null}
             {row.item.title}
           </Button>

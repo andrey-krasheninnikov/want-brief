@@ -1,4 +1,5 @@
 import {
+  UserCircle,
   CalendarBlank,
   CalendarDots,
   ChartBar,
@@ -18,6 +19,8 @@ import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMe
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
+import { notifySessionChange, useAccount } from './account'
+import { WorkspacePicker } from '../features/account/AccountScreen'
 import { EventDossierSheet } from '../features/events/EventDossier'
 import { TaskDossierSheet } from '../features/tasks/TaskPage'
 import { TaskLogProvider } from '../features/tasks/TaskLogPrompt'
@@ -35,6 +38,7 @@ const links: { to: string; label: string; Icon: Icon }[] = [
   { to: '/companies', label: 'Companies', Icon: Buildings },
   { to: '/pulse', label: 'Pulse', Icon: ChartBar },
   { to: '/settings', label: 'Sources', Icon: Plugs },
+  { to: '/account', label: 'Account', Icon: UserCircle },
 ]
 
 function NavigationLink({ to, label, Icon }: (typeof links)[number]) {
@@ -47,11 +51,14 @@ function NavigationLink({ to, label, Icon }: (typeof links)[number]) {
 }
 
 export function Shell() {
+  const { workspace, capabilities } = useAccount()
+  const readOnly = workspace.kind === 'team' && workspace.role === 'editor' && !capabilities.canCollaborate
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const [checkinOpen, setCheckinOpen] = useState(false)
   const { theme, changeTheme } = useTheme()
+  const [logoutError, setLogoutError] = useState('')
   const taskId = searchParams.get('task')
   const eventId = searchParams.get('event')
   const eventOn = searchParams.get('on') ?? undefined
@@ -78,7 +85,7 @@ export function Shell() {
   }
 
   function logout() {
-    void api.logout().finally(() => navigate('/login'))
+    void api.logout().then(() => { notifySessionChange(); window.location.replace('/login') }).catch((err: Error) => setLogoutError(err.message))
   }
 
   return (
@@ -90,6 +97,7 @@ export function Shell() {
             <img src="/logo.png" alt="" width={32} height={32} />
             <strong>Want Brief</strong>
           </div>
+          <WorkspacePicker />
           <nav className="primary-nav" aria-label="Main">
             {links.map((link) => <NavigationLink key={link.to} {...link} />)}
           </nav>
@@ -104,6 +112,8 @@ export function Shell() {
           </div>
         </aside>
         <main id="main-content" className="stage">
+          {readOnly ? <p className="workspace-notice" role="status">This team is on the free plan. You can view its records. Shared editing resumes when the owner restores the paid plan.</p> : null}
+          {logoutError ? <p className="error" role="alert">{logoutError}</p> : null}
           <Outlet />
         </main>
         <nav className="mobile-nav" aria-label="Main">

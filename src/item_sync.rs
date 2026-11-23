@@ -1,5 +1,5 @@
 use crate::http::{database_error, error, id, not_found, AppState};
-use crate::sources::Source;
+use crate::sources::{jira_auth, Source, SourceHttp};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -16,6 +16,8 @@ use uuid::Uuid;
 struct ItemRef {
     id: Uuid,
     source_id: Uuid,
+    item_version: String,
+    source_version: String,
     external_key: String,
     kind: String,
 }
@@ -162,39 +164,21 @@ async fn get_json<T: for<'de> Deserialize<'de>>(
 }
 
 async fn fetch_remote(source: &Source, token: &str, key: &str) -> Result<RemoteDetail, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(25))
-        .redirect(if source.kind == "jira" {
-            reqwest::redirect::Policy::none()
-        } else {
-            reqwest::redirect::Policy::default()
-        })
-        .danger_accept_invalid_certs(source.kind == "jira" && source.insecure_tls)
-        .build()
-        .map_err(|err| err.to_string())?;
+    let http = SourceHttp::new(source)?;
     if source.kind == "todoist" {
-        let mut task_url = reqwest::Url::parse(&source.base_url).map_err(|err| err.to_string())?;
-        task_url
-            .path_segments_mut()
-            .map_err(|_| "invalid todoist URL")?
-            .extend(["rest", "v2", "tasks", key]);
+        let task_url = http.endpoint(&["rest", "v2", "tasks", key]);
         let task: TodoTask = get_json(
-            client
+            http.client
                 .get(task_url)
                 .bearer_auth(token)
                 .header("Accept", "application/json"),
             "todoist task",
         )
         .await?;
-        let mut comment_url =
-            reqwest::Url::parse(&source.base_url).map_err(|err| err.to_string())?;
-        comment_url
-            .path_segments_mut()
-            .map_err(|_| "invalid todoist URL")?
-            .extend(["rest", "v2", "comments"]);
+        let mut comment_url = http.endpoint(&["rest", "v2", "comments"]);
         comment_url.query_pairs_mut().append_pair("task_id", key);
         let comments: Vec<TodoComment> = get_json(
-            client
+            http.client
                 .get(comment_url)
                 .bearer_auth(token)
                 .header("Accept", "application/json"),
@@ -222,27 +206,25 @@ async fn fetch_remote(source: &Source, token: &str, key: &str) -> Result<RemoteD
                 .collect(),
         });
     }
-    let cloud = source.base_url.to_lowercase().contains(".atlassian.net");
-    let mut issue_url = reqwest::Url::parse(&source.base_url).map_err(|err| err.to_string())?;
-    issue_url
-        .path_segments_mut()
-        .map_err(|_| "invalid jira URL")?
-        .extend(["rest", "api", if cloud { "3" } else { "2" }, "issue", key]);
+    let mut issue_url = http.endpoint(&[
+        "rest",
+        "api",
+        if http.cloud { "3" } else { "2" },
+        "issue",
+        key,
+    ]);
     issue_url.query_pairs_mut().append_pair(
         "fields",
         "summary,status,priority,duedate,created,description,comment",
     );
-    let mut request = client.get(issue_url).header("Accept", "application/json");
-    if cloud {
-        request = request.basic_auth(&source.email, Some(token));
-    } else if let Some((user, password)) = token
-        .split_once(':')
-        .filter(|(user, password)| !user.is_empty() && !password.is_empty())
-    {
-        request = request.basic_auth(user, Some(password));
-    } else {
-        request = request.bearer_auth(token);
-    }
+    let request = jira_auth(
+        http.client
+            .get(issue_url)
+            .header("Accept", "application/json"),
+        source,
+        token,
+        http.cloud,
+    );
     let issue: JiraIssue = get_json(request, "jira issue").await?;
     let browse = format!("{}/browse/{key}", source.base_url.trim_end_matches('/'));
     Ok(RemoteDetail {
@@ -273,7 +255,7 @@ async fn fetch_remote(source: &Source, token: &str, key: &str) -> Result<RemoteD
 }
 
 async fn sync_one(state: &AppState, item_id: Uuid) -> Result<Value, Response> {
-    let item: ItemRef = sqlx::query_as("SELECT i.id,i.source_id,i.external_key,s.kind FROM items i JOIN sources s ON s.id=i.source_id WHERE i.id=$1 AND i.deleted_at IS NULL")
+    let item: ItemRef = sqlx::query_as("SELECT i.id,i.source_id,i.external_key,s.kind,i.xmin::text AS item_version,s.xmin::text AS source_version FROM items i JOIN sources s ON s.id=i.source_id WHERE i.id=$1 AND i.deleted_at IS NULL")
         .bind(item_id).fetch_one(&state.pool).await.map_err(not_found)?;
     if item.kind != "jira" && item.kind != "todoist" {
         return Err(error(StatusCode::FORBIDDEN, "forbidden: sync"));
@@ -287,6 +269,34 @@ async fn sync_one(state: &AppState, item_id: Uuid) -> Result<Value, Response> {
         .await
         .map_err(crate::sources::integration_error)?;
     let mut tx = state.pool.begin().await.map_err(database_error)?;
+    // Restore obtains this lock exclusively. Tuple versions also detect a restored row
+    // with the same IDs and application timestamps as the one sent to the provider.
+    sqlx::query(
+        "SELECT pg_advisory_xact_lock_shared(hashtextextended(wb_workspace()::text,78415))",
+    )
+    .execute(&mut *tx)
+    .await
+    .map_err(database_error)?;
+    let current: Option<Uuid> = sqlx::query_scalar(
+        "SELECT i.id FROM items i JOIN sources s ON s.id=i.source_id
+         WHERE i.id=$1 AND i.source_id=$2 AND i.external_key=$3 AND i.deleted_at IS NULL
+           AND i.xmin::text=$4 AND s.xmin::text=$5 AND wb_source_enabled(s.workspace_id,s.id)
+         FOR SHARE OF s FOR UPDATE OF i",
+    )
+    .bind(item.id)
+    .bind(item.source_id)
+    .bind(&item.external_key)
+    .bind(&item.item_version)
+    .bind(&item.source_version)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(database_error)?;
+    if current.is_none() {
+        return Err(error(
+            StatusCode::CONFLICT,
+            "source or item changed during sync",
+        ));
+    }
     sqlx::query("UPDATE items SET external_status=$2,title=CASE WHEN btrim($3::text)='' THEN title ELSE btrim($3) END,description=CASE WHEN btrim($4::text)='' THEN description ELSE btrim($4) END,updated_at=$5 WHERE id=$1")
         .bind(item.id).bind(remote.status.trim()).bind(&remote.title).bind(&remote.description).bind(Utc::now())
         .execute(&mut *tx).await.map_err(database_error)?;

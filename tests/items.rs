@@ -1,5 +1,5 @@
+mod support;
 use serde_json::{json, Value};
-use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 use want_brief::auth::Auth;
@@ -12,7 +12,7 @@ async fn item_routes_preserve_shape_and_soft_delete() {
     let url = std::env::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set");
     let database_name = url.split('?').next().unwrap().rsplit('/').next().unwrap();
     assert!(database_name.starts_with("wantbrief_issue92_"));
-    let pool = PgPool::connect(&url).await.unwrap();
+    let pool = support::legacy_pool(&url).await;
     let auth = Auth::new(pool.clone());
     auth.ensure_user("sample-password").await.unwrap();
     let token = auth.login("sample-password").await.unwrap().unwrap();

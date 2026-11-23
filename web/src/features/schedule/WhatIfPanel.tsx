@@ -138,7 +138,7 @@ export function WhatIfPanel({ kind, from, to, lanes, busy, onClose }: Props) {
         </header>
         <div className="sched-whatif-grid">
           <div>
-            <p className="sched-whatif-label">Tasks this week</p>
+            <p className="sched-whatif-label">Tasks in this period</p>
             {tasks.length === 0 ? <p className="muted">Nothing packed.</p> : null}
             <ul className="sched-whatif-list">
               {tasks.map((task) => {
@@ -169,7 +169,7 @@ export function WhatIfPanel({ kind, from, to, lanes, busy, onClose }: Props) {
           </div>
           <div>
             <p className="sched-whatif-label">Meetings</p>
-            {meetings.length === 0 ? <p className="muted">No meetings this week.</p> : null}
+            {meetings.length === 0 ? <p className="muted">No meetings in this period.</p> : null}
             <ul className="sched-whatif-list">
               {meetings.map((meeting) => (
                 <li key={meeting.seriesId}>

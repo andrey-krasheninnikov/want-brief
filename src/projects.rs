@@ -12,7 +12,7 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use std::collections::HashSet;
 use uuid::Uuid;
 
-const COLUMNS: &str = "id, name, color, description, monthly_income_usd::float8 AS monthly_income_usd, monthly_income_rub::float8 AS monthly_income_rub, target_hours_day::float8 AS target_hours_day, target_hours_week::float8 AS target_hours_week, links, archived_at, created_at, updated_at";
+const COLUMNS: &str = "id, name, color, description, COALESCE((SELECT usd FROM project_personal_income WHERE project_id=projects.id),monthly_income_usd)::float8 AS monthly_income_usd, COALESCE((SELECT rub FROM project_personal_income WHERE project_id=projects.id),monthly_income_rub)::float8 AS monthly_income_rub, target_hours_day::float8 AS target_hours_day, target_hours_week::float8 AS target_hours_week, links, archived_at, created_at, updated_at";
 
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct ProjectLink {
@@ -88,6 +88,19 @@ struct ProjectPatch {
     people: Option<Vec<PersonRel>>,
     companies: Option<Vec<PersonRel>>,
     archived: Option<bool>,
+}
+
+impl ProjectPatch {
+    fn changes_shared_fields(&self) -> bool {
+        self.name.is_some()
+            || self.color.is_some()
+            || self.description.is_some()
+            || self.target_hours_day.is_some()
+            || self.links.is_some()
+            || self.people.is_some()
+            || self.companies.is_some()
+            || self.archived.is_some()
+    }
 }
 
 #[derive(Serialize, FromRow)]
@@ -196,40 +209,44 @@ async fn assemble(pool: &PgPool, row: ProjectRow) -> Result<Project, Response> {
 async fn replace_rels(
     transaction: &mut Transaction<'_, Postgres>,
     project_id: Uuid,
-    people: &[PersonRel],
-    companies: &[PersonRel],
+    people: Option<&[PersonRel]>,
+    companies: Option<&[PersonRel]>,
 ) -> Result<(), Response> {
-    sqlx::query("DELETE FROM person_projects WHERE project_id=$1")
-        .bind(project_id)
-        .execute(&mut **transaction)
-        .await
-        .map_err(database_error)?;
-    for rel in people {
-        sqlx::query(
-            "INSERT INTO person_projects (project_id, person_id, comment) VALUES ($1,$2,$3)",
-        )
-        .bind(project_id)
-        .bind(rel.id)
-        .bind(&rel.comment)
-        .execute(&mut **transaction)
-        .await
-        .map_err(database_error)?;
+    if let Some(people) = people {
+        sqlx::query("DELETE FROM person_projects WHERE project_id=$1")
+            .bind(project_id)
+            .execute(&mut **transaction)
+            .await
+            .map_err(database_error)?;
+        for rel in people {
+            sqlx::query(
+                "INSERT INTO person_projects (project_id, person_id, comment) VALUES ($1,$2,$3)",
+            )
+            .bind(project_id)
+            .bind(rel.id)
+            .bind(&rel.comment)
+            .execute(&mut **transaction)
+            .await
+            .map_err(database_error)?;
+        }
     }
-    sqlx::query("DELETE FROM company_projects WHERE project_id=$1")
-        .bind(project_id)
-        .execute(&mut **transaction)
-        .await
-        .map_err(database_error)?;
-    for rel in companies {
-        sqlx::query(
-            "INSERT INTO company_projects (project_id, company_id, comment) VALUES ($1,$2,$3)",
-        )
-        .bind(project_id)
-        .bind(rel.id)
-        .bind(&rel.comment)
-        .execute(&mut **transaction)
-        .await
-        .map_err(database_error)?;
+    if let Some(companies) = companies {
+        sqlx::query("DELETE FROM company_projects WHERE project_id=$1")
+            .bind(project_id)
+            .execute(&mut **transaction)
+            .await
+            .map_err(database_error)?;
+        for rel in companies {
+            sqlx::query(
+                "INSERT INTO company_projects (project_id, company_id, comment) VALUES ($1,$2,$3)",
+            )
+            .bind(project_id)
+            .bind(rel.id)
+            .bind(&rel.comment)
+            .execute(&mut **transaction)
+            .await
+            .map_err(database_error)?;
+        }
     }
     Ok(())
 }
@@ -320,7 +337,14 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     if let Err(err) = result {
         return database_error(err);
     }
-    if let Err(response) = replace_rels(&mut transaction, project_id, &people, &companies).await {
+    if let Err(response) = replace_rels(
+        &mut transaction,
+        project_id,
+        Some(&people),
+        Some(&companies),
+    )
+    .await
+    {
         return response;
     }
     if let Err(err) = transaction.commit().await {
@@ -332,118 +356,114 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
     }
 }
 
-async fn patch(State(state): State<AppState>, Path(raw): Path<String>, body: Bytes) -> Response {
-    let project_id = match id(&raw) {
-        Ok(id) => id,
-        Err(response) => return response,
-    };
-    let input: ProjectPatch = match decode(&body) {
-        Ok(value) => value,
-        Err(response) => return response,
-    };
-    let mut project = match read(&state.pool, project_id).await {
-        Ok(project) => project,
-        Err(response) => return response,
-    };
-    if let Some(name) = input.name {
-        let name = name.trim();
-        if name.is_empty() {
-            return error(StatusCode::BAD_REQUEST, "invalid: project name");
+async fn patch(
+    State(state): State<AppState>,
+    Path(raw): Path<String>,
+    body: Bytes,
+) -> Result<Json<Project>, Response> {
+    let project_id = id(&raw)?;
+    let mut input: ProjectPatch = decode(&body)?;
+    let scope = crate::workspace::current()
+        .ok_or_else(|| error(StatusCode::UNAUTHORIZED, "unauthorized"))?;
+    let changes_income = input.monthly_income_usd.is_some() || input.monthly_income_rub.is_some();
+    let income_only = changes_income && !input.changes_shared_fields();
+    if !scope.can_edit_shared() {
+        crate::http::private_patch(&body, &["monthlyIncomeUsd", "monthlyIncomeRub"])?;
+        if !income_only {
+            return Err(error(
+                StatusCode::FORBIDDEN,
+                "shared editing requires a paid workspace",
+            ));
         }
-        project.name = name.to_owned();
     }
-    if let Some(color) = input.color.filter(|value| !value.is_empty()) {
-        project.color = color;
+    let name = input.name.as_deref().map(str::trim);
+    if name == Some("") {
+        return Err(error(StatusCode::BAD_REQUEST, "invalid: project name"));
     }
-    if let Some(description) = input.description {
-        project.description = description.trim().to_owned();
+    if input.monthly_income_usd.is_some_and(|v| v < 0.0) {
+        return Err(error(
+            StatusCode::BAD_REQUEST,
+            "invalid: monthly income usd",
+        ));
     }
-    if let Some(income) = input.monthly_income_usd {
-        if income < 0.0 {
-            return error(StatusCode::BAD_REQUEST, "invalid: monthly income usd");
+    if input.monthly_income_rub.is_some_and(|v| v < 0.0) {
+        return Err(error(
+            StatusCode::BAD_REQUEST,
+            "invalid: monthly income rub",
+        ));
+    }
+    if input.target_hours_day.is_some_and(|v| v < 0.0) {
+        return Err(error(StatusCode::BAD_REQUEST, "invalid: target hours"));
+    }
+    if let Some(links) = input.links.as_mut() {
+        normalize_links(links)?;
+    }
+    let people = input.people.map(normalize_rels).transpose()?;
+    let companies = input.companies.map(normalize_rels).transpose()?;
+    let team = scope.kind == "team";
+    let mut transaction = state.pool.begin().await.map_err(database_error)?;
+    if !team || !income_only {
+        let updated = sqlx::query(
+            "UPDATE projects SET name=COALESCE($2,name), color=COALESCE($3,color),
+             description=COALESCE($4,description), target_hours_day=COALESCE($5,target_hours_day),
+             target_hours_week=COALESCE($5::float8*7,target_hours_week), links=COALESCE($6,links),
+             archived_at=CASE $7::boolean WHEN true THEN COALESCE(archived_at,$8)
+                         WHEN false THEN NULL ELSE archived_at END, updated_at=$8 WHERE id=$1",
+        )
+        .bind(project_id)
+        .bind(name)
+        .bind(input.color.as_deref().filter(|value| !value.is_empty()))
+        .bind(input.description.as_deref().map(str::trim))
+        .bind(input.target_hours_day)
+        .bind(input.links.map(DbJson))
+        .bind(input.archived)
+        .bind(Utc::now())
+        .execute(&mut *transaction)
+        .await
+        .map_err(database_error)?;
+        if updated.rows_affected() == 0 {
+            return Err(error(StatusCode::NOT_FOUND, "not found"));
         }
-        project.monthly_income_usd = income;
     }
-    if let Some(income) = input.monthly_income_rub {
-        if income < 0.0 {
-            return error(StatusCode::BAD_REQUEST, "invalid: monthly income rub");
-        }
-        project.monthly_income_rub = income;
-    }
-    if let Some(hours) = input.target_hours_day {
-        if hours < 0.0 {
-            return error(StatusCode::BAD_REQUEST, "invalid: target hours");
-        }
-        project.target_hours_day = hours;
-        project.target_hours_week = hours * 7.0;
-    }
-    if let Some(mut links) = input.links {
-        if let Err(response) = normalize_links(&mut links) {
-            return response;
-        }
-        project.links = links;
-    }
-    if let Some(people) = input.people {
-        project.people = match normalize_rels(people) {
-            Ok(value) => value,
-            Err(response) => return response,
+    if changes_income {
+        let query = if team {
+            "INSERT INTO project_personal_income(project_id,usd,rub)
+             SELECT id,COALESCE($2,0),COALESCE($3,0) FROM projects WHERE id=$1
+             ON CONFLICT(workspace_id,owner_id,project_id) DO UPDATE
+             SET usd=COALESCE($2,project_personal_income.usd),rub=COALESCE($3,project_personal_income.rub)"
+        } else {
+            "UPDATE projects SET monthly_income_usd=COALESCE($2,monthly_income_usd),
+             monthly_income_rub=COALESCE($3,monthly_income_rub) WHERE id=$1"
         };
-    }
-    if let Some(companies) = input.companies {
-        project.companies = match normalize_rels(companies) {
-            Ok(value) => value,
-            Err(response) => return response,
-        };
-    }
-    let now = Utc::now();
-    if let Some(archived) = input.archived {
-        if archived && project.archived_at.is_none() {
-            project.archived_at = Some(now);
+        let updated = sqlx::query(query)
+            .bind(project_id)
+            .bind(input.monthly_income_usd)
+            .bind(input.monthly_income_rub)
+            .execute(&mut *transaction)
+            .await
+            .map_err(database_error)?;
+        if updated.rows_affected() == 0 {
+            return Err(error(StatusCode::NOT_FOUND, "not found"));
         }
-        if !archived {
-            project.archived_at = None;
+        if team {
+            sqlx::query(
+                "DELETE FROM project_personal_income WHERE project_id=$1 AND usd=0 AND rub=0",
+            )
+            .bind(project_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(database_error)?;
         }
     }
-    let mut transaction = match state.pool.begin().await {
-        Ok(transaction) => transaction,
-        Err(err) => return database_error(err),
-    };
-    let result = sqlx::query(
-        "UPDATE projects SET name=$2, color=$3, description=$4, monthly_income_usd=$5, monthly_income_rub=$6, target_hours_day=$7, target_hours_week=$8, links=$9, archived_at=$10, updated_at=$11 WHERE id=$1",
-    )
-    .bind(project_id)
-    .bind(project.name)
-    .bind(project.color)
-    .bind(project.description)
-    .bind(project.monthly_income_usd)
-    .bind(project.monthly_income_rub)
-    .bind(project.target_hours_day)
-    .bind(project.target_hours_week)
-    .bind(DbJson(project.links))
-    .bind(project.archived_at)
-    .bind(now)
-    .execute(&mut *transaction)
-    .await;
-    if let Err(err) = result {
-        return database_error(err);
-    }
-    if let Err(response) = replace_rels(
+    replace_rels(
         &mut transaction,
         project_id,
-        &project.people,
-        &project.companies,
+        people.as_deref(),
+        companies.as_deref(),
     )
-    .await
-    {
-        return response;
-    }
-    if let Err(err) = transaction.commit().await {
-        return database_error(err);
-    }
-    match read(&state.pool, project_id).await {
-        Ok(project) => Json(project).into_response(),
-        Err(response) => response,
-    }
+    .await?;
+    transaction.commit().await.map_err(database_error)?;
+    Ok(Json(read(&state.pool, project_id).await?))
 }
 
 async fn delete(State(state): State<AppState>, Path(raw): Path<String>) -> Response {

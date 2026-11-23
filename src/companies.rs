@@ -113,7 +113,10 @@ async fn rows(pool: &PgPool, query: &str, company: Uuid) -> Result<Vec<Value>, s
 }
 
 pub(crate) async fn fetch(pool: &PgPool, company: Uuid, zone: Tz) -> Result<Company, sqlx::Error> {
-    let row: CompanyRow = sqlx::query_as("SELECT id,name,description,links,started_on::timestamp AT TIME ZONE 'UTC' AS started_on,ended_on::timestamp AT TIME ZONE 'UTC' AS ended_on,created_at,updated_at FROM companies WHERE id=$1").bind(company).fetch_one(pool).await?;
+    let row: CompanyRow = sqlx::query_as("SELECT c.id,c.name,c.description,c.links,
+        COALESCE(d.started_on,c.started_on)::timestamp AT TIME ZONE 'UTC' AS started_on,
+        COALESCE(d.ended_on,c.ended_on)::timestamp AT TIME ZONE 'UTC' AS ended_on,c.created_at,c.updated_at
+        FROM companies c LEFT JOIN company_employment_dates d ON d.company_id=c.id WHERE c.id=$1").bind(company).fetch_one(pool).await?;
     let projects = rels(pool, "company_projects", "project_id", company).await?;
     let events = rels(pool, "company_events", "event_id", company).await?;
     let people = rels(pool, "company_people", "person_id", company).await?;
@@ -263,6 +266,53 @@ async fn replace_links(
     Ok(())
 }
 
+async fn patch_employment(
+    state: &AppState,
+    company: Uuid,
+    fields: &serde_json::Map<String, Value>,
+) -> Result<Company, Response> {
+    let parse = |key: &str| match fields.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(raw)) if raw.is_empty() => Ok(None),
+        Some(Value::String(raw)) => date(raw).map(Some),
+        _ => Err(error(StatusCode::BAD_REQUEST, "invalid: company dates")),
+    };
+    let (start, end) = (parse("startedOn")?, parse("endedOn")?);
+    let mut tx = state.pool.begin().await.map_err(database_error)?;
+    sqlx::query("INSERT INTO company_employment_dates(company_id) SELECT id FROM companies WHERE id=$1 ON CONFLICT DO NOTHING")
+        .bind(company).execute(&mut *tx).await.map_err(database_error)?;
+    let updated = sqlx::query(
+        "UPDATE company_employment_dates SET started_on=CASE WHEN $2 THEN $3 ELSE started_on END,
+        ended_on=CASE WHEN $4 THEN $5 ELSE ended_on END WHERE company_id=$1",
+    )
+    .bind(company)
+    .bind(fields.contains_key("startedOn"))
+    .bind(start)
+    .bind(fields.contains_key("endedOn"))
+    .bind(end)
+    .execute(&mut *tx)
+    .await
+    .map_err(|err| {
+        if err
+            .as_database_error()
+            .is_some_and(|db| db.is_check_violation())
+        {
+            error(StatusCode::BAD_REQUEST, "invalid: company dates")
+        } else {
+            database_error(err)
+        }
+    })?;
+    if updated.rows_affected() == 0 {
+        return Err(error(StatusCode::NOT_FOUND, "not found"));
+    }
+    sqlx::query("DELETE FROM company_employment_dates WHERE company_id=$1 AND started_on IS NULL AND ended_on IS NULL")
+        .bind(company).execute(&mut *tx).await.map_err(database_error)?;
+    tx.commit().await.map_err(database_error)?;
+    fetch(&state.pool, company, zone(state).await?)
+        .await
+        .map_err(not_found)
+}
+
 async fn save(state: AppState, company: Option<String>, body: Bytes) -> Response {
     let updating = company.is_some();
     let company_id = match company {
@@ -272,6 +322,28 @@ async fn save(state: AppState, company: Option<String>, body: Bytes) -> Response
         },
         None => Uuid::new_v4(),
     };
+    if updating && crate::workspace::current().is_some_and(|s| s.kind == "team") {
+        let fields: serde_json::Map<String, Value> = match decode(&body) {
+            Ok(fields) => fields,
+            Err(err) => return err,
+        };
+        if !fields.is_empty()
+            && fields
+                .keys()
+                .all(|key| matches!(key.as_str(), "startedOn" | "endedOn"))
+        {
+            return match patch_employment(&state, company_id, &fields).await {
+                Ok(company) => Json(company).into_response(),
+                Err(err) => err,
+            };
+        }
+        if crate::workspace::current().is_some_and(|scope| !scope.can_edit_shared()) {
+            return error(
+                StatusCode::FORBIDDEN,
+                "shared editing requires a paid workspace",
+            );
+        }
+    }
     let mut write: Write = match decode(&body) {
         Ok(write) => write,
         Err(response) => return response,

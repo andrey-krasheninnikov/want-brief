@@ -17,8 +17,19 @@ async fn schedule_saves_blocks_and_compares_a_scenario() {
     let auth = Auth::new(pool.clone());
     auth.ensure_user("sample-password").await.unwrap();
     let token = auth.login("sample-password").await.unwrap().unwrap();
+    let user = auth
+        .authenticate_session(&token)
+        .await
+        .unwrap()
+        .unwrap()
+        .user_id;
+    let personal = want_brief::workspace::access(&pool, user, None)
+        .await
+        .unwrap()
+        .workspace_id;
+
     let previous: Option<(chrono::DateTime<Utc>, DbJson<Value>)> =
-        sqlx::query_as("SELECT taken_at,blocks FROM schedule_snapshots WHERE kind='work'")
+        sqlx::query_as("SELECT taken_at,blocks FROM schedule_snapshots WHERE kind='work' AND workspace_id=$1 AND owner_id=$2").bind(personal).bind(user)
             .fetch_optional(&pool)
             .await
             .unwrap();
@@ -73,7 +84,7 @@ async fn schedule_saves_blocks_and_compares_a_scenario() {
         .unwrap()
         .iter()
         .flat_map(|lane| lane["blocks"].as_array().unwrap())
-        .any(|block| block["itemId"] == item_id));
+        .any(|block| block["itemId"] == item_id && block["workspaceId"].as_str().is_some()));
     let response = client
         .get(format!("{root}/api/schedule"))
         .header("Cookie", &cookie)
@@ -107,15 +118,15 @@ async fn schedule_saves_blocks_and_compares_a_scenario() {
         .unwrap();
     match previous {
         Some((taken_at, blocks)) => {
-            sqlx::query("UPDATE schedule_snapshots SET taken_at=$1,blocks=$2 WHERE kind='work'")
+            sqlx::query("UPDATE schedule_snapshots SET taken_at=$1,blocks=$2 WHERE kind='work' AND workspace_id=$3 AND owner_id=$4")
                 .bind(taken_at)
-                .bind(blocks)
+                .bind(blocks).bind(personal).bind(user)
                 .execute(&pool)
                 .await
                 .unwrap();
         }
         None => {
-            sqlx::query("DELETE FROM schedule_snapshots WHERE kind='work'")
+            sqlx::query("DELETE FROM schedule_snapshots WHERE kind='work' AND workspace_id=$1 AND owner_id=$2").bind(personal).bind(user)
                 .execute(&pool)
                 .await
                 .unwrap();

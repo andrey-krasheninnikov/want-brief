@@ -72,7 +72,7 @@ export function TaskLogDialog({ itemId, kind, onClose }: Props) {
         <div className="tasks-log-core">
           <p className="tasks-kicker">Log</p>
           <h2 id="tasks-log-title">How did it go?</h2>
-          <p className="muted">Stress and a note are optional. Skip leaves the board as-is.</p>
+          <p className="muted">Your stress rating and note are private. You can skip both.</p>
           <div className="tasks-log-levels" role="group" aria-label="Stress">
             {[1, 2, 3, 4, 5].map((value) => (
               <Button

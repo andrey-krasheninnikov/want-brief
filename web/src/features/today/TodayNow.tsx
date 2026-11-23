@@ -43,7 +43,7 @@ function WorkCard({
           <span className="agenda-chip">Work</span>
           {block.late ? <span className="agenda-chip late">late</span> : null}
         </div>
-        <TaskTimer itemId={block.itemId} running={running} prominent />
+        <TaskTimer itemId={block.itemId} workspaceId={block.workspaceId} running={running} prominent />
       </div>
     </article>
   )

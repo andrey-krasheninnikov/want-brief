@@ -42,15 +42,39 @@ pub(crate) struct Input {
     pub(crate) factors: HashMap<String, f64>,
     pub(crate) history: Vec<Span>,
     pub(crate) checkins: Option<(i16, i16)>,
-    pub(crate) previous: Vec<Block>,
+    pub(crate) previous: Vec<Reservation>,
+    pub(crate) horizon_end: DateTime<Utc>,
     pub(crate) now: DateTime<Utc>,
     pub(crate) from: DateTime<Utc>,
     pub(crate) to: DateTime<Utc>,
 }
 
+// Persist only the fields used to stabilize placement between requests.
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Reservation {
+    item_id: Uuid,
+    kind: String,
+    starts_at: DateTime<Utc>,
+    ends_at: DateTime<Utc>,
+}
+
+impl From<&Block> for Reservation {
+    fn from(block: &Block) -> Self {
+        Self {
+            item_id: block.item_id,
+            kind: block.kind.clone(),
+            starts_at: block.starts_at,
+            ends_at: block.ends_at,
+        }
+    }
+}
+
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Block {
+    #[serde(default)]
+    pub(crate) workspace_id: Uuid,
     pub(crate) item_id: Uuid,
     pub(crate) title: String,
     pub(crate) external_key: String,
@@ -99,6 +123,8 @@ pub(crate) struct Unplanned {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Busy {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    workspace_id: Option<Uuid>,
     starts_at: DateTime<Utc>,
     ends_at: DateTime<Utc>,
     title: String,
@@ -147,6 +173,7 @@ pub(crate) struct Grid {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Risk {
+    workspace_id: Uuid,
     item_id: Uuid,
     key: String,
     title: String,
@@ -192,7 +219,7 @@ struct Ranked {
     reasons: Vec<String>,
 }
 
-fn local_at(zone: Tz, day: NaiveDate, minute: i32) -> DateTime<Utc> {
+pub(super) fn local_at(zone: Tz, day: NaiveDate, minute: i32) -> DateTime<Utc> {
     let naive =
         NaiveDateTime::new(day, chrono::NaiveTime::MIN) + Duration::minutes(i64::from(minute));
     let mut candidate = naive;
@@ -554,6 +581,10 @@ fn quadrant_rank(value: &str) -> i32 {
     }
 }
 
+fn optional_event(input: &Input, event: &EventOccurrence) -> bool {
+    input.settings.soft_busy && event.can_skip && event.participant_user_ids.is_empty()
+}
+
 fn buffered(input: &Input, event: &EventOccurrence) -> Span {
     let active = event_active(event);
     let buffer = Duration::minutes(i64::from(input.settings.meeting_buffer_min));
@@ -568,7 +599,7 @@ fn free(input: &Input, zone: Tz) -> (Vec<Span>, Vec<Span>) {
     let mut soft = Vec::new();
     for event in &input.events {
         let span = buffered(input, event);
-        if input.settings.soft_busy && event.can_skip {
+        if optional_event(input, event) {
             soft.push(span);
         } else {
             hard.push(span);
@@ -577,9 +608,9 @@ fn free(input: &Input, zone: Tz) -> (Vec<Span>, Vec<Span>) {
     hard = merge(hard);
     let mut day = input.now.with_timezone(&zone).date_naive();
     let mut output = Vec::new();
-    for _ in 0..120 {
+    while local_at(zone, day, 0) < input.horizon_end {
         for window in work_window(input, zone, day) {
-            if let Some(window) = clip(window, input.now, window.end) {
+            if let Some(window) = clip(window, input.now, input.horizon_end) {
                 let mut slots = vec![window];
                 for hole in &hard {
                     slots = subtract(&slots, *hole);
@@ -590,6 +621,79 @@ fn free(input: &Input, zone: Tz) -> (Vec<Span>, Vec<Span>) {
         day = day.succ_opt().unwrap();
     }
     (output, soft)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DayLoad {
+    date: NaiveDate,
+    available_seconds: i64,
+    planned_seconds: i64,
+}
+
+pub(crate) fn day_loads(mut input: Input, team_id: Uuid, team_zone: Tz) -> Vec<DayLoad> {
+    let mut blocks = plan(&input).horizon;
+    let other_kind = if input.kind == "followup" {
+        "work"
+    } else {
+        "followup"
+    };
+    if input.items.iter().any(|item| eligible(item, other_kind)) {
+        input.kind = other_kind.to_owned();
+        blocks.extend(plan(&input).horizon);
+    }
+    let member_zone = input
+        .settings
+        .timezone
+        .parse()
+        .unwrap_or(chrono_tz::Europe::Moscow);
+    let (mut available, soft) = free(&input, member_zone);
+    let block_span = |block: &Block| Span {
+        start: block.starts_at,
+        end: block.ends_at,
+    };
+    for occupied in merge(
+        soft.into_iter()
+            .chain(blocks.iter().map(block_span))
+            .collect(),
+    ) {
+        available = subtract(&available, occupied);
+    }
+    let booked = merge(
+        blocks
+            .iter()
+            .filter(|block| block.workspace_id == team_id)
+            .map(block_span)
+            .chain(
+                input
+                    .events
+                    .iter()
+                    .filter(|event| event.workspace_id == team_id)
+                    .map(event_active),
+            )
+            .collect(),
+    );
+    let mut day = input.from.with_timezone(&team_zone).date_naive();
+    let mut result = Vec::new();
+    while local_at(team_zone, day, 0) < input.to {
+        let next = day.succ_opt().unwrap();
+        let start = local_at(team_zone, day, 0).max(input.from);
+        let end = local_at(team_zone, next, 0).min(input.to);
+        let total = |spans: &[Span]| {
+            spans
+                .iter()
+                .filter_map(|span| clip(*span, start, end))
+                .map(seconds)
+                .sum()
+        };
+        result.push(DayLoad {
+            date: day,
+            available_seconds: total(&available),
+            planned_seconds: total(&booked),
+        });
+        day = next;
+    }
+    result
 }
 
 fn grid(input: &Input, zone: Tz) -> Grid {
@@ -654,10 +758,11 @@ fn busy(input: &Input, zone: Tz) -> Vec<Busy> {
                 let visible_active = clip(active, slot.start, slot.end);
                 let ids: Vec<Uuid> = event.people.iter().map(|person| person.id).collect();
                 out.push(Busy {
+                    workspace_id: Some(event.workspace_id),
                     starts_at: slot.start,
                     ends_at: slot.end,
                     title: event.title.clone(),
-                    soft: input.settings.soft_busy && event.can_skip,
+                    soft: optional_event(input, event),
                     series_id: Some(event.series_id),
                     original_on: Some(event.original_on),
                     active_starts_at: visible_active.map(|span| span.start),
@@ -680,6 +785,7 @@ fn busy(input: &Input, zone: Tz) -> Vec<Busy> {
                 };
                 if let Some(span) = clip(span, input.from, input.to) {
                     out.push(Busy {
+                        workspace_id: None,
                         starts_at: span.start,
                         ends_at: span.end,
                         title: "Break".to_owned(),
@@ -862,7 +968,7 @@ impl Pack {
             }
         }
         for event in &input.events {
-            if input.settings.soft_busy && event.can_skip {
+            if optional_event(input, event) {
                 continue;
             }
             if event
@@ -922,8 +1028,7 @@ impl Pack {
             }
         }
         for event in &input.events {
-            if input.settings.soft_busy
-                && event.can_skip
+            if optional_event(input, event)
                 && buffered(input, event).start < span.end
                 && buffered(input, event).end > span.start
             {
@@ -931,6 +1036,7 @@ impl Pack {
             }
         }
         let block = Block {
+            workspace_id: r.item.workspace_id,
             item_id: r.item.id,
             title: r.item.title.clone(),
             external_key: r.item.external_key.clone(),
@@ -1226,7 +1332,7 @@ fn pack_with(
                 r,
                 Span {
                     start: input.now,
-                    end: input.now + Duration::seconds(take),
+                    end: input.horizon_end.min(input.now + Duration::seconds(take)),
                 },
                 0,
                 vec!["active".to_owned()],
@@ -1352,7 +1458,7 @@ fn pack_work(
         else {
             continue;
         };
-        let mut prior: Vec<&Block> = input
+        let mut prior: Vec<&Reservation> = input
             .previous
             .iter()
             .filter(|block| {
@@ -1413,7 +1519,7 @@ fn pack_followup(input: &Input, zone: Tz, queue: &[Ranked], free: &[Span]) -> Ve
         let mut placed = 0;
         let mut carry = Vec::new();
         for search in 0..150 {
-            if search >= 30 && placed == 0 {
+            if local_at(zone, day, 0) >= input.horizon_end || (search >= 30 && placed == 0) {
                 break;
             }
             if placed > 0 && day > until {
@@ -1469,7 +1575,7 @@ fn pack_followup(input: &Input, zone: Tz, queue: &[Ranked], free: &[Span]) -> Ve
                     }
                     let mut person_busy = None;
                     for event in &input.events {
-                        if input.settings.soft_busy && event.can_skip {
+                        if optional_event(input, event) {
                             continue;
                         }
                         if let Some(rel) = event
@@ -1499,6 +1605,7 @@ fn pack_followup(input: &Input, zone: Tz, queue: &[Ranked], free: &[Span]) -> Ve
                     let mut reasons = r.reasons.clone();
                     reasons.append(&mut carry);
                     blocks.push(Block {
+                        workspace_id: r.item.workspace_id,
                         item_id: r.item.id,
                         title: r.item.title.clone(),
                         external_key: r.item.external_key.clone(),
@@ -1712,6 +1819,7 @@ pub(crate) fn plan(input: &Input) -> Schedule {
         .iter()
         .filter(|r| r.slack < 0)
         .map(|r| Risk {
+            workspace_id: r.item.workspace_id,
             item_id: r.item.id,
             key: r.item.external_key.clone(),
             title: r.item.title.clone(),

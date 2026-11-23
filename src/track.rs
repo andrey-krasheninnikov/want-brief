@@ -230,6 +230,39 @@ async fn stop_interval(State(state): State<AppState>, Path(raw): Path<String>) -
     Json(updated).into_response()
 }
 
+pub(crate) async fn set_item_stress(
+    tx: &mut Transaction<'_, Postgres>,
+    item: Uuid,
+    level: Option<i16>,
+) -> Result<(), sqlx::Error> {
+    if crate::workspace::current().is_some_and(|s| s.kind == "team") {
+        if let Some(level) = level {
+            sqlx::query(
+                "INSERT INTO item_ratings(item_id,stress) VALUES($1,$2)
+                ON CONFLICT(workspace_id,owner_id,item_id) DO UPDATE SET stress=excluded.stress",
+            )
+            .bind(item)
+            .bind(level)
+            .execute(&mut **tx)
+            .await?;
+        } else {
+            sqlx::query("DELETE FROM item_ratings WHERE item_id=$1")
+                .bind(item)
+                .execute(&mut **tx)
+                .await?;
+        }
+    } else {
+        sqlx::query(
+            "UPDATE items SET stress=$2,updated_at=now() WHERE id=$1 AND deleted_at IS NULL",
+        )
+        .bind(item)
+        .bind(level)
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
+}
+
 async fn create_log(
     pool: &PgPool,
     kind: &str,
@@ -243,27 +276,24 @@ async fn create_log(
             "invalid: stress must be 1-5",
         ));
     }
+    let mut tx = pool.begin().await.map_err(database_error)?;
     let log = sqlx::query_as::<_, StressLog>("INSERT INTO stress_logs (id,item_id,kind,level,logged_at) VALUES ($1,$2,$3,$4,$5) RETURNING id,item_id,kind,level,logged_at")
         .bind(Uuid::new_v4())
         .bind(item_id)
         .bind(kind)
         .bind(level as i16)
         .bind(at)
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await
         .map_err(database_error)?;
     if kind == "stress" {
         if let Some(item_id) = item_id {
-            let _ = sqlx::query(
-                "UPDATE items SET stress=$2,updated_at=$3 WHERE id=$1 AND deleted_at IS NULL",
-            )
-            .bind(item_id)
-            .bind(level)
-            .bind(Utc::now())
-            .execute(pool)
-            .await;
+            set_item_stress(&mut tx, item_id, Some(level as i16))
+                .await
+                .map_err(database_error)?;
         }
     }
+    tx.commit().await.map_err(database_error)?;
     Ok(log)
 }
 

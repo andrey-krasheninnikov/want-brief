@@ -1,5 +1,9 @@
+mod origin;
+pub(crate) use origin::SourceHttp;
+
 use crate::crypto::TokenBox;
 use crate::http::{database_error, decode, error, id, not_found, AppState};
+use crate::workspace;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -42,11 +46,25 @@ pub(crate) struct Source {
 impl Source {
     pub(crate) async fn load(state: &AppState, source_id: Uuid) -> Result<Self, Response> {
         let query = format!("SELECT {COLUMNS} FROM sources WHERE id=$1");
-        sqlx::query_as::<_, Self>(&query)
+        let source = sqlx::query_as::<_, Self>(&query)
             .bind(source_id)
             .fetch_one(&state.pool)
             .await
-            .map_err(not_found)
+            .map_err(not_found)?;
+        if source.kind != "manual" {
+            let enabled: bool = sqlx::query_scalar("SELECT wb_source_enabled(wb_workspace(),$1)")
+                .bind(source_id)
+                .fetch_one(&state.pool)
+                .await
+                .map_err(database_error)?;
+            if !enabled {
+                return Err(error(
+                    StatusCode::CONFLICT,
+                    "source exceeds workspace quota",
+                ));
+            }
+        }
+        Ok(source)
     }
 
     #[allow(clippy::result_large_err)]
@@ -61,6 +79,14 @@ impl Source {
 
     fn public(mut self) -> Self {
         self.has_token = !self.token_sealed.is_empty();
+        if workspace::current().is_some_and(|s| s.role != "owner") {
+            self.email.clear();
+            self.base_url.clear();
+            self.query_filter.clear();
+            if !self.last_error.is_empty() {
+                self.last_error = "Source sync failed".into();
+            }
+        }
         self
     }
 }
@@ -106,41 +132,21 @@ async fn project_exists(state: &AppState, project_id: Option<Uuid>) -> Result<()
 }
 
 async fn probe(source: &Source, token: &str) -> Result<(), String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(25))
-        .redirect(if source.kind == "jira" {
-            reqwest::redirect::Policy::none()
-        } else {
-            reqwest::redirect::Policy::default()
-        })
-        .danger_accept_invalid_certs(source.kind == "jira" && source.insecure_tls)
-        .build()
-        .map_err(|err| err.to_string())?;
+    let http = SourceHttp::new(source)?;
     let endpoint = if source.kind == "jira" {
-        let suffix = if source.base_url.to_lowercase().contains(".atlassian.net") {
-            "/rest/api/3/myself"
-        } else {
-            "/rest/api/2/myself"
-        };
-        format!("{}{suffix}", source.base_url)
+        http.endpoint(&["rest", "api", if http.cloud { "3" } else { "2" }, "myself"])
     } else {
-        format!("{}/rest/v2/projects", source.base_url)
+        http.endpoint(&["rest", "v2", "projects"])
     };
-    let mut request = client.get(endpoint).header("Accept", "application/json");
-    if source.kind == "jira" {
-        if source.base_url.to_lowercase().contains(".atlassian.net") {
-            request = request.basic_auth(&source.email, Some(token));
-        } else if let Some((user, password)) = token
-            .split_once(':')
-            .filter(|(user, password)| !user.is_empty() && !password.is_empty())
-        {
-            request = request.basic_auth(user, Some(password));
-        } else {
-            request = request.bearer_auth(token);
-        }
+    let request = http
+        .client
+        .get(endpoint)
+        .header("Accept", "application/json");
+    let request = if source.kind == "jira" {
+        jira_auth(request, source, token, http.cloud)
     } else {
-        request = request.bearer_auth(token);
-    }
+        request.bearer_auth(token)
+    };
     let response = request
         .send()
         .await
@@ -252,6 +258,9 @@ async fn create(State(state): State<AppState>, body: Bytes) -> Response {
         updated_at: now,
         has_token: false,
     };
+    if let Err(message) = origin::validate(&source) {
+        return error(StatusCode::BAD_REQUEST, message);
+    }
     if !token.is_empty() {
         match probe(&source, token).await {
             Ok(()) => source.connected = true,
@@ -351,6 +360,9 @@ async fn patch(State(state): State<AppState>, Path(raw): Path<String>, body: Byt
         };
         Some(token.to_owned())
     };
+    if let Err(message) = origin::validate(&source) {
+        return error(StatusCode::BAD_REQUEST, message);
+    }
     let should_reprobe = reprobe || plain.is_some();
     if should_reprobe {
         let plain = match plain {
@@ -498,25 +510,13 @@ fn jira_time(raw: &str) -> Option<DateTime<Utc>> {
         .map(|date| date.with_timezone(&Utc))
 }
 
-fn source_client(source: &Source) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(25))
-        .redirect(if source.kind == "jira" {
-            reqwest::redirect::Policy::none()
-        } else {
-            reqwest::redirect::Policy::default()
-        })
-        .danger_accept_invalid_certs(source.kind == "jira" && source.insecure_tls)
-        .build()
-        .map_err(|err| err.to_string())
-}
-
-fn jira_auth(
+pub(crate) fn jira_auth(
     request: reqwest::RequestBuilder,
     source: &Source,
     token: &str,
+    cloud: bool,
 ) -> reqwest::RequestBuilder {
-    if source.base_url.to_lowercase().contains(".atlassian.net") {
+    if cloud {
         request.basic_auth(&source.email, Some(token))
     } else if let Some((user, password)) = token
         .split_once(':')
@@ -529,10 +529,11 @@ fn jira_auth(
 }
 
 async fn pull(source: &Source, token: &str) -> Result<Vec<RemoteItem>, String> {
-    let client = source_client(source)?;
+    let http = SourceHttp::new(source)?;
     if source.kind == "todoist" {
-        let endpoint = format!("{}/rest/v2/tasks", source.base_url);
-        let request = client
+        let endpoint = http.endpoint(&["rest", "v2", "tasks"]);
+        let request = http
+            .client
             .get(endpoint)
             .bearer_auth(token)
             .header("Accept", "application/json");
@@ -576,11 +577,11 @@ async fn pull(source: &Source, token: &str) -> Result<Vec<RemoteItem>, String> {
             })
             .collect());
     }
-    let cloud = source.base_url.to_lowercase().contains(".atlassian.net");
+    let cloud = http.cloud;
     let endpoint = if cloud {
-        format!("{}/rest/api/3/search/jql", source.base_url)
+        http.endpoint(&["rest", "api", "3", "search", "jql"])
     } else {
-        format!("{}/rest/api/2/search", source.base_url)
+        http.endpoint(&["rest", "api", "2", "search"])
     };
     let mut page_token = String::new();
     let mut start_at = 0_usize;
@@ -595,12 +596,13 @@ async fn pull(source: &Source, token: &str) -> Result<Vec<RemoteItem>, String> {
             body["startAt"] = start_at.into();
         }
         let request = jira_auth(
-            client
-                .post(&endpoint)
+            http.client
+                .post(endpoint.clone())
                 .header("Accept", "application/json")
                 .json(&body),
             source,
             token,
+            cloud,
         );
         let response = request
             .send()
@@ -682,6 +684,9 @@ async fn finish_failure(
 }
 
 pub(crate) fn integration_error(message: String) -> Response {
+    if origin::denied(&message) {
+        return error(StatusCode::FORBIDDEN, message);
+    }
     let status = if message.contains("HTTP") {
         StatusCode::BAD_GATEWAY
     } else {
@@ -753,7 +758,7 @@ async fn sync_source(state: &AppState, source_id: Uuid, scheduled: bool) -> Resp
     let claim_id = Uuid::new_v4();
     let query = format!(
         "UPDATE sources SET sync_claim_id=$2,sync_claim_until=clock_timestamp()+INTERVAL '10 minutes', \
-         last_attempt_at=clock_timestamp() WHERE id=$1 AND kind IN ('jira','todoist') \
+         last_attempt_at=clock_timestamp() WHERE id=$1 AND wb_source_enabled(workspace_id,id) AND kind IN ('jira','todoist') \
          AND project_id IS NOT NULL AND token_sealed<>'' \
          AND (sync_claim_until IS NULL OR sync_claim_until<=clock_timestamp()) \
          AND (NOT $3::boolean OR (sync_interval_minutes>0 AND \
@@ -823,7 +828,7 @@ async fn apply_remote(
         Err(err) => return Err(database_error(err)),
     };
     let current: Option<(Uuid, DateTime<Utc>)> =
-        match sqlx::query_as("SELECT sync_claim_id,updated_at FROM sources WHERE id=$1 AND sync_claim_until>clock_timestamp() FOR UPDATE")
+        match sqlx::query_as("SELECT sync_claim_id,updated_at FROM sources WHERE id=$1 AND sync_claim_until>clock_timestamp() AND wb_source_enabled(workspace_id,id) FOR UPDATE")
             .bind(source_id)
             .fetch_optional(&mut *transaction)
             .await
@@ -877,7 +882,9 @@ async fn apply_remote(
     Ok(upserted)
 }
 
-pub async fn run_scheduler(state: AppState) {
+pub async fn run_scheduler(mut state: AppState) {
+    let control = state.auth.pool().clone();
+    state.pool = workspace::data_pool(&control);
     let mut ticker = tokio::time::interval(std::time::Duration::from_secs(60));
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut running = tokio::task::JoinSet::new();
@@ -888,16 +895,16 @@ pub async fn run_scheduler(state: AppState) {
         if available == 0 {
             continue;
         }
-        let due: Vec<Uuid> = match sqlx::query_scalar(
-            "SELECT id FROM sources WHERE kind IN ('jira','todoist') AND project_id IS NOT NULL \
+        let due: Vec<(Uuid,Uuid,Uuid)> = match sqlx::query_as(
+            "SELECT s.id,s.workspace_id,w.owner_id FROM sources s JOIN workspaces w ON w.id=s.workspace_id WHERE s.kind IN ('jira','todoist') AND wb_source_enabled(s.workspace_id,s.id) AND s.project_id IS NOT NULL \
              AND token_sealed<>'' AND sync_interval_minutes>0 \
              AND (sync_claim_until IS NULL OR sync_claim_until<=clock_timestamp()) \
              AND (last_attempt_at IS NULL OR \
              last_attempt_at+sync_interval_minutes*INTERVAL '1 minute'<=clock_timestamp()) \
-             ORDER BY last_attempt_at NULLS FIRST,id LIMIT $1",
+             ORDER BY last_attempt_at NULLS FIRST,s.id LIMIT $1",
         )
         .bind(available as i64)
-        .fetch_all(&state.pool)
+        .fetch_all(&control)
         .await
         {
             Ok(due) => due,
@@ -906,10 +913,15 @@ pub async fn run_scheduler(state: AppState) {
                 continue;
             }
         };
-        for source_id in due {
+        for (source_id, workspace_id, user_id) in due {
+            let scope = match workspace::access(&control, user_id, Some(workspace_id)).await {
+                Ok(scope) => scope,
+                Err(_) => continue,
+            };
             let state = state.clone();
             running.spawn(async move {
-                let response = sync_source(&state, source_id, true).await;
+                let response =
+                    workspace::in_scope(scope, sync_source(&state, source_id, true)).await;
                 if response.status().is_server_error() {
                     eprintln!("scheduled source sync failed: {}", response.status());
                 }

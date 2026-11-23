@@ -4,6 +4,7 @@ import { DotsThree } from '@phosphor-icons/react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { useAccount } from '../../shared/account'
 import { api } from '../../api'
 import { OpenUrl } from '../../shared/UrlField'
 import { openTask } from '../../shared/taskOverlay'
@@ -76,6 +77,7 @@ function payloadFrom(form: Draft) {
 }
 
 export function CompanyDossier({ companyId, onCreated, onDeleted, onClose }: Props) {
+  const { workspace } = useAccount()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const company = useQuery({
@@ -114,8 +116,16 @@ export function CompanyDossier({ companyId, onCreated, onDeleted, onClose }: Pro
   }, [companyId, row?.id, row?.updatedAt])
 
   const save = useMutation({
-    mutationFn: (body: ReturnType<typeof payloadFrom>) =>
-      companyId ? api.patchCompany(companyId, body) : api.createCompany(body),
+    mutationFn: (body: ReturnType<typeof payloadFrom>) => {
+      if (!companyId) return api.createCompany(body)
+      if (workspace.kind === 'team' && row) {
+        const previous = payloadFrom(draftFrom(row))
+        if (JSON.stringify({ ...body, startedOn: previous.startedOn, endedOn: previous.endedOn }) === JSON.stringify(previous)) {
+          return api.patchCompany(companyId, { startedOn: body.startedOn, endedOn: body.endedOn })
+        }
+      }
+      return api.patchCompany(companyId, body)
+    },
     onSuccess: (next) => {
       setError('')
       setWaiting(false)
@@ -262,6 +272,7 @@ export function CompanyDossier({ companyId, onCreated, onDeleted, onClose }: Pro
           Create
         </Button>
       ) : null}
+      {workspace.kind === 'team' ? <p className="muted">The team shares this company profile. Career history, pay, contracts and private notes are visible only to their author.</p> : null}
       <label>
         Description
         <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />

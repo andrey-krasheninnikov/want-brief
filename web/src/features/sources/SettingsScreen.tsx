@@ -1,5 +1,6 @@
 import { Input } from '@want-foundation/desyst-react'
 import { Button } from '@want-foundation/desyst-react'
+import { useAccount } from '../../shared/account'
 import { useTimezone } from '../../shared/timezone'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
@@ -17,6 +18,8 @@ const syncIntervals = [
 
 export function SettingsScreen() {
   const tz = useTimezone()
+  const { workspace, sourceCount, capabilities } = useAccount()
+  const owner = workspace.role === 'owner'
   const queryClient = useQueryClient()
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources, refetchInterval: 60_000 })
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
@@ -29,6 +32,14 @@ export function SettingsScreen() {
   const [insecureTls, setInsecureTls] = useState(false)
   const [syncIntervalMinutes, setSyncIntervalMinutes] = useState(0)
   const [error, setError] = useState('')
+
+  const count = sources.data?.filter((source) => source.kind !== 'manual').length ?? sourceCount
+  const limit = capabilities.externalSourceLimit
+  const atLimit = limit != null && count >= limit
+  function refreshCount() {
+    void queryClient.invalidateQueries({ queryKey: ['sources'] })
+    void queryClient.invalidateQueries({ queryKey: ['me'] })
+  }
 
   const createSource = useMutation({
     mutationFn: () =>
@@ -47,9 +58,9 @@ export function SettingsScreen() {
       setToken('')
       setEmail('')
       setInsecureTls(false)
-      void queryClient.invalidateQueries({ queryKey: ['sources'] })
+      refreshCount()
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => { setError(err.message); refreshCount() },
   })
   const sync = useMutation({
     mutationFn: api.syncSource,
@@ -72,7 +83,8 @@ export function SettingsScreen() {
   })
   const removeSource = useMutation({
     mutationFn: api.deleteSource,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sources'] }),
+    onSuccess: refreshCount,
+    onError: (err: Error) => setError(err.message),
   })
 
   const projectName = new Map((projects.data ?? []).map((project) => [project.id, project.name]))
@@ -89,8 +101,10 @@ export function SettingsScreen() {
 
   return (
     <Window title="Sources">
-      {error ? <p className="error">{error}</p> : null}
-      <h3>Sources</h3>
+      {error ? <p className="error" role="alert">{error}</p> : null}
+      <p>{workspace.name} · {limit != null ? `Free · ${count} of ${limit} external sources used.` : `Paid · ${count} external sources. No limit.`} Manual tasks use no source slots.</p>
+      {sources.isLoading ? <p role="status">Loading sources…</p> : null}
+      {sources.error ? <p className="error" role="alert">{sources.error.message}</p> : null}
       <ul className="list dense sources-list">
         {(sources.data ?? []).map((source) => (
           <li key={source.id}>
@@ -99,7 +113,7 @@ export function SettingsScreen() {
               <small>
                 {source.kind}
                 {source.projectId ? ` · ${projectName.get(source.projectId) ?? 'project'}` : ''}
-                {source.email ? ` · ${source.email}` : ''}
+                {owner && source.email ? ` · ${source.email}` : ''}
                 {' · '}
                 {source.connected ? 'connected' : 'no connection'}
                 {source.lastError ? ` · ${source.lastError}` : ''}
@@ -109,9 +123,9 @@ export function SettingsScreen() {
                   Last attempt: {syncTime(source.lastAttemptAt)} · Last successful sync: {syncTime(source.lastSyncAt)}
                 </small>
               )}
-              {source.kind !== 'manual' && !source.hasToken ? <small>Add a token to enable sync.</small> : null}
+              {owner && source.kind !== 'manual' && !source.hasToken ? <small>Add a token to enable sync.</small> : null}
             </div>
-            {source.kind === 'manual' ? null : (
+            {source.kind === 'manual' || !owner ? null : (
               <>
                 <label>
                   Sync schedule
@@ -170,15 +184,16 @@ export function SettingsScreen() {
           </li>
         ))}
       </ul>
-      <form className="stack" onSubmit={onAddSource}>
+      {owner && atLimit ? <p role="status">Both source slots are in use. Remove a source to connect another.</p> : null}
+      {owner && !atLimit ? <form className="stack" onSubmit={onAddSource}>
         <div className="row">
-          <select value={kind} onChange={(e) => setKind(e.target.value as 'jira' | 'todoist')}>
+          <select aria-label="Source type" value={kind} onChange={(e) => setKind(e.target.value as 'jira' | 'todoist')}>
             <option value="jira">Jira</option>
             <option value="todoist">Todoist</option>
           </select>
-          <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input aria-label="Source name" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value)} required>
+        <select aria-label="Project" value={projectId} onChange={(e) => setProjectId(e.target.value)} required>
           <option value="">Project</option>
           {openProjects.map((project) => (
             <option key={project.id} value={project.id}>
@@ -187,6 +202,7 @@ export function SettingsScreen() {
           ))}
         </select>
         <Input
+          aria-label="Service URL"
           placeholder={kind === 'jira' ? 'https://your-domain.atlassian.net' : 'https://api.todoist.com'}
           value={baseUrl}
           onChange={(e) => setBaseUrl(e.target.value)}
@@ -194,6 +210,7 @@ export function SettingsScreen() {
         {kind === 'jira' ? (
           <>
             <Input
+              aria-label="Atlassian email"
               placeholder="Atlassian email"
               type="email"
               value={email}
@@ -207,6 +224,7 @@ export function SettingsScreen() {
           </>
         ) : null}
         <Input
+          aria-label="API token"
           placeholder="API token"
           type="password"
           value={token}
@@ -223,8 +241,8 @@ export function SettingsScreen() {
         <Button type="submit" disabled={!projectId || createSource.isPending}>
           Add source
         </Button>
-      </form>
-      <BackupSection />
+      </form> : null}
+      {owner ? <BackupSection /> : <p className="muted">The workspace owner manages connections and backups.</p>}
     </Window>
   )
 }

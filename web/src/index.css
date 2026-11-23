@@ -59,6 +59,7 @@ textarea { resize: vertical; min-height: 7rem; }
   flex-direction: column;
   min-height: 0;
   padding: 16px 10px;
+  overflow-y: auto;
   background: var(--card);
   border-radius: var(--panel-radius);
 }
@@ -1583,3 +1584,16 @@ a.matrix-cell:hover { background: var(--accent); }
 [data-slot="button"].danger:hover { background: color-mix(in srgb, var(--destructive) 12%, var(--secondary)); }
 [data-slot="button"].chip { background: var(--secondary); color: var(--muted-foreground); min-width: 44px; }
 [data-slot="button"].chip.on { background: color-mix(in srgb, var(--primary) 18%, var(--secondary)); color: var(--foreground); }
+
+.workspace-picker { display: grid; gap: .35rem; min-width: 0; }
+.workspace-picker select { max-width: 100%; min-width: 0; width: 100%; }
+.account-settings { max-width: 52rem; }
+.account-settings section + section { border-top: 1px solid var(--border); padding-top: 1.2rem; margin-top: .6rem; }
+.account-settings h2, .account-settings h3 { margin: 0; }
+.account-settings form { max-width: 32rem; }
+.account-links { display: flex; flex-wrap: wrap; gap: .25rem; }
+.account-list { list-style: none; margin: 0; padding: 0; }
+.account-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; padding: .45rem 0; overflow-wrap: anywhere; }
+.account-list small { display: block; }
+
+.workspace-notice { margin: 0; padding: .6rem 1rem; color: var(--foreground); background: var(--secondary); }

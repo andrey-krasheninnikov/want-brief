@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api'
 import { zonedDayRange } from '../../shared/zoned'
 import { useTimezone } from '../../shared/timezone'
-import { openEvent, openTask } from '../../shared/taskOverlay'
+import { openEvent, openTask, scheduleOrigins } from '../../shared/taskOverlay'
 import { Window } from '../../shared/Window'
 import { pickNow, todayBlocks, zonedYmd } from '../schedule/now'
 import { ClockRow } from './ClockRow'
@@ -52,6 +52,7 @@ export function TodayScreen() {
   })
 
   const today = zonedYmd(new Date(tick), tz)
+  const origins = scheduleOrigins(schedule.data)
   const lanes = schedule.data?.lanes ?? []
   const blocks = todayBlocks(lanes, today, tz)
   const pick = pickNow(blocks, tick)
@@ -91,7 +92,7 @@ export function TodayScreen() {
               running={running}
               tz={tz}
               titleOf={(id) => names.get(id)}
-              onOpen={(id) => openTask(navigate, id)}
+              onOpen={(id) => openTask(navigate, id, origins.tasks.get(id))}
             />
           </div>
         </div>
@@ -102,8 +103,8 @@ export function TodayScreen() {
               loading={packing}
               error={schedule.isError ? schedule.error.message : undefined}
               tz={tz}
-              onOpenWork={(id) => openTask(navigate, id)}
-              onOpenMeeting={(seriesId, originalOn) => openEvent(navigate, seriesId, originalOn)}
+              onOpenWork={(id) => openTask(navigate, id, origins.tasks.get(id))}
+              onOpenMeeting={(seriesId, originalOn) => openEvent(navigate, seriesId, originalOn, origins.events.get(seriesId))}
             />
           </div>
         </div>
@@ -112,7 +113,7 @@ export function TodayScreen() {
             <TodayRisk
               rows={risk}
               loading={(packing || items.isLoading) && risk.length === 0}
-              onOpen={(id) => openTask(navigate, id)}
+              onOpen={(id) => openTask(navigate, id, origins.tasks.get(id))}
             />
           </div>
         </div>

@@ -1,6 +1,6 @@
+mod support;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 use want_brief::auth::Auth;
@@ -13,18 +13,21 @@ async fn load_counts_overlaps_and_splits_moscow_midnight() {
     let url = std::env::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set");
     let database_name = url.split('?').next().unwrap().rsplit('/').next().unwrap();
     assert!(database_name.starts_with("wantbrief_issue92_"));
-    let pool = PgPool::connect(&url).await.unwrap();
+    let pool = support::legacy_pool(&url).await;
     let auth = Auth::new(pool.clone());
     auth.ensure_user("sample-password").await.unwrap();
     let token = auth.login("sample-password").await.unwrap().unwrap();
-    let source_id: Uuid = sqlx::query_scalar("SELECT id FROM sources WHERE kind='manual' LIMIT 1")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    let project_id: Uuid = sqlx::query_scalar("SELECT id FROM projects WHERE name='Work' LIMIT 1")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let source_id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM sources WHERE workspace_id=wb_workspace() AND kind='manual' LIMIT 1",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let project_id: Uuid =
+        sqlx::query_scalar("INSERT INTO projects (name) VALUES ('Load test') RETURNING id")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     let first = Uuid::new_v4();
     let second = Uuid::new_v4();
     for item_id in [first, second] {
@@ -86,6 +89,11 @@ async fn load_counts_overlaps_and_splits_moscow_midnight() {
     assert_eq!(report["byDay"][1]["allocatedSeconds"], 5400);
     sqlx::query("DELETE FROM items WHERE id=ANY($1)")
         .bind(vec![first, second])
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM projects WHERE id=$1")
+        .bind(project_id)
         .execute(&pool)
         .await
         .unwrap();

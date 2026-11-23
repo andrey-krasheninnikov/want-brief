@@ -1,6 +1,6 @@
+mod support;
 use chrono::{Duration, Utc};
 use serde_json::{json, Value};
-use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 use want_brief::auth::Auth;
@@ -13,14 +13,14 @@ async fn timer_and_checkin_routes_keep_history_and_defaults() {
     let url = std::env::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set");
     let database_name = url.split('?').next().unwrap().rsplit('/').next().unwrap();
     assert!(database_name.starts_with("wantbrief_issue92_"));
-    let pool = PgPool::connect(&url).await.unwrap();
-    let source_id = Uuid::new_v4();
+    let pool = support::legacy_pool(&url).await;
+    let source_id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM sources WHERE workspace_id=wb_workspace() AND kind='manual'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     let item_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO sources (id,kind,name) VALUES ($1,'manual','Track test')")
-        .bind(source_id)
-        .execute(&pool)
-        .await
-        .unwrap();
     sqlx::query("INSERT INTO items (id,source_id,title,status,kind) VALUES ($1,$2,'Track test','to_do','task')")
         .bind(item_id)
         .bind(source_id)
@@ -114,8 +114,8 @@ async fn timer_and_checkin_routes_keep_history_and_defaults() {
         .execute(&pool)
         .await
         .unwrap();
-    sqlx::query("DELETE FROM sources WHERE id=$1")
-        .bind(source_id)
+    sqlx::query("DELETE FROM items WHERE id=$1")
+        .bind(item_id)
         .execute(&pool)
         .await
         .unwrap();

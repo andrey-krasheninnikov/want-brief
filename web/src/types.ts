@@ -285,6 +285,8 @@ export type Source = {
 
 export type Item = {
   id: string
+  workspaceId: string
+  assigneeUserId: string | null
   sourceId: string
   externalKey: string
   title: string
@@ -375,6 +377,7 @@ export type EventOccurrence = {
 
 export type EventSeries = {
   id: string
+  participantUserIds: string[]
   title: string
   description: string
   agenda: string
@@ -552,6 +555,7 @@ export type JournalEntry = {
 export type ScheduleBlockKind = 'work' | 'ping'
 
 export type ScheduleBlock = {
+  workspaceId: string
   itemId: string
   title: string
   externalKey: string
@@ -586,6 +590,7 @@ export type ScheduleLane = {
 }
 
 export type ScheduleBusy = {
+  workspaceId?: string
   startsAt: string
   endsAt: string
   title: string
@@ -626,6 +631,7 @@ export type ScheduleGrid = {
 }
 
 export type AtRiskItem = {
+  workspaceId?: string
   itemId: string
   key: string
   title: string
@@ -820,4 +826,35 @@ const STATUS_LABELS: Record<ItemStatus, string> = {
 
 export function statusLabel(status: ItemStatus): string {
   return STATUS_LABELS[status] ?? status.replaceAll('_', ' ')
+}
+
+export type Workspace = {
+  id: string
+  name: string
+  kind: 'personal' | 'team'
+  plan: 'free' | 'paid'
+  role: 'owner' | 'editor'
+}
+
+export type Account = {
+  ok: true
+  user: { id: string; email: string | null }
+  workspace: Workspace
+  workspaces: Workspace[]
+  members: { id: string; label: string; role: Workspace['role'] }[]
+  sourceCount: number
+  personalPlan: Workspace['plan']
+  capabilities: { scheduleDays: number; externalSourceLimit: number | null; canCollaborate: boolean; canAnalyze: boolean }
+}
+
+export type Session = { id: string; createdAt: string; expiresAt: string; current: boolean }
+export type Invitation = { id: string; email: string; expiresAt: string }
+
+export type TeamSchedule = {
+  from: string
+  to: string
+  timezone: string
+  members: { userId: string; days: { date: string; availableSeconds: number; plannedSeconds: number }[] }[]
+  items: { id: string; title: string; assigneeUserId: string | null }[]
+  events: { id: string; seriesId: string; originalOn: string; title: string; startsAt: string; endsAt: string; participantUserIds: string[] }[]
 }

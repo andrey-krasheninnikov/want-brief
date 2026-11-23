@@ -1,5 +1,6 @@
 import { Input } from '@want-foundation/desyst-react'
 import { Button, Textarea } from '@want-foundation/desyst-react'
+import { useAccount } from '../../shared/account'
 import { useTimezone } from '../../shared/timezone'
 import { zonedInstant, zonedLocalInput } from '../../shared/zoned'
 import { ArrowCounterClockwise, ArrowsClockwise, ChatTeardrop, Clock, Copy, Snowflake, Trash } from '@phosphor-icons/react'
@@ -52,6 +53,7 @@ function statusTone(item: Item): string {
 }
 
 export function TaskBrief({ item, task, onGone }: Props) {
+  const { workspace } = useAccount()
   const tz = useTimezone()
   const { patch, mark, hint } = task
   const promptLog = useTaskLogPrompt()
@@ -262,7 +264,7 @@ export function TaskBrief({ item, task, onGone }: Props) {
         </div>
         <div className="dossier-bar">
           <div className="tasks-actions">
-            {remote ? (
+            {remote && workspace.role === 'owner' ? (
               <Button
                 type="button"
                 className="ghost"

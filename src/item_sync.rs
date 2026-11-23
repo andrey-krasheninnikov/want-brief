@@ -1,5 +1,5 @@
 use crate::http::{database_error, error, id, not_found, AppState};
-use crate::sources::Source;
+use crate::sources::{jira_auth, Source, SourceHttp};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -162,39 +162,21 @@ async fn get_json<T: for<'de> Deserialize<'de>>(
 }
 
 async fn fetch_remote(source: &Source, token: &str, key: &str) -> Result<RemoteDetail, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(25))
-        .redirect(if source.kind == "jira" {
-            reqwest::redirect::Policy::none()
-        } else {
-            reqwest::redirect::Policy::default()
-        })
-        .danger_accept_invalid_certs(source.kind == "jira" && source.insecure_tls)
-        .build()
-        .map_err(|err| err.to_string())?;
+    let http = SourceHttp::new(source)?;
     if source.kind == "todoist" {
-        let mut task_url = reqwest::Url::parse(&source.base_url).map_err(|err| err.to_string())?;
-        task_url
-            .path_segments_mut()
-            .map_err(|_| "invalid todoist URL")?
-            .extend(["rest", "v2", "tasks", key]);
+        let task_url = http.endpoint(&["rest", "v2", "tasks", key]);
         let task: TodoTask = get_json(
-            client
+            http.client
                 .get(task_url)
                 .bearer_auth(token)
                 .header("Accept", "application/json"),
             "todoist task",
         )
         .await?;
-        let mut comment_url =
-            reqwest::Url::parse(&source.base_url).map_err(|err| err.to_string())?;
-        comment_url
-            .path_segments_mut()
-            .map_err(|_| "invalid todoist URL")?
-            .extend(["rest", "v2", "comments"]);
+        let mut comment_url = http.endpoint(&["rest", "v2", "comments"]);
         comment_url.query_pairs_mut().append_pair("task_id", key);
         let comments: Vec<TodoComment> = get_json(
-            client
+            http.client
                 .get(comment_url)
                 .bearer_auth(token)
                 .header("Accept", "application/json"),
@@ -222,27 +204,25 @@ async fn fetch_remote(source: &Source, token: &str, key: &str) -> Result<RemoteD
                 .collect(),
         });
     }
-    let cloud = source.base_url.to_lowercase().contains(".atlassian.net");
-    let mut issue_url = reqwest::Url::parse(&source.base_url).map_err(|err| err.to_string())?;
-    issue_url
-        .path_segments_mut()
-        .map_err(|_| "invalid jira URL")?
-        .extend(["rest", "api", if cloud { "3" } else { "2" }, "issue", key]);
+    let mut issue_url = http.endpoint(&[
+        "rest",
+        "api",
+        if http.cloud { "3" } else { "2" },
+        "issue",
+        key,
+    ]);
     issue_url.query_pairs_mut().append_pair(
         "fields",
         "summary,status,priority,duedate,created,description,comment",
     );
-    let mut request = client.get(issue_url).header("Accept", "application/json");
-    if cloud {
-        request = request.basic_auth(&source.email, Some(token));
-    } else if let Some((user, password)) = token
-        .split_once(':')
-        .filter(|(user, password)| !user.is_empty() && !password.is_empty())
-    {
-        request = request.basic_auth(user, Some(password));
-    } else {
-        request = request.bearer_auth(token);
-    }
+    let request = jira_auth(
+        http.client
+            .get(issue_url)
+            .header("Accept", "application/json"),
+        source,
+        token,
+        http.cloud,
+    );
     let issue: JiraIssue = get_json(request, "jira issue").await?;
     let browse = format!("{}/browse/{key}", source.base_url.trim_end_matches('/'));
     Ok(RemoteDetail {

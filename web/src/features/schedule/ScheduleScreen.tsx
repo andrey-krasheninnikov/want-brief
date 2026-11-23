@@ -5,9 +5,11 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { span } from '../../shared/format'
-import { shiftWeeks, zonedWeek } from '../../shared/zoned'
+import { schedulePage } from '../../shared/zoned'
+import { useAccount } from '../../shared/account'
+import { ScheduleScope, TeamScheduleScreen } from './TeamScheduleScreen'
 import { useTimezone } from '../../shared/timezone'
-import { openEvent, openTask } from '../../shared/taskOverlay'
+import { openEvent, openTask, scheduleOrigins } from '../../shared/taskOverlay'
 import { Window } from '../../shared/Window'
 import { DayOverridePopover } from './DayOverridePopover'
 import { NeedsFields } from './NeedsFields'
@@ -91,7 +93,7 @@ function endMinutes(iso: string, startMin: number, tz: string): number {
 function weekKicker(days: string[]): string {
   const fmt = (ymd: string) =>
     new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${ymd}T12:00:00Z`))
-  return `${fmt(days[0])} - ${fmt(days[6])}`
+  return days.length === 1 ? fmt(days[0]) : `${fmt(days[0])} - ${fmt(days[days.length - 1])}`
 }
 
 function dayTone(ymd: string, today: string, override?: DayOverride): string {
@@ -390,7 +392,7 @@ function Pressure({
           ? `Will not fit: ${span(overflow.seconds)} past ${dueLabel(overflow.firstDueAt, tz)}`
           : overflow.itemCount > 0
             ? `Will not fit: ${span(overflow.seconds)}`
-            : `This week: ${meetings} meetings, ${span(free)} free for tasks`}
+            : `${meetings} meetings · ${span(free)} free for tasks`}
         <span className="sched-score mono" title="Late seconds, fragments, switches and load variance folded into one number; lower is better">
           {' · '}score {score.total.toFixed(1)} · {score.fragments} fragments · {score.switches} switches
         </span>
@@ -506,11 +508,17 @@ function DayHeads({
 }
 
 export function ScheduleScreen() {
+  const { workspace } = useAccount()
+  return workspace.kind === 'team' ? <TeamScheduleScreen /> : <PersonalSchedule />
+}
+
+function PersonalSchedule() {
+  const { personalPlan } = useAccount()
   const navigate = useNavigate()
   const tz = useTimezone()
   const queryClient = useQueryClient()
   const gantt = useRef<HTMLDivElement>(null)
-  const [anchor, setAnchor] = useState(() => new Date())
+  const [page, setPage] = useState(0)
   const [kind, setKind] = useState<'work' | 'followup'>('work')
   const [view, setView] = useState<View>(readView)
   const [ganttDay, setGanttDay] = useState<string | null>(null)
@@ -521,7 +529,10 @@ export function ScheduleScreen() {
     const id = window.setInterval(() => setTick(Date.now()), 60_000)
     return () => window.clearInterval(id)
   }, [])
-  const week = useMemo(() => zonedWeek(anchor, tz), [anchor, tz])
+  const today = zonedYmd(new Date(tick), tz)
+  const week = useMemo(() => schedulePage(today, tz, personalPlan, page), [today, tz, personalPlan, page])
+  const lastDay = week.days[week.days.length - 1]
+  const hasNext = week.pageIndex + 1 < week.pageCount
   const intervals = useQuery({
     queryKey: ['intervals'],
     queryFn: api.intervals,
@@ -534,8 +545,8 @@ export function ScheduleScreen() {
     refetchInterval: running.length > 0 ? 10_000 : false,
   })
   const dayOverrides = useQuery({
-    queryKey: ['schedule-days', week.days[0], week.days[6]],
-    queryFn: () => api.dayOverrides(week.days[0], week.days[6]),
+    queryKey: ['schedule-days', week.days[0], lastDay],
+    queryFn: () => api.dayOverrides(week.days[0], lastDay),
   })
   const upsertDay = useMutation({
     mutationFn: ({ day, draft }: { day: string; draft: DayOverrideDraft }) => api.putDayOverride(day, draft),
@@ -554,7 +565,7 @@ export function ScheduleScreen() {
     },
   })
   const grid = gridOf(report.data?.grid, tz)
-  const today = zonedYmd(new Date(tick), grid.tz)
+  const origins = scheduleOrigins(report.data)
   const chartDay = pickChartDay(week.days, today, ganttDay, report.data?.grid.workdays ?? FALLBACK_GRID.workdays)
   const lanes = report.data?.lanes ?? []
   const unplanned = report.data?.unplanned ?? []
@@ -596,6 +607,7 @@ export function ScheduleScreen() {
       title={kind === 'followup' ? 'Follow-up' : 'Schedule'}
       actions={
         <div className="sched-actions">
+          <ScheduleScope />
           <div className="sched-cluster">
             <div className="sched-tabs">
               <Button type="button" className={kind === 'work' ? 'ghost on' : 'ghost'} onClick={() => setKind('work')}>
@@ -622,17 +634,17 @@ export function ScheduleScreen() {
               Gantt
             </Button>
           </div>
-          <div className="sched-tabs">
-            <Button type="button" className="ghost" aria-label="Previous week" onClick={() => setAnchor((d) => shiftWeeks(d, -1, tz))}>
+          {week.pageCount > 1 ? <div className="sched-tabs">
+            <Button type="button" className="ghost" aria-label="Previous week" disabled={week.pageIndex === 0} onClick={() => setPage(week.pageIndex - 1)}>
               ‹
             </Button>
-            <Button type="button" className="ghost" aria-label="This week" onClick={() => setAnchor(new Date())}>
-              This week
+            <Button type="button" className="ghost" aria-label="Back to today" onClick={() => setPage(0)}>
+              Today
             </Button>
-            <Button type="button" className="ghost" aria-label="Next week" onClick={() => setAnchor((d) => shiftWeeks(d, 1, tz))}>
+            <Button type="button" className="ghost" aria-label="Next week" disabled={!hasNext} onClick={() => setPage(week.pageIndex + 1)}>
               ›
             </Button>
-          </div>
+          </div> : <p className="sched-pack-hint">Today · Free plan</p>}
           <div className="sched-tabs">
             <Button type="button" className="ghost" aria-label="Now" onClick={scrollNow}>
               Now
@@ -658,8 +670,8 @@ export function ScheduleScreen() {
           tz={grid.tz}
           projectOf={(id) => projectByItem.get(id)}
           titleOf={(id) => titleByItem.get(id)}
-          onOpen={(id) => openTask(navigate, id)}
-          onNextWeek={() => setAnchor((d) => shiftWeeks(d, 1, tz))}
+          onOpen={(id) => openTask(navigate, id, origins.tasks.get(id))}
+          onNextWeek={hasNext ? () => setPage(week.pageIndex + 1) : undefined}
         />
       ) : null}
       {whatIf ? (
@@ -695,7 +707,7 @@ export function ScheduleScreen() {
                     score={report.data.score}
                     meetings={meetingCount(busy)}
                     tz={grid.tz}
-                    onOpen={(id) => openTask(navigate, id)}
+                    onOpen={(id) => openTask(navigate, id, origins.tasks.get(id))}
                   />
                 ) : null}
                 <p className="sched-week-range">
@@ -713,8 +725,8 @@ export function ScheduleScreen() {
                     runningIds={runningIds}
                     focusIds={focusIds}
                     projectOf={(id) => projectByItem.get(id)}
-                    onOpen={(id) => openTask(navigate, id)}
-                    onBusy={(id, on) => openEvent(navigate, id, on)}
+                    onOpen={(id) => openTask(navigate, id, origins.tasks.get(id))}
+                    onBusy={(id, on) => openEvent(navigate, id, on, origins.events.get(id))}
                   />
                 ) : view === 'gantt' ? (
                   <ScheduleGantt
@@ -728,8 +740,8 @@ export function ScheduleScreen() {
                     focusIds={focusIds}
                     now={tick}
                     onDay={setGanttDay}
-                    onOpen={(id) => openTask(navigate, id)}
-                    onBusy={(id, on) => openEvent(navigate, id, on)}
+                    onOpen={(id) => openTask(navigate, id, origins.tasks.get(id))}
+                    onBusy={(id, on) => openEvent(navigate, id, on, origins.events.get(id))}
                   />
                 ) : (
                   <>
@@ -767,10 +779,10 @@ export function ScheduleScreen() {
                             busy={busy}
                             grid={grid}
                             overrides={overrides}
-                            onBusy={(id, on) => openEvent(navigate, id, on)}
+                            onBusy={(id, on) => openEvent(navigate, id, on, origins.events.get(id))}
                           />
                         </div>
-                        <p className="sched-empty muted">No scheduled work this week.</p>
+                        <p className="sched-empty muted">No scheduled work in this range.</p>
                       </>
                     ) : (
                       lanes.map((lane) => (
@@ -784,8 +796,8 @@ export function ScheduleScreen() {
                           overrides={overrides}
                           runningIds={runningIds}
                           focusIds={focusIds}
-                          onOpen={(id) => openTask(navigate, id)}
-                          onBusy={(id, on) => openEvent(navigate, id, on)}
+                          onOpen={(id) => openTask(navigate, id, origins.tasks.get(id))}
+                          onBusy={(id, on) => openEvent(navigate, id, on, origins.events.get(id))}
                         />
                       ))
                     )}

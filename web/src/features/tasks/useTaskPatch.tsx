@@ -30,6 +30,7 @@ export function useTaskPatch(id: string) {
         window.setTimeout(() => mark(field, 'idle'), 1200)
       }
       void queryClient.invalidateQueries({ queryKey: ['items'] })
+      void queryClient.invalidateQueries({ queryKey: ['schedule'] })
       void queryClient.invalidateQueries({ queryKey: ['load'] })
       void queryClient.invalidateQueries({ queryKey: ['people'] })
       void queryClient.invalidateQueries({ queryKey: ['person'] })

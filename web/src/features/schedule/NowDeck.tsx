@@ -17,7 +17,7 @@ type Props = {
   projectOf: (itemId: string) => DeckProject | undefined
   titleOf: (itemId: string) => string | undefined
   onOpen: (id: string) => void
-  onNextWeek: () => void
+  onNextWeek?: () => void
 }
 
 function dueLabel(iso: string, tz: string): string {
@@ -74,7 +74,7 @@ function Featured({
         </p>
         <WhyChips block={block} />
       </div>
-      <TaskTimer itemId={block.itemId} running={interval} prominent />
+      <TaskTimer itemId={block.itemId} workspaceId={block.workspaceId} running={interval} prominent />
     </article>
   )
 }
@@ -106,7 +106,7 @@ function Row({
       <span className="sched-deck-row-span mono">{span(blockSeconds(block))}</span>
       <span className="sched-deck-row-flag">{block.late ? <span className="sched-chip late">late</span> : null}</span>
       <span className="sched-deck-row-timer">
-        <TaskTimer itemId={block.itemId} running={interval} prominent />
+        <TaskTimer itemId={block.itemId} workspaceId={block.workspaceId} running={interval} prominent />
       </span>
     </li>
   )
@@ -143,9 +143,7 @@ export function NowDeck({ pick, loading, running, lateCount, lateId, tz, project
         {!loading && !featured ? (
           <p className="sched-deck-empty">
             {pick.phase === 'after' ? 'Nothing left in the plan today.' : 'Nothing packed for today.'}
-            <Button type="button" className="ghost" onClick={onNextWeek}>
-              Next week ›
-            </Button>
+            {onNextWeek ? <Button type="button" className="ghost" onClick={onNextWeek}>Next week ›</Button> : null}
           </p>
         ) : null}
         {alsoNow.length > 0 ? (

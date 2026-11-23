@@ -1,3 +1,4 @@
+import { useAccount } from '../../shared/account'
 import { useTimezone } from '../../shared/timezone'
 import { DotsSixVertical, UsersThree } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -71,6 +72,7 @@ export function TaskCard({
   onDragBegin,
   onMove,
 }: Props) {
+  const { workspace } = useAccount()
   const tz = useTimezone()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -97,7 +99,7 @@ export function TaskCard({
   const checks = item.checkTotal > 0
   const checkRatio = checks ? Math.min(1, item.checkDone / item.checkTotal) : 0
   const foreign = foreignStatus(item)
-  const canSync = item.sourceKind === 'jira' || item.sourceKind === 'todoist'
+  const canSync = workspace.role === 'owner' && (item.sourceKind === 'jira' || item.sourceKind === 'todoist')
   const showCreated = !item.externalKey && !hasDue(item)
   const href = { pathname: `/tasks/${item.id}`, search: location.search }
 

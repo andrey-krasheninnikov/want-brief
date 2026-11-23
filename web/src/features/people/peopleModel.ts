@@ -99,12 +99,12 @@ export async function copyText(value: string): Promise<boolean> {
   }
 }
 
-export function rememberPerson(id: string) {
-  sessionStorage.setItem(LAST_PERSON_KEY, id)
+export function rememberPerson(id: string, scope: string) {
+  sessionStorage.setItem(`${LAST_PERSON_KEY}:${scope}`, id)
 }
 
-export function rememberedPerson(ids: string[]): string | null {
-  const last = sessionStorage.getItem(LAST_PERSON_KEY)
+export function rememberedPerson(ids: string[], scope: string): string | null {
+  const last = sessionStorage.getItem(`${LAST_PERSON_KEY}:${scope}`)
   if (last && ids.includes(last)) return last
   return ids[0] ?? null
 }

@@ -1,6 +1,6 @@
+mod support;
 use chrono::NaiveDate;
 use serde_json::{json, Value};
-use sqlx::PgPool;
 use std::sync::Arc;
 use want_brief::auth::Auth;
 use want_brief::crypto::TokenBox;
@@ -12,7 +12,7 @@ async fn earn_days_and_journal_keep_response_shape() {
     let url = std::env::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set");
     let database_name = url.split('?').next().unwrap().rsplit('/').next().unwrap();
     assert!(database_name.starts_with("wantbrief_issue92_"));
-    let pool = PgPool::connect(&url).await.unwrap();
+    let pool = support::legacy_pool(&url).await;
     let auth = Auth::new(pool.clone());
     auth.ensure_user("sample-password").await.unwrap();
     let token = auth.login("sample-password").await.unwrap().unwrap();
@@ -81,7 +81,7 @@ async fn earn_days_and_journal_keep_response_shape() {
         .execute(&pool)
         .await
         .unwrap();
-    sqlx::query("DELETE FROM earn_days WHERE day=$1")
+    sqlx::query("DELETE FROM earn_days WHERE workspace_id=wb_workspace() AND owner_id=wb_actor() AND day=$1")
         .bind(NaiveDate::parse_from_str(day, "%Y-%m-%d").unwrap())
         .execute(&pool)
         .await

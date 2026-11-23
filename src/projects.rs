@@ -12,7 +12,7 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use std::collections::HashSet;
 use uuid::Uuid;
 
-const COLUMNS: &str = "id, name, color, description, monthly_income_usd::float8 AS monthly_income_usd, monthly_income_rub::float8 AS monthly_income_rub, target_hours_day::float8 AS target_hours_day, target_hours_week::float8 AS target_hours_week, links, archived_at, created_at, updated_at";
+const COLUMNS: &str = "id, name, color, description, COALESCE((SELECT usd FROM project_personal_income WHERE project_id=projects.id),monthly_income_usd)::float8 AS monthly_income_usd, COALESCE((SELECT rub FROM project_personal_income WHERE project_id=projects.id),monthly_income_rub)::float8 AS monthly_income_rub, target_hours_day::float8 AS target_hours_day, target_hours_week::float8 AS target_hours_week, links, archived_at, created_at, updated_at";
 
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct ProjectLink {

@@ -1,3 +1,4 @@
+pub mod accounts;
 pub mod auth;
 pub mod backup;
 pub mod companies;
@@ -12,6 +13,7 @@ pub mod item_sync;
 pub mod items;
 pub mod journal;
 pub mod load;
+pub mod mail;
 pub mod migrate;
 pub mod notes;
 pub mod people;
@@ -25,3 +27,4 @@ pub mod schedule_plan;
 pub mod schedule_settings;
 pub mod sources;
 pub mod track;
+pub mod workspace;

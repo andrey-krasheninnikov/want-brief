@@ -29,6 +29,7 @@ function equal<T>(got: T, want: T, label: string) {
 
 function block(partial: Partial<ScheduleBlock> & Pick<ScheduleBlock, 'itemId' | 'startsAt' | 'endsAt'>): ScheduleBlock {
   return {
+    workspaceId: '00000000-0000-4000-8000-000000000001',
     title: 'Task',
     externalKey: '',
     kind: 'work',

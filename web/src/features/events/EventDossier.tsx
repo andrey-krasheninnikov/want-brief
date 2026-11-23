@@ -9,6 +9,8 @@ import { useTimezone } from '../../shared/timezone'
 import { zonedInstant, zonedLocalInput } from '../../shared/zoned'
 import { openEvent } from '../../shared/taskOverlay'
 import { OpenUrl, UrlField } from '../../shared/UrlField'
+import { useAccount } from '../../shared/account'
+import { ParticipantField } from '../account/MemberField'
 import { PeoplePicker } from '../people/PeoplePicker'
 import { TaskSheet } from '../tasks/TaskSheet'
 import {
@@ -69,6 +71,7 @@ function draftFrom(tz: string, row?: EventSeries) {
     canSkip: row?.canSkip ?? true,
     links: row?.links ?? [],
     people: row?.people ?? [],
+    participantUserIds: row?.participantUserIds ?? [],
   }
 }
 
@@ -95,6 +98,7 @@ export function EventDossierSheet({
 }
 
 export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Props) {
+  const { workspace } = useAccount()
   const tz = useTimezone()
   const queryClient = useQueryClient()
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
@@ -169,6 +173,7 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
       canSkip: form.canSkip,
       links: form.links,
       people: form.people,
+      participantUserIds: workspace.kind === 'team' ? form.participantUserIds : undefined,
     }
   }
 
@@ -458,6 +463,7 @@ export function EventDossier({ seriesId, originalOn, onCreated, onDeleted }: Pro
         <input type="checkbox" checked={form.canSkip} onChange={(e) => setForm({ ...form, canSkip: e.target.checked })} />
         Can skip
       </label>
+      <ParticipantField value={form.participantUserIds} onChange={(participantUserIds) => setForm({ ...form, participantUserIds })} />
       <PeoplePicker value={form.people} onChange={(people) => setForm({ ...form, people })} requireComment />
       {form.links.length > 0 ? (
         <ul className="events-slots">

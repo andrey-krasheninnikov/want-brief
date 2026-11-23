@@ -8,6 +8,7 @@ import { api } from '../../api'
 import { OpenUrl, UrlField } from '../../shared/UrlField'
 import { createdLabel } from '../../shared/format'
 import { sourceKindLabel, type Item, type ProjectLink } from '../../types'
+import { AssigneeField } from '../account/MemberField'
 import { PeoplePicker } from '../people/PeoplePicker'
 import { idsToRels, relIds } from '../people/RelationField'
 import type { TaskPatch } from './useTaskPatch'
@@ -212,6 +213,8 @@ export function TaskConnections({ item, task }: Props) {
           </select>
           {hint('project')}
         </label>
+        <AssigneeField value={item.assigneeUserId} onChange={(id) => patch.mutate({ body: { assigneeUserId: id }, field: 'assignee' })} />
+        {hint('assignee')}
         <PeoplePicker
           value={idsToRels(item.personIds ?? [])}
           onChange={(people) => patch.mutate({ body: { personIds: relIds(people) }, field: 'people' })}

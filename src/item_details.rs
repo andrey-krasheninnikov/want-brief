@@ -478,7 +478,7 @@ async fn annotate_event(
         Ok(tx) => tx,
         Err(err) => return database_error(err),
     };
-    let event = sqlx::query_as::<_, ItemEvent>("SELECT id,item_id,kind,field,from_value,to_value,note,stress,created_at FROM item_events WHERE item_id=$1 AND kind=ANY($2) ORDER BY created_at DESC,id DESC LIMIT 1")
+    let event = sqlx::query_as::<_, ItemEvent>("SELECT id,item_id,kind,field,from_value,to_value,note,stress,created_at FROM item_events WHERE item_id=$1 AND owner_id=wb_actor() AND kind=ANY($2) ORDER BY created_at DESC,id DESC LIMIT 1")
         .bind(item_id).bind(&input.kinds).fetch_optional(&mut *tx).await;
     let event = match event {
         Ok(event) => event,
@@ -513,7 +513,7 @@ async fn annotate_event(
             return database_error(err);
         }
     }
-    if !note.is_empty() {
+    if !note.is_empty() && crate::workspace::current().is_none_or(|s| s.kind != "team") {
         if let Err(err) = sqlx::query("INSERT INTO item_notes (id,item_id,body,source_kind,external_id,author_name,url,created_at) VALUES ($1,$2,$3,'manual','','','',$4)")
             .bind(Uuid::new_v4()).bind(item_id).bind(note).bind(Utc::now()).execute(&mut *tx).await {
             return database_error(err);

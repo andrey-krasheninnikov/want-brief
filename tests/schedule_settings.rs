@@ -1,6 +1,6 @@
+mod support;
 use serde_json::{json, Value};
 use sqlx::types::Json as DbJson;
-use sqlx::PgPool;
 use std::sync::Arc;
 use want_brief::auth::Auth;
 use want_brief::crypto::TokenBox;
@@ -12,15 +12,29 @@ async fn schedule_settings_keep_defaults_and_day_overrides_round_trip() {
     let url = std::env::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set");
     let database_name = url.split('?').next().unwrap().rsplit('/').next().unwrap();
     assert!(database_name.starts_with("wantbrief_issue92_"));
-    let pool = PgPool::connect(&url).await.unwrap();
+    let pool = support::legacy_pool(&url).await;
     let auth = Auth::new(pool.clone());
     auth.ensure_user("sample-password").await.unwrap();
     let token = auth.login("sample-password").await.unwrap().unwrap();
-    let previous: Option<DbJson<Value>> =
-        sqlx::query_scalar("SELECT data FROM schedule_settings WHERE id=1")
-            .fetch_optional(&pool)
-            .await
-            .unwrap();
+    let user = auth
+        .authenticate_session(&token)
+        .await
+        .unwrap()
+        .unwrap()
+        .user_id;
+    let personal = want_brief::workspace::access(&pool, user, None)
+        .await
+        .unwrap()
+        .workspace_id;
+
+    let previous: Option<DbJson<Value>> = sqlx::query_scalar(
+        "SELECT data FROM schedule_settings WHERE id=1 AND workspace_id=$1 AND owner_id=$2",
+    )
+    .bind(personal)
+    .bind(user)
+    .fetch_optional(&pool)
+    .await
+    .unwrap();
     let app = router(AppState {
         pool: pool.clone(),
         auth,
@@ -89,17 +103,21 @@ async fn schedule_settings_keep_defaults_and_day_overrides_round_trip() {
     assert_eq!(response.status(), reqwest::StatusCode::NO_CONTENT);
     match previous {
         Some(value) => {
-            sqlx::query("UPDATE schedule_settings SET data=$1 WHERE id=1")
-                .bind(value)
+            sqlx::query("UPDATE schedule_settings SET data=$1 WHERE id=1 AND workspace_id=$2 AND owner_id=$3")
+                .bind(value).bind(personal).bind(user)
                 .execute(&pool)
                 .await
                 .unwrap();
         }
         None => {
-            sqlx::query("DELETE FROM schedule_settings WHERE id=1")
-                .execute(&pool)
-                .await
-                .unwrap();
+            sqlx::query(
+                "DELETE FROM schedule_settings WHERE id=1 AND workspace_id=$1 AND owner_id=$2",
+            )
+            .bind(personal)
+            .bind(user)
+            .execute(&pool)
+            .await
+            .unwrap();
         }
     }
     server.abort();

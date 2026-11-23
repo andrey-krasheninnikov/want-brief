@@ -89,7 +89,7 @@ async fn upsert(State(state): State<AppState>, Path(raw): Path<String>, body: By
     {
         return error(StatusCode::BAD_REQUEST, "invalid: earn");
     }
-    match sqlx::query_as::<_, EarnDay>("INSERT INTO earn_days (day,usd,rub,rate,updated_at) VALUES ($1::date,$2::double precision::numeric,$3::double precision::numeric,$4::double precision::numeric,$5) ON CONFLICT (day) DO UPDATE SET usd=EXCLUDED.usd,rub=EXCLUDED.rub,rate=EXCLUDED.rate,updated_at=EXCLUDED.updated_at RETURNING day::text AS day,usd::double precision AS usd,rub::double precision AS rub,rate::double precision AS rate,updated_at")
+    match sqlx::query_as::<_, EarnDay>("INSERT INTO earn_days (day,usd,rub,rate,updated_at) VALUES ($1::date,$2::double precision::numeric,$3::double precision::numeric,$4::double precision::numeric,$5) ON CONFLICT (workspace_id,owner_id,day) DO UPDATE SET usd=EXCLUDED.usd,rub=EXCLUDED.rub,rate=EXCLUDED.rate,updated_at=EXCLUDED.updated_at RETURNING day::text AS day,usd::double precision AS usd,rub::double precision AS rub,rate::double precision AS rate,updated_at")
         .bind(day)
         .bind(input.usd)
         .bind(input.rub)

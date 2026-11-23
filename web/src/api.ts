@@ -1,4 +1,9 @@
+import { workspaceFromPath } from './shared/workspacePath'
 import type {
+  Account,
+  Session,
+  Invitation,
+  TeamSchedule,
   CalendarEvent,
   EventOccurrence,
   EventNote,
@@ -38,42 +43,56 @@ import type {
   WhatIfScenario,
 } from './types'
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  })
-  if (response.status === 204) {
-    return undefined as T
+export class ApiError extends Error {
+  readonly status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
   }
-  const data = (await response.json().catch(() => ({}))) as T & { error?: string }
+}
+
+async function send(path: string, init?: RequestInit, workspaceId = workspaceFromPath(window.location.pathname)) {
+  const headers = new Headers(init?.headers)
+  if (init?.body) headers.set('Content-Type', 'application/json')
+  if (workspaceId) headers.set('X-Workspace-Id', workspaceId)
+  const response = await fetch(path, { ...init, headers, credentials: 'include', cache: 'no-store' })
   if (!response.ok) {
-    throw new Error(data.error || `HTTP ${response.status}`)
+    const data = await response.json().catch(() => ({}))
+    if (response.status === 401 && data.error === 'unauthorized' && workspaceId && !window.location.pathname.endsWith('/login')) {
+      window.location.replace('/login')
+    }
+    throw new ApiError(response.status, data.error || `HTTP ${response.status}`)
   }
-  return data
+  return response
+}
+
+async function request<T>(path: string, init?: RequestInit, workspaceId?: string): Promise<T> {
+  const response = await send(path, init, workspaceId)
+  return response.status === 204 ? undefined as T : response.json()
+}
+
+function post<T = { ok: boolean }>(path: string, body: unknown) {
+  return request<T>(path, { method: 'POST', body: JSON.stringify(body) })
 }
 
 export const api = {
-  downloadBackup: async () => {
-    const response = await fetch('/api/backup', { credentials: 'include' })
-    if (!response.ok) {
-      const data = (await response.json().catch(() => ({}))) as { error?: string }
-      throw new Error(data.error || `HTTP ${response.status}`)
-    }
-    return response.blob()
-  },
+  downloadBackup: async () => (await send('/api/backup')).blob(),
   restoreBackup: (file: File) => request<void>('/api/restore?mode=replace', { method: 'POST', body: file }),
-  login: (password: string) =>
-    request<{ ok: boolean }>('/api/login', {
-      method: 'POST',
-      body: JSON.stringify({ password }),
-    }),
-  logout: () => request('/api/logout', { method: 'POST' }),
-  me: () => request<{ ok: boolean }>('/api/me'),
+  login: (password: string, email?: string) => post('/api/login', { email, password }),
+  logout: () => post('/api/logout', {}),
+  me: () => request<Account>('/api/me'),
+  register: (email: string) => post('/api/auth/register', { email }),
+  confirmEmail: (token: string, password?: string) => post('/api/auth/confirm', { token, password }),
+  forgotPassword: (email: string) => post('/api/auth/forgot', { email }),
+  resetPassword: (token: string, password: string) => post('/api/auth/reset', { token, password }),
+  bindEmail: (email: string, password: string) => post('/api/account/email', { email, password }),
+  sessions: () => request<Session[]>('/api/account/sessions'),
+  revokeSession: (id: string) => request<void>(`/api/account/sessions/${id}`, { method: 'DELETE' }),
+  createWorkspace: (name: string) => post<{ id: string }>('/api/workspaces', { name }),
+  invitations: (id: string) => request<Invitation[]>(`/api/workspaces/${id}/invitations`),
+  invite: (id: string, email: string) => post(`/api/workspaces/${id}/invitations`, { email }),
+  revokeInvitation: (id: string, invitationId: string) => request<void>(`/api/workspaces/${id}/invitations/${invitationId}`, { method: 'DELETE' }),
+  acceptInvitation: (token: string) => post<{ workspaceId: string }>('/api/invitations/accept', { token }),
   projects: () => request<Project[]>('/api/projects'),
   project: (id: string) => request<Project>(`/api/projects/${id}`),
   createProject: (body: { name: string; color?: string }) =>
@@ -127,11 +146,12 @@ export const api = {
     title: string
     kind: ItemKind
     projectId?: string
+    assigneeUserId?: string | null
     urgent?: boolean
     important?: boolean
   }) => request<Item>('/api/items', { method: 'POST', body: JSON.stringify(body) }),
-  patchItem: (id: string, body: Record<string, unknown>) =>
-    request<Item>(`/api/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  patchItem: (id: string, body: Record<string, unknown>, workspaceId?: string) =>
+    request<Item>(`/api/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }, workspaceId),
   deleteItem: (id: string) => request(`/api/items/${id}`, { method: 'DELETE' }),
   undeleteItem: (id: string) => request<Item>(`/api/items/${id}/undelete`, { method: 'POST' }),
   itemNotes: (id: string) => request<ItemNote[]>(`/api/items/${id}/notes`),
@@ -268,10 +288,11 @@ export const api = {
     return request<LoadReport>(`/api/load${suffix}`)
   },
   schedule: (from: string, to: string, kind?: 'work' | 'followup') => {
-    const params = new URLSearchParams({ from, to })
+    const params = new URLSearchParams({ from, to, view: 'personal' })
     if (kind) params.set('kind', kind)
     return request<Schedule>(`/api/schedule?${params}`)
   },
+  teamSchedule: () => request<TeamSchedule>('/api/schedule?view=team'),
   scheduleSettings: () => request<ScheduleSettings>('/api/schedule/settings'),
   saveScheduleSettings: (body: ScheduleSettings) =>
     request<ScheduleSettings>('/api/schedule/settings', { method: 'PUT', body: JSON.stringify(body) }),

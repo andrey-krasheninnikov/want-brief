@@ -1,6 +1,7 @@
 import { Button } from '@want-foundation/desyst-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState, type ChangeEvent } from 'react'
+import { useAccount } from '../../shared/account'
 import { api } from '../../api'
 
 type Summary = {
@@ -11,6 +12,7 @@ type Summary = {
 const maxBytes = 64 * 1024 * 1024
 
 export function BackupSection() {
+  const { workspace } = useAccount()
   const queryClient = useQueryClient()
   const [file, setFile] = useState<File | null>(null)
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -27,7 +29,7 @@ export function BackupSection() {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `want-brief-${new Date().toISOString().slice(0, 10)}.json`
+      link.download = `want-brief-${workspace.id}-${new Date().toISOString().slice(0, 10)}.json`
       document.body.append(link)
       link.click()
       link.remove()
@@ -61,6 +63,13 @@ export function BackupSection() {
         !Object.values(parsed.tables).every(Array.isArray)) {
         throw new Error('Invalid backup file.')
       }
+      const schema = 'schemaVersion' in parsed ? parsed.schemaVersion : undefined
+      const current = schema === 52 && 'workspaceKind' in parsed && parsed.workspaceKind === workspace.kind
+      const legacy = workspace.kind === 'personal' && (schema === 47 || schema === 48)
+      if (!current && !legacy) {
+        setError('This backup version is incompatible with the selected workspace.')
+        return
+      }
       setSummary({
         exportedAt: parsed.exportedAt,
         records: Object.values(parsed.tables).reduce((total, rows) => total + (rows as unknown[]).length, 0),
@@ -92,17 +101,17 @@ export function BackupSection() {
   return (
     <section className="stack" aria-labelledby="backup-heading">
       <h3 id="backup-heading">Backup</h3>
-      <p>Download your records and settings. Source tokens, account password, and sessions are excluded.</p>
+      <p>Download records from {workspace.name}. {workspace.kind === 'team' ? 'The team backup contains shared records only.' : 'The personal backup includes your private records.'} Passwords, sessions and source tokens stay out of the backup.</p>
       <div><Button type="button" onClick={() => void download()} disabled={busy}>Download backup</Button></div>
       <label htmlFor="backup-file">Restore from a backup file</label>
       <input id="backup-file" type="file" accept=".json,application/json" onChange={(event) => void choose(event)} disabled={busy} />
       {summary ? (
         <>
           <p>{file?.name}: {summary.records} records, exported {summary.exportedAt}.</p>
-          <p>Restoring replaces all current records. Download a current backup before continuing. Source tokens must be entered again.</p>
+          <p>Restoring replaces the backed-up records in {workspace.name}. Download a current backup before continuing. Source tokens must be entered again.</p>
           <label className="row">
             <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} disabled={busy} />
-            I understand that current records will be replaced.
+            Replace the current records in {workspace.name}.
           </label>
           <div><Button type="button" onClick={() => void restore()} disabled={!confirmed || busy}>Restore backup</Button></div>
         </>

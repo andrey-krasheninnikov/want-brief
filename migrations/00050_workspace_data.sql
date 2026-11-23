@@ -104,5 +104,14 @@ CREATE TABLE project_personal_income (
 ALTER TABLE sources DROP CONSTRAINT sources_kind_check,
     ADD CHECK (kind IN ('jira','todoist','manual','gitlab','telegram','slack','whoop'));
 
+-- Older single-owner starts supplied these defaults when an import contained none.
+INSERT INTO sources(workspace_id,kind,name)
+    SELECT w.id,'manual','Manual' FROM workspaces w WHERE w.legacy_paid
+    AND NOT EXISTS(SELECT FROM sources s WHERE s.workspace_id=w.id AND s.kind='manual');
+INSERT INTO projects(workspace_id,name,color,target_hours_day,target_hours_week)
+    SELECT w.id,v.name,v.color,v.hours/7.0,v.hours FROM workspaces w
+    CROSS JOIN (VALUES ('Work','#4C4CFF',30),('Life','#7C8CFF',10)) v(name,color,hours)
+    WHERE w.legacy_paid AND NOT EXISTS(SELECT FROM projects p WHERE p.workspace_id=w.id);
+
 -- +goose Down
 DO $$ BEGIN RAISE EXCEPTION 'Restore the pre-upgrade database to downgrade'; END $$;

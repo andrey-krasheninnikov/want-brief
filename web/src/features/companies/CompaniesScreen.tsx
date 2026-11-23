@@ -3,6 +3,7 @@ import { Button } from '@want-foundation/desyst-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useAccount } from '../../shared/account'
 import { api } from '../../api'
 import { Window } from '../../shared/Window'
 import { typingTarget } from '../people/peopleModel'
@@ -21,6 +22,8 @@ function companiesHref(opts: { id?: string; creating?: boolean }): string {
 }
 
 export function CompaniesScreen() {
+  const { user, workspace } = useAccount()
+  const scope = user.id + ':' + workspace.id
   const { id } = useParams()
   const [params] = useSearchParams()
   const creating = !id && params.get('new') === '1'
@@ -35,7 +38,7 @@ export function CompaniesScreen() {
   )
 
   function pick(next: string) {
-    rememberCompany(next)
+    rememberCompany(next, scope)
     navigate(companiesHref({ id: next }))
   }
 
@@ -44,9 +47,9 @@ export function CompaniesScreen() {
     const rows = companies.data ?? []
     if (rows.length === 0) return
     if (!window.matchMedia('(min-width: 769px)').matches) return
-    const next = rememberedCompany(rows.map((row) => row.id))
+    const next = rememberedCompany(rows.map((row) => row.id), scope)
     if (next) navigate(companiesHref({ id: next }), { replace: true })
-  }, [creating, id, companies.isLoading, companies.data, navigate])
+  }, [creating, id, companies.isLoading, companies.data, navigate, scope])
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {

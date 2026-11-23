@@ -3,6 +3,7 @@ import { Button } from '@want-foundation/desyst-react'
 import { DotsThree } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAccount } from '../../shared/account'
 import { api } from '../../api'
 import { DateField } from '../../shared/DateField'
 import { useTimezone } from '../../shared/timezone'
@@ -94,6 +95,7 @@ function payloadFrom(form: Draft) {
 }
 
 export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props) {
+  const { workspace } = useAccount()
   const tz = useTimezone()
   const queryClient = useQueryClient()
   const person = useQuery({
@@ -307,6 +309,7 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
         ))}
       </nav>
       </div>
+      {workspace.kind === 'team' ? <p className="muted">The team shares names and work connections. Contact details, addresses, personal history and private notes are visible only to their author.</p> : null}
       {row ? <PersonOverview person={{ ...row, name: form.name }} /> : null}
       {row ? <PersonProfessions personId={personId} professions={row.professions ?? []} /> : null}
       {row ? <PersonContacts personId={personId} contacts={row.contacts ?? []} /> : null}

@@ -16,7 +16,7 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 const COLUMNS: &str =
-    "id,name,born_on::timestamp AT TIME ZONE 'UTC' AS born_on,created_at,updated_at";
+    "id,name,COALESCE((SELECT b.born_on FROM person_birthdays b WHERE b.person_id=people.id),born_on)::timestamp AT TIME ZONE 'UTC' AS born_on,created_at,updated_at";
 
 #[derive(FromRow)]
 struct PersonRow {

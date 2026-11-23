@@ -344,6 +344,7 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
         "person_birthdays",
         "item_ratings",
         "project_personal_income",
+        "company_employment_dates",
         "event_participants",
     ] {
         previous["tables"].as_object_mut().unwrap().remove(table);
@@ -351,6 +352,33 @@ async fn backup_restores_records_and_relations_without_credentials_or_duplicates
     for row in previous["tables"]["items"].as_array_mut().unwrap() {
         row.as_object_mut().unwrap().remove("assignee_user_id");
     }
+    let mut prepared = previous.clone();
+    prepared["schemaVersion"] = json!(48);
+    let original_owner = Uuid::new_v4();
+    for rows in prepared["tables"].as_object_mut().unwrap().values_mut() {
+        for row in rows.as_array_mut().unwrap() {
+            row["workspace_id"] = json!(original_owner);
+        }
+    }
+    for row in prepared["tables"]["notes"].as_array_mut().unwrap() {
+        row["owner_id"] = json!(original_owner);
+    }
+    let res = client
+        .post(format!("{root}/api/restore?mode=replace"))
+        .header("Cookie", &cookie)
+        .json(&prepared)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), reqwest::StatusCode::NO_CONTENT);
+    let retained: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT FROM items WHERE id=$1 AND workspace_id=wb_workspace())",
+    )
+    .bind(item_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(retained);
     for row in previous["tables"]["sources"].as_array_mut().unwrap() {
         let fields = row.as_object_mut().unwrap();
         fields.remove("sync_interval_minutes");

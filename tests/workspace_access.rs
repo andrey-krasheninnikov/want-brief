@@ -120,6 +120,24 @@ async fn workspace_rights_apply_to_relations_private_fields_restore_and_source_q
         StatusCode::FORBIDDEN,
     )
     .await;
+    let company = value(
+        api.request(Method::POST, &editor, team, "companies")
+            .json(&json!({
+                "name":"Team company","startedOn":"2013-01-15","endedOn":"2016-02-16"
+            })),
+        StatusCode::CREATED,
+    )
+    .await;
+    let company_path = format!("companies/{}", company["id"].as_str().unwrap());
+    assert_eq!(company["tenure"]["years"], 3);
+    let other_view = value(
+        api.request(Method::GET, &owner, team, &company_path),
+        StatusCode::OK,
+    )
+    .await;
+    assert!(other_view["startedOn"].is_null());
+    assert!(other_view["endedOn"].is_null());
+    assert!(other_view["tenure"].is_null());
     let archive = value(
         api.request(Method::GET, &owner, team, "backup"),
         StatusCode::OK,
@@ -135,6 +153,8 @@ async fn workspace_rights_apply_to_relations_private_fields_restore_and_source_q
         assert_eq!(archive["tables"][table], json!([]));
     }
     assert!(!archive.to_string().contains("1980-06-01"));
+    assert!(!archive.to_string().contains("2013-01-15"));
+    assert_eq!(archive["tables"]["company_employment_dates"], json!([]));
     let restore = "restore?mode=replace";
     assert_eq!(
         api.request(Method::POST, &owner, team, restore)
@@ -276,10 +296,75 @@ async fn workspace_rights_apply_to_relations_private_fields_restore_and_source_q
         .await["name"],
         "Updated colleague"
     );
+    let changed_employment = value(
+        api.request(Method::PATCH, &editor, team, &company_path)
+            .json(&json!({"endedOn":"2018-10-04"})),
+        StatusCode::OK,
+    )
+    .await;
+    assert_eq!(changed_employment["tenure"]["years"], 5);
+    let owner_view = value(
+        api.request(Method::GET, &owner, team, &company_path),
+        StatusCode::OK,
+    )
+    .await;
+    assert!(owner_view["tenure"].is_null());
+    value(
+        api.request(Method::PATCH, &editor, team, &company_path)
+            .json(&json!({"name":"Change shared name","endedOn":null})),
+        StatusCode::FORBIDDEN,
+    )
+    .await;
+    let preserved = value(
+        api.request(Method::GET, &owner, team, "backup"),
+        StatusCode::OK,
+    )
+    .await;
+    assert_eq!(
+        api.request(Method::POST, &owner, team, restore)
+            .json(&preserved)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::NO_CONTENT
+    );
+    let mut extra = preserved.clone();
+    let rows = extra["tables"]["sources"].as_array_mut().unwrap();
+    let mut new_source = rows
+        .iter()
+        .find(|row| row["kind"] != "manual")
+        .unwrap()
+        .clone();
+    new_source["id"] = json!(uuid::Uuid::new_v4());
+    rows.push(new_source);
+    value(
+        api.request(Method::POST, &owner, team, restore)
+            .json(&extra),
+        StatusCode::CONFLICT,
+    )
+    .await;
+    assert_eq!(
+        value(
+            api.request(Method::GET, &owner, team, "sources"),
+            StatusCode::OK
+        )
+        .await
+        .as_array()
+        .unwrap()
+        .len(),
+        4
+    );
     server.abort();
     let mut tx = pool.begin().await.unwrap();
     let spaces = [team, owner.personal, editor.personal];
-    for table in ["schedule_settings", "people", "sources", "projects"] {
+    for table in [
+        "schedule_settings",
+        "people",
+        "companies",
+        "sources",
+        "projects",
+    ] {
         sqlx::query(&format!("DELETE FROM {table} WHERE workspace_id=ANY($1)"))
             .bind(&spaces[..])
             .execute(&mut *tx)

@@ -8,7 +8,7 @@ use uuid::Uuid;
 use want_brief::auth::Auth;
 use want_brief::crypto::TokenBox;
 use want_brief::http::{router, AppState};
-use want_brief::migrate::migrate;
+use want_brief::migrate::{migrate, prepare_workspaces};
 
 fn setting(name: &str, fallback: &str) -> String {
     env::var(name)
@@ -24,9 +24,15 @@ async fn main() -> Result<()> {
         "DATABASE_URL",
         "postgres://wantbrief:wantbrief@127.0.0.1:5432/wantbrief?sslmode=disable",
     );
+    let migrations_dir = setting("MIGRATIONS_DIR", "migrations");
     let migrate_only = match args.as_slice() {
         [] => false,
         [flag] if flag == "-migrate-only" || flag == "--migrate-only" => true,
+        [command] if command == "prepare-workspaces" => {
+            prepare_workspaces(&database_url, Path::new(&migrations_dir)).await?;
+            println!("Workspace ownership prepared. The database remains on schema 48.");
+            return Ok(());
+        }
         [command, raw_id, plan]
             if command == "set-plan" && matches!(plan.as_str(), "free" | "paid") =>
         {
@@ -48,9 +54,8 @@ async fn main() -> Result<()> {
             println!("Workspace {id} uses the {plan} plan.");
             return Ok(());
         }
-        _ => anyhow::bail!("usage: want-brief [-migrate-only | set-plan <workspace-id> free|paid]"),
+        _ => anyhow::bail!("usage: want-brief [-migrate-only | prepare-workspaces | set-plan <workspace-id> free|paid]"),
     };
-    let migrations_dir = setting("MIGRATIONS_DIR", "migrations");
     migrate(&database_url, Path::new(&migrations_dir)).await?;
     if migrate_only {
         return Ok(());

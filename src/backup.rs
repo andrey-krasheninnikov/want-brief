@@ -17,7 +17,7 @@ const SCHEMA_VERSION: i64 = 52;
 const MAX_BYTES: usize = 64 * 1024 * 1024;
 
 // Parent tables precede their references so restored IDs keep every relation.
-const TABLES: [&str; 44] = [
+const TABLES: [&str; 45] = [
     "projects",
     "sources",
     "items",
@@ -61,6 +61,7 @@ const TABLES: [&str; 44] = [
     "person_birthdays",
     "item_ratings",
     "project_personal_income",
+    "company_employment_dates",
     "event_participants",
 ];
 
@@ -230,10 +231,21 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
                 "single-owner backup requires a personal workspace",
             ));
         }
+        if backup.schema_version == 48 {
+            // The v48 exporter includes the additive columns while prepare-workspaces is live.
+            // Ownership is always derived from the signed-in user in the destination.
+            for row in backup.tables.values_mut().flatten() {
+                if let Some(fields) = row.as_object_mut() {
+                    fields.remove("workspace_id");
+                    fields.remove("owner_id");
+                }
+            }
+        }
         for table in [
             "person_birthdays",
             "item_ratings",
             "project_personal_income",
+            "company_employment_dates",
             "event_participants",
         ] {
             if backup.tables.insert(table.into(), Vec::new()).is_some() {
@@ -300,6 +312,9 @@ async fn import(state: &AppState, body: &[u8]) -> Result<(), Response> {
         .execute(&mut *transaction)
         .await
         .map_err(database_error)?;
+    sqlx::query("SELECT wb_check_restore_sources(ARRAY(SELECT src.id FROM jsonb_to_recordset($1::jsonb) src(id uuid,kind text) WHERE src.kind<>'manual'))")
+        .bind(Json(&backup.tables["sources"]))
+        .execute(&mut *transaction).await.map_err(import_error)?;
     let keys = primary_keys(&mut transaction).await?;
     let shared = scope.kind == "team";
     for table in TABLES.into_iter().rev() {

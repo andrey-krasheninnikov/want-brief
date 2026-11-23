@@ -38,8 +38,8 @@ CREATE INDEX workspace_members_user_idx ON workspace_members (user_id, workspace
 CREATE UNIQUE INDEX workspace_members_owner_idx ON workspace_members (workspace_id) WHERE role = 'owner';
 
 WITH personal AS (
-    INSERT INTO workspaces (owner_id, kind, name, plan, legacy_paid)
-    SELECT id, 'personal', 'Personal', 'paid', true FROM users
+    INSERT INTO workspaces (id, owner_id, kind, name, plan, legacy_paid)
+    SELECT id, id, 'personal', 'Personal', 'paid', true FROM users
     RETURNING id, owner_id
 )
 INSERT INTO workspace_members (workspace_id, user_id, role) SELECT id, owner_id, 'owner' FROM personal;

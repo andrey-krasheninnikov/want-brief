@@ -23,6 +23,10 @@ pub struct Scope {
 }
 
 impl Scope {
+    pub fn can_edit_shared(&self) -> bool {
+        self.role == "owner" || self.plan == "paid"
+    }
+
     pub fn can_analyze(&self) -> bool {
         self.plan == "paid"
     }

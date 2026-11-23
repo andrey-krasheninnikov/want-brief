@@ -3,7 +3,7 @@ use crate::auth::{
 };
 use crate::http::{error, AppState};
 use axum::extract::{ConnectInfo, Path, State};
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Extension, Json, Router};
@@ -153,9 +153,15 @@ async fn limit(auth: &Auth, action: &str, subject: &str, max: i32) -> Outcome<()
     Ok(())
 }
 
-async fn limit_peer(auth: &Auth, peer: Peer) -> Outcome<()> {
+async fn limit_peer(auth: &Auth, peer: Peer, headers: &HeaderMap) -> Outcome<()> {
     let address = peer
-        .map(|Extension(ConnectInfo(addr))| addr.ip().to_string())
+        .map(|Extension(ConnectInfo(addr))| {
+            auth.client_ip(
+                addr.ip(),
+                headers.get("x-real-ip").and_then(|ip| ip.to_str().ok()),
+            )
+            .to_string()
+        })
         .unwrap_or_else(|| "local".into());
     limit(auth, "peer", &address, 120).await
 }
@@ -163,9 +169,10 @@ async fn limit_peer(auth: &Auth, peer: Peer) -> Outcome<()> {
 async fn login(
     State(state): State<AppState>,
     peer: Peer,
+    headers: HeaderMap,
     Json(body): Json<Login>,
 ) -> Outcome<Response> {
-    limit_peer(&state.auth, peer).await?;
+    limit_peer(&state.auth, peer, &headers).await?;
     let email = body.email.as_deref().map(address).transpose()?;
     let auth = &state.auth;
     limit(auth, "login", email.as_deref().unwrap_or("legacy"), 20).await?;
@@ -227,9 +234,10 @@ async fn issue_link(
 async fn register(
     State(state): State<AppState>,
     peer: Peer,
+    headers: HeaderMap,
     Json(body): Json<Email>,
 ) -> Outcome<Json<Value>> {
-    limit_peer(&state.auth, peer).await?;
+    limit_peer(&state.auth, peer, &headers).await?;
     let email = address(&body.email)?;
     limit(&state.auth, "register", &email, 5).await?;
     issue_link(&state.auth, "signup", &email, None).await?;
@@ -268,10 +276,11 @@ async fn bind_email(
 async fn forgot(
     State(state): State<AppState>,
     peer: Peer,
+    headers: HeaderMap,
     Json(body): Json<Email>,
 ) -> Outcome<Json<Value>> {
     let auth = &state.auth;
-    limit_peer(auth, peer).await?;
+    limit_peer(auth, peer, &headers).await?;
     let email = address(&body.email)?;
     limit(auth, "forgot", &email, 5).await?;
     if !auth.email_available() {
@@ -296,11 +305,12 @@ async fn forgot(
 async fn confirm(
     State(state): State<AppState>,
     peer: Peer,
+    headers: HeaderMap,
     Json(body): Json<Confirmation>,
 ) -> Outcome<Json<Value>> {
     let hash = link_hash(&body.token)?;
     let auth = &state.auth;
-    limit_peer(auth, peer).await?;
+    limit_peer(auth, peer, &headers).await?;
     let purpose: Option<String> = sqlx::query_scalar(
         "SELECT purpose FROM account_tokens
          WHERE token_hash=$1 AND purpose IN ('signup','bind') AND expires_at>clock_timestamp()",
@@ -364,11 +374,12 @@ async fn confirm(
 async fn reset(
     State(state): State<AppState>,
     peer: Peer,
+    headers: HeaderMap,
     Json(body): Json<Reset>,
 ) -> Outcome<Json<Value>> {
     let hash = link_hash(&body.token)?;
     let auth = &state.auth;
-    limit_peer(auth, peer).await?;
+    limit_peer(auth, peer, &headers).await?;
     let active: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT FROM account_tokens
          WHERE token_hash=$1 AND purpose='reset' AND expires_at>clock_timestamp())",

@@ -144,8 +144,16 @@ export function PersonDossier({ personId, onCreated, onDeleted, onClose }: Props
   }, [onClose])
 
   const save = useMutation({
-    mutationFn: (body: ReturnType<typeof payloadFrom>) =>
-      personId ? api.patchPerson(personId, body) : api.createPerson(body),
+    mutationFn: (body: ReturnType<typeof payloadFrom>) => {
+      if (!personId) return api.createPerson(body)
+      if (workspace.kind === 'team' && workspace.plan === 'free' && workspace.role === 'editor' && person.data) {
+        const previous = payloadFrom(draftFrom(person.data))
+        if (JSON.stringify({ ...body, bornOn: previous.bornOn, ageYears: previous.ageYears }) === JSON.stringify(previous)) {
+          return api.patchPerson(personId, { bornOn: body.bornOn, ageYears: body.ageYears })
+        }
+      }
+      return api.patchPerson(personId, body)
+    },
     onSuccess: (row) => {
       setError('')
       setWaiting(false)

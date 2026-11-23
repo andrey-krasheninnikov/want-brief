@@ -921,6 +921,36 @@ async fn patch(State(state): State<AppState>, Path(raw): Path<String>, body: Byt
         Ok(id) => id,
         Err(response) => return response,
     };
+    if crate::workspace::current().is_some_and(|s| !s.can_edit_shared()) {
+        if let Err(response) = crate::http::private_patch(&body, &["stress"]) {
+            return response;
+        }
+        let input: ItemPatch = match decode(&body) {
+            Ok(input) => input,
+            Err(response) => return response,
+        };
+        let Some(stress) = input.stress.filter(|v| (0..=5).contains(v)) else {
+            return error(StatusCode::BAD_REQUEST, "invalid: stress must be 1-5");
+        };
+        if let Err(response) = crate::track::item_exists(&state.pool, item_id).await {
+            return response;
+        }
+        let mut tx = match state.pool.begin().await {
+            Ok(tx) => tx,
+            Err(err) => return database_error(err),
+        };
+        let level = (stress > 0).then_some(stress as i16);
+        if let Err(err) = crate::track::set_item_stress(&mut tx, item_id, level).await {
+            return database_error(err);
+        }
+        if let Err(err) = tx.commit().await {
+            return database_error(err);
+        }
+        return match fetch(&state.pool, item_id).await {
+            Ok(item) => Json(item).into_response(),
+            Err(err) => not_found(err),
+        };
+    }
     let mut tx = match state.pool.begin().await {
         Ok(tx) => tx,
         Err(err) => return database_error(err),

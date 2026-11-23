@@ -14,6 +14,17 @@ CREATE TABLE event_participants (
     FOREIGN KEY (workspace_id, user_id) REFERENCES workspace_members (workspace_id, user_id) ON DELETE CASCADE
 );
 
+CREATE TABLE company_employment_dates (
+    workspace_id uuid NOT NULL DEFAULT wb_workspace(), owner_id uuid NOT NULL DEFAULT wb_actor() REFERENCES users(id),
+    company_id uuid NOT NULL, started_on date, ended_on date,
+    CHECK(ended_on IS NULL OR (started_on IS NOT NULL AND ended_on>=started_on)),
+    PRIMARY KEY(workspace_id,owner_id,company_id),
+    FOREIGN KEY(workspace_id,company_id) REFERENCES companies(workspace_id,id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+DROP INDEX company_managers_open_idx;
+CREATE UNIQUE INDEX company_managers_open_idx ON company_managers(owner_id,company_id) WHERE ended_on IS NULL;
+DROP INDEX company_reports_open_idx;
+CREATE UNIQUE INDEX company_reports_open_idx ON company_reports(owner_id,company_id,person_id) WHERE ended_on IS NULL;
+
 -- +goose Down
-DROP TABLE event_participants;
-ALTER TABLE items DROP COLUMN assignee_user_id;
+DO $$ BEGIN RAISE EXCEPTION 'Restore the pre-upgrade database to downgrade'; END $$;

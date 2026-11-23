@@ -53,7 +53,8 @@ function validate(s: ScheduleSettings): string {
 
 // ScheduleSettingsScreen loads the stored settings once and hands them to the form as its initial draft.
 export function ScheduleSettingsScreen() {
-  const stored = useQuery({ queryKey: ['schedule-settings'], queryFn: api.scheduleSettings })
+  const { capabilities } = useAccount()
+  const stored = useQuery({ queryKey: ['schedule-settings', capabilities.canAnalyze], queryFn: api.scheduleSettings })
   if (!stored.data) {
     return (
       <Window className="sset-window" kicker="Schedule" title="Packer settings">
@@ -61,7 +62,7 @@ export function ScheduleSettingsScreen() {
       </Window>
     )
   }
-  return <SettingsForm initial={stored.data} />
+  return <SettingsForm key={capabilities.canAnalyze ? 'paid' : 'free'} initial={stored.data} />
 }
 
 function SettingsForm({ initial }: { initial: ScheduleSettings }) {

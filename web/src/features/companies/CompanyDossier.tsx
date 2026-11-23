@@ -116,8 +116,16 @@ export function CompanyDossier({ companyId, onCreated, onDeleted, onClose }: Pro
   }, [companyId, row?.id, row?.updatedAt])
 
   const save = useMutation({
-    mutationFn: (body: ReturnType<typeof payloadFrom>) =>
-      companyId ? api.patchCompany(companyId, body) : api.createCompany(body),
+    mutationFn: (body: ReturnType<typeof payloadFrom>) => {
+      if (!companyId) return api.createCompany(body)
+      if (workspace.kind === 'team' && row) {
+        const previous = payloadFrom(draftFrom(row))
+        if (JSON.stringify({ ...body, startedOn: previous.startedOn, endedOn: previous.endedOn }) === JSON.stringify(previous)) {
+          return api.patchCompany(companyId, { startedOn: body.startedOn, endedOn: body.endedOn })
+        }
+      }
+      return api.patchCompany(companyId, body)
+    },
     onSuccess: (next) => {
       setError('')
       setWaiting(false)

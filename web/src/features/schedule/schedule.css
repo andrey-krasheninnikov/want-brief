@@ -1527,6 +1527,7 @@ tbody:first-of-type .sched-table-day th {
 }
 
 .team-plan { min-width: 0; padding-block: .4rem; }
+.team-plan.stack, .team-plan section.stack { max-width: none; }
 .team-plan h2, .team-plan h3, .team-plan h4, .team-plan p { margin: 0; }
 .team-plan-range { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem; }
 .team-plan-range p, .team-member dt { color: var(--muted-foreground); }

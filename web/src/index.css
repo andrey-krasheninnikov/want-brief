@@ -1536,6 +1536,7 @@ a.matrix-cell:hover { background: var(--accent); }
     line-height: 1.15;
     border-radius: var(--radius);
   }
+  .mobile-nav a span, .mobile-nav .mobile-more span { white-space: nowrap; font-size: clamp(.72rem, 3.3vw, .875rem); }
   .mobile-nav a.active, .mobile-nav .mobile-more.active { background: var(--secondary); color: var(--foreground); box-shadow: inset 0 -3px 0 var(--primary); }
   .mobile-nav .mobile-more { width: 100%; background: transparent; }
   .tasks-split { grid-template-columns: 1fr; }

@@ -152,13 +152,12 @@ async fn require_auth(State(state): State<AppState>, mut request: Request, next:
         || path.starts_with("/api/workspaces/")
         || path.starts_with("/api/account/")
         || path.starts_with("/api/invitations/");
-    if changes
-        && !account
-        && path != "/api/schedule/whatif"
-        && scope.kind == "team"
-        && scope.plan == "free"
-        && scope.role != "owner"
-    {
+    let route = request
+        .extensions()
+        .get::<axum::extract::MatchedPath>()
+        .map(|path| path.as_str())
+        .unwrap_or("");
+    if changes && !account && !scope.can_edit_shared() && !personal_write(route, request.method()) {
         return error(
             StatusCode::FORBIDDEN,
             "shared editing requires a paid workspace",
@@ -176,6 +175,63 @@ async fn require_auth(State(state): State<AppState>, mut request: Request, next:
     }
     request.extensions_mut().insert(session);
     crate::workspace::in_scope(scope, next.run(request)).await
+}
+
+fn personal_write(route: &str, method: &Method) -> bool {
+    match route {
+        // These handlers reject shared fields and write only the actor's private row.
+        "/api/people/{id}" | "/api/items/{id}" | "/api/companies/{id}" | "/api/projects/{id}" => {
+            *method == Method::PATCH
+        }
+        "/api/notes"
+        | "/api/notes/{id}"
+        | "/api/stress"
+        | "/api/checkins"
+        | "/api/intervals"
+        | "/api/intervals/{id}/stop"
+        | "/api/items/{id}/events/annotate"
+        | "/api/schedule/whatif"
+        | "/api/schedule/settings"
+        | "/api/schedule/days/{date}"
+        | "/api/earn/days/{day}" => true,
+        "/api/companies/{id}/contracts"
+        | "/api/companies/{id}/manager"
+        | "/api/companies/{id}/notes"
+        | "/api/companies/{id}/notes/{noteId}"
+        | "/api/companies/{id}/reports"
+        | "/api/companies/{id}/reports/{reportId}"
+        | "/api/companies/{id}/salaries"
+        | "/api/companies/{id}/titles"
+        | "/api/people/{id}/absences"
+        | "/api/people/{id}/absences/{absenceId}"
+        | "/api/people/{id}/addresses"
+        | "/api/people/{id}/addresses/{addressId}"
+        | "/api/people/{id}/bonds"
+        | "/api/people/{id}/bonds/{bondId}"
+        | "/api/people/{id}/bonds/{bondId}/end"
+        | "/api/people/{id}/contacts"
+        | "/api/people/{id}/contacts/{contactId}"
+        | "/api/people/{id}/notes"
+        | "/api/people/{id}/notes/{noteId}"
+        | "/api/people/{id}/professions"
+        | "/api/people/{id}/professions/{professionId}"
+        | "/api/people/{id}/sites"
+        | "/api/people/{id}/sites/{siteId}" => true,
+        _ => false,
+    }
+}
+
+#[allow(clippy::result_large_err)]
+pub(crate) fn private_patch(body: &[u8], allowed: &[&str]) -> Result<(), Response> {
+    let fields: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_slice(body).map_err(|_| error(StatusCode::BAD_REQUEST, "invalid"))?;
+    if fields.is_empty() || fields.keys().any(|key| !allowed.contains(&key.as_str())) {
+        return Err(error(
+            StatusCode::FORBIDDEN,
+            "shared editing requires a paid workspace",
+        ));
+    }
+    Ok(())
 }
 
 fn session_token(request: &Request) -> Option<&str> {

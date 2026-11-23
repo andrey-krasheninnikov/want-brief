@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const LOCK_KEY: i64 = 0x77616e7462726965;
+const V48_PREPARATION_END: &str = "-- end prepare-workspaces\n";
 
 struct Migration {
     version: i64,
@@ -31,6 +32,57 @@ pub async fn migrate(database_url: &str, directory: &Path) -> Result<()> {
     Ok(())
 }
 
+async fn current_version(connection: &mut PgConnection) -> Result<i64> {
+    let version = sqlx::query_scalar(
+        "SELECT coalesce(max(version_id), 0) FROM (\
+         SELECT DISTINCT ON (version_id) version_id, is_applied \
+         FROM goose_db_version ORDER BY version_id, id DESC\
+         ) versions WHERE is_applied",
+    )
+    .fetch_one(&mut *connection)
+    .await?;
+    Ok(version)
+}
+
+/// Expand a single-owner v48 installation while its API is still serving requests.
+pub async fn prepare_workspaces(database_url: &str, directory: &Path) -> Result<()> {
+    let migrations = load_migrations(directory)?;
+    let preparation = migrations
+        .iter()
+        .find(|migration| migration.version == 50)
+        .and_then(|migration| migration.up.split_once(V48_PREPARATION_END))
+        .map(|(preparation, _)| preparation)
+        .context("migration 50 has no workspace preparation stage")?;
+    let mut connection = PgConnection::connect(database_url)
+        .await
+        .context("connect for preparation")?;
+    let mut tx = connection.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(LOCK_KEY)
+        .execute(&mut *tx)
+        .await?;
+    anyhow::ensure!(
+        current_version(&mut tx).await? == 48,
+        "prepare-workspaces requires schema 48"
+    );
+    sqlx::query("LOCK TABLE users IN SHARE MODE")
+        .execute(&mut *tx)
+        .await?;
+    let users: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(&mut *tx)
+        .await?;
+    anyhow::ensure!(
+        users == 1,
+        "prepare-workspaces requires exactly one installation owner"
+    );
+    sqlx::raw_sql(preparation)
+        .execute(&mut *tx)
+        .await
+        .context("prepare workspace ownership")?;
+    tx.commit().await?;
+    Ok(())
+}
+
 async fn apply(connection: &mut PgConnection, migrations: &[Migration]) -> Result<()> {
     connection
         .execute(
@@ -48,14 +100,7 @@ async fn apply(connection: &mut PgConnection, migrations: &[Migration]) -> Resul
             .execute(&mut *connection)
             .await?;
     }
-    let current: i64 = sqlx::query_scalar(
-        "SELECT coalesce(max(version_id), 0) FROM (\
-         SELECT DISTINCT ON (version_id) version_id, is_applied \
-         FROM goose_db_version ORDER BY version_id, id DESC\
-         ) versions WHERE is_applied",
-    )
-    .fetch_one(&mut *connection)
-    .await?;
+    let current = current_version(connection).await?;
     if current > migrations.last().map_or(0, |migration| migration.version) {
         return Err(anyhow!(
             "database migration version is newer than this binary"

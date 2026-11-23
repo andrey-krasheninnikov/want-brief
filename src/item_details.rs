@@ -503,12 +503,7 @@ async fn annotate_event(
         if let Err(err) = sqlx::query("INSERT INTO stress_logs (id,item_id,kind,level,logged_at) VALUES ($1,$2,'stress',$3,$4)")
             .bind(Uuid::new_v4()).bind(item_id).bind(level as i16).bind(Utc::now())
             .execute(&mut *tx).await { return database_error(err); }
-        if let Err(err) = sqlx::query("UPDATE items SET stress=$2,updated_at=$3 WHERE id=$1")
-            .bind(item_id)
-            .bind(level as i16)
-            .bind(Utc::now())
-            .execute(&mut *tx)
-            .await
+        if let Err(err) = crate::track::set_item_stress(&mut tx, item_id, Some(level as i16)).await
         {
             return database_error(err);
         }

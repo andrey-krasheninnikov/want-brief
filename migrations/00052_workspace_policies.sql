@@ -2,13 +2,14 @@
 -- Connections serving application data always assume this non-owner role, including
 -- when the installation uses the PostgreSQL container's bootstrap superuser.
 CREATE FUNCTION wb_runtime_role() RETURNS name LANGUAGE sql STABLE AS $$
-    SELECT ('wb_data_' || oid)::name FROM pg_database WHERE datname=current_database()
+    SELECT pg_get_userbyid(polroles[1]) FROM pg_policy
+    WHERE polrelid='public.items'::regclass AND polname='scoped_read'
 $$;
 CREATE FUNCTION wb_private_table(tab text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
     SELECT tab=ANY(ARRAY['notes','time_intervals','stress_logs','person_notes','person_contacts',
        'item_ratings','project_personal_income','person_sites','person_bonds','person_bond_events','person_professions','person_profession_salaries',
        'person_absences','person_addresses','person_birthdays','company_notes','company_titles','company_salaries',
-       'company_contracts','earn_days','schedule_settings','schedule_day_overrides','schedule_snapshots'])
+       'company_contracts','company_managers','company_reports','company_employment_dates','earn_days','schedule_settings','schedule_day_overrides','schedule_snapshots'])
 $$;
 CREATE FUNCTION wb_archiving_team() RETURNS boolean LANGUAGE sql STABLE AS $$
     SELECT coalesce(current_setting('wantbrief.backup',true)='shared',false)
@@ -35,7 +36,7 @@ END $$;
 
 DO $$
 DECLARE
-    runtime name := wb_runtime_role();
+    runtime name := (SELECT ('wb_data_' || oid)::name FROM pg_database WHERE datname=current_database());
     tab text;
     visible text;
     writable text;
@@ -57,7 +58,13 @@ BEGIN
         ELSIF tab='item_events' THEN
             visible:=visible || ' AND (NOT wb_personal_event(kind,field,note,stress) OR (owner_id=wb_actor() AND NOT wb_archiving_team()))';
         END IF;
-        writable:=visible || ' AND EXISTS (SELECT 1 FROM workspaces w WHERE w.id=wb_workspace() AND (w.owner_id=wb_actor() OR w.plan=''paid''))';
+        IF wb_private_table(tab) THEN
+            writable:=visible;
+        ELSIF tab='item_events' THEN
+            writable:=visible || ' AND ((owner_id=wb_actor() AND wb_personal_event(kind,field,note,stress)) OR EXISTS (SELECT 1 FROM workspaces w WHERE w.id=wb_workspace() AND (w.owner_id=wb_actor() OR w.plan=''paid'')))';
+        ELSE
+            writable:=visible || ' AND EXISTS (SELECT 1 FROM workspaces w WHERE w.id=wb_workspace() AND (w.owner_id=wb_actor() OR w.plan=''paid''))';
+        END IF;
         IF tab='sources' THEN
             writable:=writable || ' AND EXISTS (SELECT 1 FROM workspaces w WHERE w.id=wb_workspace() AND w.owner_id=wb_actor())';
         END IF;
@@ -73,11 +80,24 @@ BEGIN
     END LOOP;
 END $$;
 
+-- Lock the plan and validate the complete replacement before any current source is deleted.
+CREATE FUNCTION wb_check_restore_sources(external_ids uuid[]) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE tier text;
+BEGIN
+    SELECT plan INTO STRICT tier FROM workspaces WHERE id=wb_workspace() AND owner_id=wb_actor() FOR UPDATE;
+    IF tier='free' AND cardinality(external_ids)>2 AND EXISTS(
+        SELECT value FROM unnest(external_ids) value
+        EXCEPT SELECT id FROM sources WHERE workspace_id=wb_workspace() AND kind<>'manual'
+    ) THEN
+        RAISE EXCEPTION USING ERRCODE='WB002', MESSAGE='external source limit reached';
+    END IF;
+    PERFORM set_config('wantbrief.restoring_sources','checked',true);
+END $$;
 CREATE FUNCTION wb_source_quota() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 DECLARE
     tier text;
 BEGIN
-    IF NEW.kind='manual' THEN RETURN NEW; END IF;
+    IF NEW.kind='manual' OR current_setting('wantbrief.restoring_sources',true)='checked' THEN RETURN NEW; END IF;
     SELECT plan INTO STRICT tier FROM workspaces WHERE id=NEW.workspace_id FOR UPDATE;
     IF tier='free' AND (SELECT count(*) FROM sources WHERE workspace_id=NEW.workspace_id AND kind<>'manual' AND id<>NEW.id)>=2 THEN
         RAISE EXCEPTION USING ERRCODE='WB002', MESSAGE='external source limit reached';
@@ -107,6 +127,18 @@ BEGIN
         ELSIF TG_OP='UPDATE' THEN DELETE FROM person_birthdays WHERE person_id=NEW.id AND owner_id=wb_actor();
         END IF;
         NEW.born_on:=NULL;
+    ELSIF TG_TABLE_NAME='companies' THEN
+        IF wb_archiving_team() THEN
+            IF NEW.started_on IS NOT NULL OR NEW.ended_on IS NOT NULL THEN
+                RAISE EXCEPTION USING ERRCODE='WB003',MESSAGE='private employment dates in shared backup';
+            END IF;
+        ELSIF NEW.started_on IS NOT NULL THEN
+            INSERT INTO company_employment_dates(workspace_id,owner_id,company_id,started_on,ended_on)
+            VALUES(NEW.workspace_id,wb_actor(),NEW.id,NEW.started_on,NEW.ended_on)
+            ON CONFLICT(workspace_id,owner_id,company_id) DO UPDATE SET started_on=excluded.started_on,ended_on=excluded.ended_on;
+        ELSIF TG_OP='UPDATE' THEN DELETE FROM company_employment_dates WHERE company_id=NEW.id AND owner_id=wb_actor();
+        END IF;
+        NEW.started_on:=NULL; NEW.ended_on:=NULL;
     ELSIF TG_TABLE_NAME='items' THEN
         IF wb_archiving_team() THEN
             IF NEW.stress IS NOT NULL THEN RAISE EXCEPTION USING ERRCODE='WB003',MESSAGE='private rating in shared backup'; END IF;
@@ -132,6 +164,7 @@ BEGIN
     RETURN NEW;
 END $$;
 CREATE TRIGGER private_birthday BEFORE INSERT OR UPDATE OF born_on ON people FOR EACH ROW EXECUTE FUNCTION wb_store_personal_fields();
+CREATE TRIGGER private_employment BEFORE INSERT OR UPDATE OF started_on,ended_on ON companies FOR EACH ROW EXECUTE FUNCTION wb_store_personal_fields();
 CREATE TRIGGER private_rating BEFORE INSERT OR UPDATE OF stress ON items FOR EACH ROW EXECUTE FUNCTION wb_store_personal_fields();
 CREATE TRIGGER private_income BEFORE INSERT OR UPDATE OF monthly_income,monthly_income_usd,monthly_income_rub ON projects FOR EACH ROW EXECUTE FUNCTION wb_store_personal_fields();
 

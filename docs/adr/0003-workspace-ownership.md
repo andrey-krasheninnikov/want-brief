@@ -14,6 +14,6 @@ Team members share work records such as tasks, events and CRM relationships. Ent
 
 ## Consequences
 
-The owner manages source configuration, invitations and backups. Changing the plan preserves stored records. On Free the first two external sources remain eligible for sync and shared edits are limited to the owner. Each account retains its own authentication and sessions.
+The owner manages source configuration, invitations and backups. Changing the plan preserves stored records. On Free the first two external sources remain eligible for sync and shared edits are limited to the owner. Members retain control of their own timers, notes, settings and career records. Each account retains its own authentication and sessions.
 
 A personal backup can restore a historical single-owner file. A team export includes shared records and omits private entries, even those written by the owner. Restores keep IDs, discard saved source credentials and run in a transaction. An attempted replacement that would delete private records fails. Changing members, permissions or the tariff is outside the backup format.

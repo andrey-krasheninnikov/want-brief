@@ -1,4 +1,52 @@
 -- +goose Up
+-- The same additive statements run through prepare-workspaces while schema 48 is live.
+CREATE TEMP TABLE wb_legacy_scope (relation_name text PRIMARY KEY, owned boolean NOT NULL) ON COMMIT DROP;
+INSERT INTO pg_temp.wb_legacy_scope (relation_name, owned) VALUES
+    ('projects', false), ('sources', false), ('items', false),
+    ('notes', true), ('time_intervals', true), ('stress_logs', true),
+    ('events', false), ('project_notes', false), ('item_notes', false),
+    ('people', false), ('person_notes', true), ('person_projects', false),
+    ('person_events', false), ('person_items', false), ('person_contacts', true),
+    ('person_sites', true), ('person_bonds', true), ('person_bond_events', true),
+    ('person_professions', true), ('person_profession_salaries', true), ('item_checks', false),
+    ('event_overrides', false), ('event_notes', false), ('schedule_settings', true),
+    ('schedule_day_overrides', true), ('person_absences', true), ('schedule_snapshots', true),
+    ('companies', false), ('company_projects', false), ('company_events', false),
+    ('company_people', false), ('company_notes', true), ('company_titles', true),
+    ('company_salaries', true), ('company_managers', true), ('company_reports', true),
+    ('company_contracts', true), ('item_events', true), ('person_addresses', true),
+    ('earn_days', true);
+
+DO $$
+DECLARE
+    legacy_owner uuid;
+    relation record;
+    col text;
+    had_column boolean;
+BEGIN
+    LOCK TABLE users IN SHARE MODE;
+    SELECT id INTO legacy_owner FROM users;
+    FOR relation IN SELECT * FROM pg_temp.wb_legacy_scope ORDER BY relation_name LOOP
+        FOREACH col IN ARRAY (
+            CASE WHEN relation.owned THEN ARRAY['workspace_id','owner_id'] ELSE ARRAY['workspace_id'] END
+        ) LOOP
+            SELECT EXISTS (SELECT FROM pg_attribute WHERE attrelid=relation.relation_name::regclass
+                AND attname=col AND NOT attisdropped) INTO had_column;
+            -- A constant default also backfills existing rows without rewriting the whole table.
+            EXECUTE format('ALTER TABLE %I ADD COLUMN IF NOT EXISTS %I uuid DEFAULT %L::uuid',
+                           relation.relation_name, col, legacy_owner);
+            IF had_column AND legacy_owner IS NOT NULL THEN
+                EXECUTE format('ALTER TABLE %I ALTER COLUMN %I SET DEFAULT %L::uuid',
+                               relation.relation_name, col, legacy_owner);
+                -- A v48 restore may have supplied an explicit NULL in the new column.
+                EXECUTE format('UPDATE %I SET %I=$1 WHERE %I IS NULL', relation.relation_name, col, col)
+                    USING legacy_owner;
+            END IF;
+        END LOOP;
+    END LOOP;
+END $$;
+-- end prepare-workspaces
+
 CREATE FUNCTION wb_workspace() RETURNS uuid LANGUAGE sql STABLE AS $$
     SELECT nullif(current_setting('wantbrief.workspace', true), '')::uuid
 $$;
@@ -9,36 +57,24 @@ $$;
 -- Only application records from the supported single-owner schema are backfilled.
 DO $$
 DECLARE
-    relations text[] := ARRAY['projects','sources','items','notes','time_intervals','stress_logs','events',
-        'project_notes','item_notes','people','person_notes','person_projects','person_events','person_items',
-        'person_contacts','person_sites','person_bonds','person_bond_events','person_professions',
-        'person_profession_salaries','item_checks','event_overrides','event_notes','schedule_settings',
-        'schedule_day_overrides','person_absences','schedule_snapshots','companies','company_projects',
-        'company_events','company_people','company_notes','company_titles','company_salaries','company_managers',
-        'company_reports','company_contracts','item_events','person_addresses','earn_days'];
-    owned text[] := ARRAY['notes','time_intervals','stress_logs','person_notes','person_contacts','person_sites',
-        'person_bonds','person_bond_events','person_professions','person_profession_salaries','person_absences',
-        'person_addresses','company_notes','company_titles','company_salaries','company_contracts',
-        'earn_days','schedule_settings','schedule_day_overrides','schedule_snapshots','item_events'];
     legacy workspaces;
+    relation record;
     tab text;
     has_data boolean;
     fk record;
 BEGIN
     SELECT * INTO legacy FROM workspaces WHERE legacy_paid;
-    FOREACH tab IN ARRAY relations LOOP
-        EXECUTE format('ALTER TABLE %I ADD COLUMN workspace_id uuid REFERENCES workspaces(id)',tab);
+    FOR relation IN SELECT * FROM pg_temp.wb_legacy_scope ORDER BY relation_name LOOP
+        tab := relation.relation_name;
         IF legacy.id IS NULL THEN
             EXECUTE format('SELECT EXISTS (SELECT 1 FROM %I)',tab) INTO has_data;
             IF has_data THEN RAISE EXCEPTION 'No legacy owner for records in %', tab; END IF;
-        ELSE
-            EXECUTE format('UPDATE %I SET workspace_id=$1',tab) USING legacy.id;
         END IF;
-        EXECUTE format('ALTER TABLE %I ALTER workspace_id SET NOT NULL, ALTER workspace_id SET DEFAULT wb_workspace()',tab);
-        IF tab=ANY(owned) THEN
-            EXECUTE format('ALTER TABLE %I ADD COLUMN owner_id uuid REFERENCES users(id)',tab);
-            EXECUTE format('UPDATE %I SET owner_id=$1',tab) USING legacy.owner_id;
-            EXECUTE format('ALTER TABLE %I ALTER owner_id SET NOT NULL, ALTER owner_id SET DEFAULT wb_actor()',tab);
+        EXECUTE format('ALTER TABLE %I ADD FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+            ALTER workspace_id SET NOT NULL, ALTER workspace_id SET DEFAULT wb_workspace()', tab);
+        IF relation.owned THEN
+            EXECUTE format('ALTER TABLE %I ADD FOREIGN KEY (owner_id) REFERENCES users(id),
+                ALTER owner_id SET NOT NULL, ALTER owner_id SET DEFAULT wb_actor()', tab);
         END IF;
         IF EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=tab::regclass AND attname='id' AND atttypid='uuid'::regtype AND NOT attisdropped) THEN
             EXECUTE format('ALTER TABLE %I ADD UNIQUE (workspace_id,id)',tab);
@@ -51,8 +87,8 @@ BEGIN
     FOR fk IN SELECT c.conrelid::regclass AS child, c.confrelid::regclass AS parent,
                  c.conname, a.attname AS col, c.confdeltype
               FROM pg_constraint c JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=c.conkey[1]
-              WHERE c.contype='f' AND c.conrelid::regclass::text=ANY(relations)
-                AND c.confrelid::regclass::text=ANY(relations) AND cardinality(c.conkey)=1
+              WHERE c.contype='f' AND c.conrelid IN (SELECT relation_name::regclass FROM pg_temp.wb_legacy_scope)
+                AND c.confrelid IN (SELECT relation_name::regclass FROM pg_temp.wb_legacy_scope) AND cardinality(c.conkey)=1
     LOOP
         EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I, ADD FOREIGN KEY (workspace_id,%I) REFERENCES %s(workspace_id,id) ON DELETE %s',
             fk.child,fk.conname,fk.col,fk.parent,

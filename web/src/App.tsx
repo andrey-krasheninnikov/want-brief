@@ -54,7 +54,7 @@ function Gate() {
     refetchInterval: 60_000,
   })
   const settings = useQuery({
-    queryKey: ['schedule-settings'],
+    queryKey: ['schedule-settings', me.data?.capabilities.canAnalyze],
     queryFn: api.scheduleSettings,
     enabled: me.isSuccess && Boolean(selected),
   })

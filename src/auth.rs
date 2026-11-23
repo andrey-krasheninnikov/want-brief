@@ -5,7 +5,7 @@ use rand::{rngs::OsRng, RngCore};
 use reqwest::Url;
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Transaction};
-use std::{env, sync::Arc};
+use std::{env, net::IpAddr, sync::Arc};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -13,6 +13,7 @@ pub struct Auth {
     pool: PgPool,
     public_url: Url,
     mail: Option<Arc<Mailer>>,
+    trusted_proxy: Option<IpAddr>,
 }
 
 #[derive(Clone, Copy)]
@@ -27,6 +28,7 @@ impl Auth {
             pool,
             public_url: Url::parse("http://127.0.0.1").expect("valid loopback origin"),
             mail: None,
+            trusted_proxy: None,
         }
     }
 
@@ -35,12 +37,29 @@ impl Auth {
             pool,
             public_url: app_url(origin)?,
             mail: mail.map(Arc::new),
+            trusted_proxy: None,
         })
     }
 
     pub fn from_env(pool: PgPool, cors_origin: &str) -> Result<Self> {
         let address = env::var("PUBLIC_APP_URL").unwrap_or_else(|_| cors_origin.to_owned());
-        Self::configured(pool, &address, Mailer::from_env()?)
+        let mut auth = Self::configured(pool, &address, Mailer::from_env()?)?;
+        auth.trusted_proxy = env::var("TRUSTED_PROXY_IP")
+            .ok()
+            .filter(|ip| !ip.is_empty())
+            .map(|ip| ip.parse())
+            .transpose()
+            .context("invalid TRUSTED_PROXY_IP")?;
+        Ok(auth)
+    }
+
+    pub(crate) fn client_ip(&self, peer: IpAddr, reported: Option<&str>) -> IpAddr {
+        if self.trusted_proxy == Some(peer) {
+            if let Some(ip) = reported.and_then(|ip| ip.parse().ok()) {
+                return ip;
+            }
+        }
+        peer
     }
 
     pub fn pool(&self) -> &PgPool {
@@ -274,6 +293,21 @@ pub(crate) async fn password_matches(value: String, hash: String) -> Result<bool
 #[cfg(test)]
 mod tests {
     use super::hash_token;
+    #[tokio::test]
+    async fn reported_ip_requires_the_configured_proxy() {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://localhost/test")
+            .unwrap();
+        let mut auth = super::Auth::new(pool);
+        let proxy = "127.0.0.1".parse().unwrap();
+        let client = "192.0.2.17".parse().unwrap();
+        assert_eq!(auth.client_ip(proxy, Some("192.0.2.17")), proxy);
+        auth.trusted_proxy = Some(proxy);
+        assert_eq!(auth.client_ip(proxy, Some("192.0.2.17")), client);
+        assert_eq!(auth.client_ip(client, Some("127.0.0.1")), client);
+        assert_eq!(auth.client_ip(proxy, Some("invalid")), proxy);
+    }
+
     #[test]
     fn session_hash_matches_sha256_hex() {
         assert_eq!(
